@@ -10,6 +10,8 @@ ROOT = pathlib.Path(__file__).parent
 
 # ---- 讀取素材 ----
 img_b64 = base64.b64encode((ROOT / "charts/ross_entry_exit_chart.png").read_bytes()).decode()
+win_b64 = base64.b64encode((ROOT / "case-study/dcfc_win_day.png").read_bytes()).decode()
+red_b64 = base64.b64encode((ROOT / "case-study/dcfc_red_day.png").read_bytes()).decode()
 
 with open(ROOT / "data/ross_rules.csv", encoding="utf-8-sig") as f:
     rows = list(csv.reader(f))
@@ -67,6 +69,7 @@ page = f"""<!doctype html>
   <a href="#guide">📖 使用指南</a>
   <a href="#dash">📊 三層看板</a>
   <a href="#chart">📈 入市/賣出圖表</a>
+  <a href="#case">⚖️ 成敗案例 DCFC</a>
   <a href="#rules">📚 規則庫 (83條)</a>
   <a href="#pine">📣 Pine 警報腳本</a>
 </nav>
@@ -107,6 +110,25 @@ page = f"""<!doctype html>
   <h2>📈 Ross 典型交易日：入市點與賣出點</h2>
   <div class="hint">模擬低流通量 Gap &amp; Go 交易日（1分鐘K線＋成交量＋MACD）。藍框=入市訊號，紅框=賣出訊號，灰區=Back-side 禁區。</div>
   <img class="chart" alt="Ross 典型交易日入市賣出點標註圖" src="data:image/png;base64,{img_b64}">
+</section>
+
+<section id="case" class="layer">
+  <h2>⚖️ 成功日 vs 失敗日 對照案例：DCFC (Tritium)</h2>
+  <div class="hint">同一隻股票、同一個白宮消息事件窗口（2022/2/8–10）：一天 +$12k、一天轉紅。失敗日的每個價位均出自 Ross 在《Red Day Lessons》中的自述。詳細分析見 case-study/README.md。</div>
+  <img class="chart" alt="成功日 +12k" src="data:image/png;base64,{win_b64}">
+  <br><br>
+  <img class="chart" alt="失敗日 紅日" src="data:image/png;base64,{red_b64}">
+  <div style="overflow-x:auto"><table>
+    <thead><tr><th>維度</th><th>✅ 成功日</th><th>⛔ 失敗日</th></tr></thead>
+    <tbody>
+      <tr><td>消息階段</td><td>第 1 天（未 price-in）</td><td>第 2 天（已 price-in，#51）</td></tr>
+      <tr><td>入場位置</td><td>盤前高突破位，貼近 VWAP</td><td>離 VWAP >10% 的延伸段（$10.50 FOMO）</td></tr>
+      <tr><td>倉位</td><td>計劃內</td><td>誤買 9,000 股（#67/#80）</td></tr>
+      <tr><td>虧損處理</td><td>—</td><td>$10.30/$10.40 向下攤平（#43）</td></tr>
+      <tr><td>出場</td><td>延伸棒分批止盈（#53/#60）</td><td>反彈 $10.85 認賠（正確執行 #61，避開 -$27k）</td></tr>
+      <tr><td>根因</td><td>賺夠收工（#48）</td><td>冷市踩不住煞車（#34）</td></tr>
+    </tbody>
+  </table></div>
 </section>
 
 <section id="rules" class="layer">
