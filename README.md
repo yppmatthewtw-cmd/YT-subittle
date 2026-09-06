@@ -9,6 +9,7 @@ A YouTube subtitle/caption batch downloader powered by `yt-dlp`. Designed as a *
 - 🤖 **Auto-generated subs** — Fall back to YouTube's auto-generated captions when manual subs aren't available
 - 📄 **Multiple formats** — Export as SRT, VTT, plain text (timestamps stripped), or JSON3
 - 🍪 **Cookie support** — Use browser cookies for age-restricted or members-only content
+- 🎨 **Patreon posts** — Pass a `patreon.com/<creator>/posts/...` URL to pull subtitles from the post's embedded video (cookies required for patron-only posts)
 - 🔄 **Batch download** — Download subtitles for multiple videos in one go
 - 🧠 **AI Skill** — Use as a Claude/OpenClaw skill with the `/subtitle` command
 
@@ -17,7 +18,7 @@ A YouTube subtitle/caption batch downloader powered by `yt-dlp`. Designed as a *
 ### Prerequisites
 
 ```bash
-pip install yt-dlp
+pip install "yt-dlp[default,curl-cffi]"
 ```
 
 ### Download subtitles from a single video
@@ -25,6 +26,15 @@ pip install yt-dlp
 ```bash
 python scripts/yt_subs.py "https://www.youtube.com/watch?v=VIDEO_ID" --lang en --format srt
 ```
+
+### Download subtitles from a Patreon post
+
+```bash
+python scripts/yt_subs.py "https://www.patreon.com/<creator>/posts/<slug>-<id>" \
+  --lang zh-TW --format txt --auto --cookies patreon_cookies.txt
+```
+
+Export `patreon_cookies.txt` (Netscape format) from a browser logged in to Patreon; see [Cookie File](#cookie-file).
 
 ### List videos from a channel
 
@@ -112,7 +122,7 @@ Options:
 Some videos require authentication (age-restricted, members-only). To export cookies:
 
 1. Install a browser extension like [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
-2. Log into YouTube
+2. Log into YouTube (or Patreon, for Patreon posts)
 3. Export cookies as Netscape format `.txt` file
 4. Provide the file when prompted
 

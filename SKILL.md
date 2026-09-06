@@ -21,8 +21,10 @@ This skill works in **both Claude and OpenClaw** environments. The workflow and 
 ## Setup
 
 ```bash
-pip install yt-dlp --break-system-packages -q
+pip install "yt-dlp[default,curl-cffi]" --break-system-packages -q
 ```
+
+`curl-cffi` enables browser impersonation, which Patreon requires.
 
 ## Interactive Workflow (triggered by `/subtitle`)
 
@@ -37,8 +39,9 @@ Respond: "Ready to download YouTube subtitles. Please paste a **YouTube channel 
 The user provides a URL. Determine whether it is:
 - **Channel/playlist URL** — contains `/channel/`, `/@`, `/c/`, or `/playlist?list=`
 - **Single video URL** — contains `watch?v=` or `youtu.be/`
+- **Patreon post URL** — contains `patreon.com/<creator>/posts/` (treated as a single video)
 
-For a **single video**, skip to Step 4 (no need to list videos).
+For a **single video** or **Patreon post**, skip to Step 4 (no need to list videos).
 
 For a **channel/playlist**, proceed to Step 3.
 
@@ -62,6 +65,10 @@ Parse the user's selection. The script also outputs a JSON file at `/tmp/yt_chan
 Ask the user:
 
 > "Some channels require authentication to access. If you have a **cookies file** (Netscape format, exported from your browser), please upload it now. Otherwise, type `skip` to proceed without cookies."
+
+**Patreon posts:** patron-only posts always need a cookies file exported while logged in to a
+patron account. `yt_subs.py` resolves the post's embedded video (YouTube, Vimeo, or Patreon-hosted)
+through yt-dlp's Patreon extractor; subtitle availability depends on the underlying video host.
 
 **How cookies work:**
 - If the user uploads a file, note its path (in Claude: `/mnt/user-data/uploads/<filename>`; in OpenClaw: the path provided by the runtime)
@@ -102,10 +109,10 @@ Options:
 
 ### `scripts/yt_subs.py`
 
-Download subtitles for a single video.
+Download subtitles for a single video (YouTube URL or Patreon post URL).
 
 ```
-Usage: python scripts/yt_subs.py <VIDEO_URL> [options]
+Usage: python scripts/yt_subs.py <VIDEO_URL|PATREON_POST_URL> [options]
 
 Options:
   --lang LANG      Subtitle language code (default: en)
