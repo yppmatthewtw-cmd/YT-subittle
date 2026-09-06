@@ -12,6 +12,31 @@ import subprocess
 import sys
 
 
+PATREON_RE = re.compile(r"https?://(www\.)?patreon\.com/", re.I)
+
+
+def is_patreon(url: str) -> bool:
+    return bool(PATREON_RE.match(url))
+
+
+def platform_args(url: str, cookies: str | None) -> list[str]:
+    """Extra yt-dlp flags needed for non-YouTube platforms."""
+    extra: list[str] = []
+    if is_patreon(url):
+        # Patreon blocks plain python requests; impersonate a browser when
+        # curl_cffi is installed (pip install "yt-dlp[default,curl-cffi]").
+        try:
+            import curl_cffi  # noqa: F401
+            extra.extend(["--impersonate", "chrome"])
+        except ImportError:
+            print("⚠️  curl_cffi not installed; Patreon may block the request. "
+                  "Install with: pip install \"yt-dlp[default,curl-cffi]\"")
+        if not cookies:
+            print("ℹ️  Patreon post detected. Patron-only posts need --cookies "
+                  "(Netscape cookies.txt exported while logged in to Patreon).")
+    return extra
+
+
 def run_ytdlp(args: list[str]) -> subprocess.CompletedProcess:
     """Run yt-dlp with given arguments."""
     cmd = ["yt-dlp"] + args
@@ -20,9 +45,10 @@ def run_ytdlp(args: list[str]) -> subprocess.CompletedProcess:
 
 def list_subtitles(url: str, cookies: str | None = None) -> None:
     """List all available subtitles for a video."""
-    cmd = ["--list-subs", "--no-download", url]
+    cmd = ["--list-subs", "--no-download"] + platform_args(url, cookies)
     if cookies:
         cmd.extend(["--cookies", cookies])
+    cmd.append(url)
     result = run_ytdlp(cmd)
     print(result.stdout + result.stderr)
 
@@ -92,6 +118,7 @@ def download_subtitles(
         "-o", os.path.join(output_dir, "%(title)s.%(ext)s"),
     ]
 
+    args.extend(platform_args(url, cookies))
     if cookies:
         args.extend(["--cookies", cookies])
 
@@ -106,6 +133,15 @@ def download_subtitles(
 
     # Check for failure
     if result.returncode != 0 or "has no subtitles" in combined.lower():
+        low = combined.lower()
+        if is_patreon(url) and ("403" in low or "login" in low or "patron" in low):
+            print("❌ Patreon refused access. Pass --cookies with a cookies.txt "
+                  "exported from a browser logged in to a patron account.")
+            print(combined.strip())
+            return None
+        if "impersonat" in low and "no impersonate target" in low:
+            print("⚠️  Browser impersonation unavailable. Install with: "
+                  "pip install \"yt-dlp[default,curl-cffi]\"")
         if not auto:
             print(f"⚠️  No manual subtitles for language '{lang}'. Retrying with auto-generated...")
             return download_subtitles(url, lang, auto=True, fmt=fmt, output_dir=output_dir, cookies=cookies)
@@ -146,8 +182,8 @@ def download_subtitles(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Download YouTube subtitles")
-    parser.add_argument("url", help="YouTube video URL")
+    parser = argparse.ArgumentParser(description="Download YouTube / Patreon subtitles")
+    parser.add_argument("url", help="YouTube video URL or Patreon post URL")
     parser.add_argument("--lang", default="en", help="Language code (default: en)")
     parser.add_argument("--auto", action="store_true", help="Include auto-generated subtitles")
     parser.add_argument("--format", dest="fmt", default="srt", choices=["srt", "vtt", "txt", "json3"])
