@@ -11,7 +11,7 @@
 //  進場 (二選一或並用)：
 //        A) 擠壓突破：最近 N 根內出現擠壓 → 收盤突破上軌 + BW 擴張 + 放量
 //        B) 順勢回踩：中線上升 → 價格回踩 EMA9 後收盤站回 (陽線 + 高於前收)
-//  過濾：MACD 綠燈 (>0) / 價格在 EMA50 之上 / 量 > 20 日均量 × 倍數
+//  過濾：MACD 綠燈 (>0) / 價格在 EMA21 之上 / 量 > 20 日均量 × 倍數
 //  出場：初始止損 = 進場 K 的下軌與低點取低者
 //        止盈 = R 倍數 (預設 2R)
 //        移動出場 = 收盤跌破 EMA9 中線 (可設連續幾根)
@@ -48,7 +48,7 @@ allowShort = input.bool(false, "允許做空 (鏡像規則)", group = grpE)
 useVol     = input.bool(true, "量能過濾：量 > 20日均量 ×", inline = "v", group = grpE)
 volX       = input.float(1.5, "", step = 0.1, minval = 0.5, inline = "v", group = grpE)
 useMacd    = input.bool(true, "MACD 過濾 (多: MACD>0 / 空: MACD<0)", group = grpE)
-useTrend   = input.bool(true, "大趨勢過濾 (多: 價>EMA50 / 空: 價<EMA50)", group = grpE)
+useTrend   = input.bool(true, "大趨勢過濾 (多: 價>EMA21 / 空: 價<EMA21)", group = grpE)
 
 grpX = "④ 出場 / 風控"
 rr          = input.float(2.0, "止盈 R 倍數 (0 = 不設止盈)", step = 0.5, minval = 0, group = grpX)
@@ -82,9 +82,9 @@ volOK  = not useVol or volume > volAvg * volX
 macdLongOK  = not useMacd or macdL > 0
 macdShortOK = not useMacd or macdL < 0
 
-ema50        = ta.ema(close, 50)
-trendLongOK  = not useTrend or close > ema50
-trendShortOK = not useTrend or close < ema50
+ema21        = ta.ema(close, 21)
+trendLongOK  = not useTrend or close > ema21
+trendShortOK = not useTrend or close < ema21
 
 basisUp = basis > basis[2]
 basisDn = basis < basis[2]
@@ -156,7 +156,7 @@ pB = plot(basis, "EMA9 中線", color = color.new(color.orange, 0), linewidth = 
 pU = plot(upper, "上軌", color = color.new(color.teal, 0))
 pL = plot(lower, "下軌", color = color.new(color.teal, 0))
 fill(pU, pL, color = squeeze ? color.new(color.yellow, 80) : color.new(color.teal, 92), title = "通道 (黃 = 擠壓)")
-plot(ema50, "EMA50 (趨勢過濾)", color = color.new(color.gray, 50))
+plot(ema21, "EMA21 (趨勢過濾)", color = color.new(color.gray, 20), linewidth = 3)
 plot(bw, "Band Width %", color = color.purple, display = display.data_window)
 plot(bwLow, "Band Width N 期最低", color = color.gray, display = display.data_window)
 

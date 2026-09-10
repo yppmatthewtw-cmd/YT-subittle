@@ -392,7 +392,7 @@ alertcondition(flagBreak, &quot;Bull Flag 首次回踩突破&quot;,
 //  進場 (二選一或並用)：
 //        A) 擠壓突破：最近 N 根內出現擠壓 → 收盤突破上軌 + BW 擴張 + 放量
 //        B) 順勢回踩：中線上升 → 價格回踩 EMA9 後收盤站回 (陽線 + 高於前收)
-//  過濾：MACD 綠燈 (&gt;0) / 價格在 EMA50 之上 / 量 &gt; 20 日均量 × 倍數
+//  過濾：MACD 綠燈 (&gt;0) / 價格在 EMA21 之上 / 量 &gt; 20 日均量 × 倍數
 //  出場：初始止損 = 進場 K 的下軌與低點取低者
 //        止盈 = R 倍數 (預設 2R)
 //        移動出場 = 收盤跌破 EMA9 中線 (可設連續幾根)
@@ -429,7 +429,7 @@ allowShort = input.bool(false, &quot;允許做空 (鏡像規則)&quot;, group = 
 useVol     = input.bool(true, &quot;量能過濾：量 &gt; 20日均量 ×&quot;, inline = &quot;v&quot;, group = grpE)
 volX       = input.float(1.5, &quot;&quot;, step = 0.1, minval = 0.5, inline = &quot;v&quot;, group = grpE)
 useMacd    = input.bool(true, &quot;MACD 過濾 (多: MACD&gt;0 / 空: MACD&lt;0)&quot;, group = grpE)
-useTrend   = input.bool(true, &quot;大趨勢過濾 (多: 價&gt;EMA50 / 空: 價&lt;EMA50)&quot;, group = grpE)
+useTrend   = input.bool(true, &quot;大趨勢過濾 (多: 價&gt;EMA21 / 空: 價&lt;EMA21)&quot;, group = grpE)
 
 grpX = &quot;④ 出場 / 風控&quot;
 rr          = input.float(2.0, &quot;止盈 R 倍數 (0 = 不設止盈)&quot;, step = 0.5, minval = 0, group = grpX)
@@ -463,9 +463,9 @@ volOK  = not useVol or volume &gt; volAvg * volX
 macdLongOK  = not useMacd or macdL &gt; 0
 macdShortOK = not useMacd or macdL &lt; 0
 
-ema50        = ta.ema(close, 50)
-trendLongOK  = not useTrend or close &gt; ema50
-trendShortOK = not useTrend or close &lt; ema50
+ema21        = ta.ema(close, 21)
+trendLongOK  = not useTrend or close &gt; ema21
+trendShortOK = not useTrend or close &lt; ema21
 
 basisUp = basis &gt; basis[2]
 basisDn = basis &lt; basis[2]
@@ -537,7 +537,7 @@ pB = plot(basis, &quot;EMA9 中線&quot;, color = color.new(color.orange, 0), li
 pU = plot(upper, &quot;上軌&quot;, color = color.new(color.teal, 0))
 pL = plot(lower, &quot;下軌&quot;, color = color.new(color.teal, 0))
 fill(pU, pL, color = squeeze ? color.new(color.yellow, 80) : color.new(color.teal, 92), title = &quot;通道 (黃 = 擠壓)&quot;)
-plot(ema50, &quot;EMA50 (趨勢過濾)&quot;, color = color.new(color.gray, 50))
+plot(ema21, &quot;EMA21 (趨勢過濾)&quot;, color = color.new(color.gray, 20), linewidth = 3)
 plot(bw, &quot;Band Width %&quot;, color = color.purple, display = display.data_window)
 plot(bwLow, &quot;Band Width N 期最低&quot;, color = color.gray, display = display.data_window)
 
