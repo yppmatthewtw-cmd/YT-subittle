@@ -534,9 +534,9 @@ if midExit and strategy.position_size &lt; 0 and aboveCnt &gt;= midBars
 
 // ───────────────────────────── 繪圖 ─────────────────────────────
 pB = plot(basis, &quot;EMA9 中線&quot;, color = color.new(color.orange, 0), linewidth = 2)
-pU = plot(upper, &quot;上軌&quot;, color = color.new(color.teal, 0))
-pL = plot(lower, &quot;下軌&quot;, color = color.new(color.teal, 0))
-fill(pU, pL, color = squeeze ? color.new(color.yellow, 80) : color.new(color.teal, 92), title = &quot;通道 (黃 = 擠壓)&quot;)
+pU = plot(upper, &quot;上軌&quot;, color = color.new(color.teal, 55), linewidth = 1)
+pL = plot(lower, &quot;下軌&quot;, color = color.new(color.teal, 55), linewidth = 1)
+fill(pU, pL, color = squeeze ? color.new(color.yellow, 88) : color.new(color.teal, 96), title = &quot;通道 (黃 = 擠壓)&quot;)
 plot(ema21, &quot;EMA21 (趨勢過濾)&quot;, color = color.new(color.gray, 20), linewidth = 3)
 plot(bw, &quot;Band Width %&quot;, color = color.purple, display = display.data_window)
 plot(bwLow, &quot;Band Width N 期最低&quot;, color = color.gray, display = display.data_window)
