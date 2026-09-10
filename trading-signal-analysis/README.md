@@ -18,7 +18,8 @@ trading-signal-analysis/
 ├── pine/
 │   ├── ross_momentum_dashboard.pine    ← VWAP+EMA+MACD紅綠燈+警報（主指標）
 │   ├── gap_and_go_alert.pine           ← 破盤前高+爆量 警報（入市①）
-│   └── bull_flag_first_pullback.pine   ← 首次縮量回踩突破 警報（入市②）
+│   ├── bull_flag_first_pullback.pine   ← 首次縮量回踩突破 警報（入市②）
+│   └── ema9_bandwidth_strategy.pine    ← EMA9 中線 + 帶寬擠壓 中短線波段【策略/可回測】
 └── charts/
     ├── generate_chart.py         ← 圖表產生腳本
     └── ross_entry_exit_chart.png ← 典型交易日入市/賣出點標註圖
@@ -121,6 +122,17 @@ cd charts && python3 generate_chart.py
 改 `anchors`（價格劇本）和 `vol`（量能劇本）即可產生不同情境的教學圖；也可把真實 1 分鐘數據（yfinance 下載）餵入同一繪圖段落，標註自己的實際成交。
 
 ---
+
+## 四、EMA9 帶寬中短線策略（`pine/ema9_bandwidth_strategy.pine`）
+
+把 Bollinger Band 的 20 SMA 中線換成 9 EMA，上下軌 = EMA9 ± 2σ（或 ATR 倍數），並用 **Band Width = (上軌−下軌)/中線** 偵測「擠壓 → 擴張」：
+
+- **進場 A 擠壓突破**：BW 落到 60 期最低附近（擠壓）→ 8 根內收盤突破上軌 + BW 擴張 + 量 > 1.5× 均量
+- **進場 B 順勢回踩**：EMA9 上升中，價格回踩 EMA9 後以陽線收回中線之上
+- **過濾**：MACD > 0（規則 #24）、價 > EMA50、量能確認（規則 #68）
+- **出場**：初始止損 = 進場 K 下軌/低點；止盈 2R；收盤跌破 EMA9 移動出場
+- **倉位**：每筆風險 1% 帳戶 ÷ 止損距離 = 股數（與層三計算器同一邏輯）
+- 這是 `strategy()`，可直接在 TradingView 策略測試器回測；建議日線 / 4H。
 
 ## 免責聲明
 

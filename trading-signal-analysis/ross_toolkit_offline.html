@@ -377,6 +377,196 @@ plotshape(flagBreak, &quot;FlagBreak&quot;, shape.triangleup, location.belowbar,
 alertcondition(flagBreak, &quot;Bull Flag 首次回踩突破&quot;,
      &quot;{{ticker}} 首次縮量回踩後創新高 {{close}} — Bull Flag 入場. 止損=旗形低點&quot;)
 </pre></details>
+<details class="pinebox"><summary><b>ema9_bandwidth_strategy.pine</b>
+      <button class="copybtn" onclick="copyPine(event,'ema9_bandwidth_strategy.pine')">複製</button></summary>
+      <pre id="pine-ema9_bandwidth_strategy.pine">//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  EMA9 Band Width Strategy  —  中短線波段策略
+//
+//  概念：Bollinger Band = 20 SMA ± 2σ；本策略把中線換成反應更快的 9 EMA：
+//        中線  basis = EMA(close, 9)
+//        上下軌 = basis ± 倍數 × 標準差(9)   [或改用 ATR 倍數]
+//        Band Width (BW) = (上軌 − 下軌) / 中線 × 100%
+//        BW 收縮到 N 期最低附近 = 「擠壓 (Squeeze)」，隨後的擴張 = 波段啟動
+//
+//  進場 (二選一或並用)：
+//        A) 擠壓突破：最近 N 根內出現擠壓 → 收盤突破上軌 + BW 擴張 + 放量
+//        B) 順勢回踩：中線上升 → 價格回踩 EMA9 後收盤站回 (陽線 + 高於前收)
+//  過濾：MACD 綠燈 (&gt;0) / 價格在 EMA50 之上 / 量 &gt; 20 日均量 × 倍數
+//  出場：初始止損 = 進場 K 的下軌與低點取低者
+//        止盈 = R 倍數 (預設 2R)
+//        移動出場 = 收盤跌破 EMA9 中線 (可設連續幾根)
+//  倉位：依「每筆風險 % × 帳戶 ÷ 止損距離」自動計算股數 (可關閉改用 % 權益)
+//
+//  建議週期：日線 / 4H (中短線波段)；1H 亦可但需調高量能倍數
+//  用法：TradingView → Pine Editor 貼上 → 加入圖表 → 策略測試器看績效
+//        → 右上「警報」選「任何 alert() 函數呼叫」即可推播進出場
+// ═══════════════════════════════════════════════════════════════════════════
+strategy(&quot;EMA9 Band Width Strategy&quot;, shorttitle = &quot;EMA9-BW&quot;,
+     overlay = true, initial_capital = 10000,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
+     commission_type = strategy.commission.percent, commission_value = 0.05,
+     slippage = 1, pyramiding = 0, process_orders_on_close = true,
+     max_labels_count = 500)
+
+// ───────────────────────────── 參數 ─────────────────────────────
+grpB = &quot;① 帶狀通道&quot;
+src      = input.source(close, &quot;價格來源&quot;, group = grpB)
+len      = input.int(9, &quot;EMA 週期 (中線)&quot;, minval = 2, group = grpB)
+bandMode = input.string(&quot;StdDev&quot;, &quot;帶寬計算方式&quot;, options = [&quot;StdDev&quot;, &quot;ATR&quot;], group = grpB)
+mult     = input.float(2.0, &quot;StdDev 倍數&quot;, step = 0.1, minval = 0.5, group = grpB)
+atrMult  = input.float(1.5, &quot;ATR 倍數&quot;, step = 0.1, minval = 0.5, group = grpB)
+
+grpS = &quot;② 擠壓 (Squeeze) 偵測&quot;
+bwLook = input.int(60, &quot;Band Width 回看期 (找 N 期最低)&quot;, minval = 10, group = grpS)
+sqzTol = input.float(15, &quot;擠壓容忍度 % (BW ≤ 最低 × (1+tol))&quot;, step = 1, minval = 0, group = grpS)
+sqzWin = input.int(8, &quot;擠壓後幾根 K 內突破才有效&quot;, minval = 1, group = grpS)
+
+grpE = &quot;③ 進場&quot;
+useBreak   = input.bool(true, &quot;A) 擠壓後突破上軌&quot;, group = grpE)
+usePull    = input.bool(true, &quot;B) 順勢回踩 EMA9 站回&quot;, group = grpE)
+allowShort = input.bool(false, &quot;允許做空 (鏡像規則)&quot;, group = grpE)
+useVol     = input.bool(true, &quot;量能過濾：量 &gt; 20日均量 ×&quot;, inline = &quot;v&quot;, group = grpE)
+volX       = input.float(1.5, &quot;&quot;, step = 0.1, minval = 0.5, inline = &quot;v&quot;, group = grpE)
+useMacd    = input.bool(true, &quot;MACD 過濾 (多: MACD&gt;0 / 空: MACD&lt;0)&quot;, group = grpE)
+useTrend   = input.bool(true, &quot;大趨勢過濾 (多: 價&gt;EMA50 / 空: 價&lt;EMA50)&quot;, group = grpE)
+
+grpX = &quot;④ 出場 / 風控&quot;
+rr          = input.float(2.0, &quot;止盈 R 倍數 (0 = 不設止盈)&quot;, step = 0.5, minval = 0, group = grpX)
+midExit     = input.bool(true, &quot;收盤跌破/站回中線即出場 (移動出場)&quot;, group = grpX)
+midBars     = input.int(1, &quot;需連續幾根 K 收在中線另一側&quot;, minval = 1, group = grpX)
+useRiskSize = input.bool(true, &quot;依風險 % 計算股數 (關閉 = 用預設 % 權益)&quot;, group = grpX)
+riskPct     = input.float(1.0, &quot;每筆風險 % 帳戶&quot;, step = 0.25, minval = 0.1, group = grpX)
+
+grpD = &quot;⑤ 回測區間&quot;
+startT  = input.time(timestamp(&quot;2023-01-01T00:00:00&quot;), &quot;開始&quot;, group = grpD)
+endT    = input.time(timestamp(&quot;2030-12-31T00:00:00&quot;), &quot;結束&quot;, group = grpD)
+inRange = time &gt;= startT and time &lt;= endT
+
+// ───────────────────────────── 指標 ─────────────────────────────
+basis = ta.ema(src, len)
+dev   = bandMode == &quot;StdDev&quot; ? mult * ta.stdev(src, len) : atrMult * ta.atr(len)
+upper = basis + dev
+lower = basis - dev
+bw    = (upper - lower) / basis * 100            // Band Width %
+bwLow = ta.lowest(bw, bwLook)
+
+squeeze   = bw &lt;= bwLow * (1 + sqzTol / 100)     // 帶寬處於 N 期最低附近
+sinceSqz  = ta.barssince(squeeze)
+recentSqz = not na(sinceSqz) and sinceSqz &lt;= sqzWin
+expanding = bw &gt; bw[1]                           // 帶寬開始擴張
+
+volAvg = ta.sma(volume, 20)
+volOK  = not useVol or volume &gt; volAvg * volX
+
+[macdL, macdS, macdH] = ta.macd(close, 12, 26, 9)
+macdLongOK  = not useMacd or macdL &gt; 0
+macdShortOK = not useMacd or macdL &lt; 0
+
+ema50        = ta.ema(close, 50)
+trendLongOK  = not useTrend or close &gt; ema50
+trendShortOK = not useTrend or close &lt; ema50
+
+basisUp = basis &gt; basis[2]
+basisDn = basis &lt; basis[2]
+
+// ───────────────────────────── 訊號 ─────────────────────────────
+flat = strategy.position_size == 0
+
+longBreak = useBreak and recentSqz and ta.crossover(close, upper) and expanding
+longPull  = usePull and basisUp and low &lt;= basis and close &gt; basis and close &gt; open and close &gt; close[1]
+longSig   = inRange and flat and (longBreak or longPull) and volOK and macdLongOK and trendLongOK
+
+shortBreak = useBreak and recentSqz and ta.crossunder(close, lower) and expanding
+shortPull  = usePull and basisDn and high &gt;= basis and close &lt; basis and close &lt; open and close &lt; close[1]
+shortSig   = allowShort and inRange and flat and (shortBreak or shortPull) and volOK and macdShortOK and trendShortOK
+
+// ───────────────────────────── 倉位 / 止損 / 止盈 ─────────────────────────────
+var float stopPx = na
+var float tpPx   = na
+
+qtyByRisk(entryPx, stopPrice) =&gt;
+    perShare = math.abs(entryPx - stopPrice)
+    riskCash = strategy.equity * riskPct / 100
+    perShare &gt; 0 ? math.max(1, math.floor(riskCash / perShare)) : 1
+
+if longSig
+    stopPx := math.min(lower, low)                       // 下軌與本 K 低點取低者
+    tpPx   := rr &gt; 0 ? close + rr * (close - stopPx) : na
+    cmt = longBreak ? &quot;L 擠壓突破&quot; : &quot;L 回踩EMA9&quot;
+    if useRiskSize
+        strategy.entry(&quot;L&quot;, strategy.long, qty = qtyByRisk(close, stopPx), comment = cmt)
+    else
+        strategy.entry(&quot;L&quot;, strategy.long, comment = cmt)
+    alert(&quot;EMA9-BW 做多 &quot; + syminfo.ticker + &quot; @&quot; + str.tostring(close, format.mintick) +
+         &quot;  止損 &quot; + str.tostring(stopPx, format.mintick) +
+         (rr &gt; 0 ? &quot;  止盈 &quot; + str.tostring(tpPx, format.mintick) : &quot;&quot;), alert.freq_once_per_bar_close)
+
+if shortSig
+    stopPx := math.max(upper, high)
+    tpPx   := rr &gt; 0 ? close - rr * (stopPx - close) : na
+    cmt = shortBreak ? &quot;S 擠壓跌破&quot; : &quot;S 反彈EMA9&quot;
+    if useRiskSize
+        strategy.entry(&quot;S&quot;, strategy.short, qty = qtyByRisk(close, stopPx), comment = cmt)
+    else
+        strategy.entry(&quot;S&quot;, strategy.short, comment = cmt)
+    alert(&quot;EMA9-BW 做空 &quot; + syminfo.ticker + &quot; @&quot; + str.tostring(close, format.mintick) +
+         &quot;  止損 &quot; + str.tostring(stopPx, format.mintick), alert.freq_once_per_bar_close)
+
+// 固定止損 + 止盈 (OCO)
+if strategy.position_size &gt; 0
+    strategy.exit(&quot;L-exit&quot;, from_entry = &quot;L&quot;, stop = stopPx, limit = tpPx)
+if strategy.position_size &lt; 0
+    strategy.exit(&quot;S-exit&quot;, from_entry = &quot;S&quot;, stop = stopPx, limit = tpPx)
+
+// 移動出場：收盤跌破 (多) / 站回 (空) 中線
+var int belowCnt = 0
+var int aboveCnt = 0
+belowCnt := close &lt; basis ? belowCnt + 1 : 0
+aboveCnt := close &gt; basis ? aboveCnt + 1 : 0
+
+if midExit and strategy.position_size &gt; 0 and belowCnt &gt;= midBars
+    strategy.close(&quot;L&quot;, comment = &quot;跌破EMA9&quot;)
+    alert(&quot;EMA9-BW 平多 &quot; + syminfo.ticker + &quot; 收盤跌破 EMA9&quot;, alert.freq_once_per_bar_close)
+if midExit and strategy.position_size &lt; 0 and aboveCnt &gt;= midBars
+    strategy.close(&quot;S&quot;, comment = &quot;站回EMA9&quot;)
+    alert(&quot;EMA9-BW 平空 &quot; + syminfo.ticker + &quot; 收盤站回 EMA9&quot;, alert.freq_once_per_bar_close)
+
+// ───────────────────────────── 繪圖 ─────────────────────────────
+pB = plot(basis, &quot;EMA9 中線&quot;, color = color.new(color.orange, 0), linewidth = 2)
+pU = plot(upper, &quot;上軌&quot;, color = color.new(color.teal, 0))
+pL = plot(lower, &quot;下軌&quot;, color = color.new(color.teal, 0))
+fill(pU, pL, color = squeeze ? color.new(color.yellow, 80) : color.new(color.teal, 92), title = &quot;通道 (黃 = 擠壓)&quot;)
+plot(ema50, &quot;EMA50 (趨勢過濾)&quot;, color = color.new(color.gray, 50))
+plot(bw, &quot;Band Width %&quot;, color = color.purple, display = display.data_window)
+plot(bwLow, &quot;Band Width N 期最低&quot;, color = color.gray, display = display.data_window)
+
+plotshape(longSig,  &quot;做多訊號&quot;, shape.triangleup,   location.belowbar, color.green, size = size.small, text = &quot;多&quot;)
+plotshape(shortSig, &quot;做空訊號&quot;, shape.triangledown, location.abovebar, color.red,   size = size.small, text = &quot;空&quot;)
+plot(strategy.position_size != 0 ? stopPx : na, &quot;止損線&quot;, color = color.red,   style = plot.style_linebr, linewidth = 1)
+plot(strategy.position_size != 0 ? tpPx   : na, &quot;止盈線&quot;, color = color.green, style = plot.style_linebr, linewidth = 1)
+
+// 狀態面板
+var tbl = table.new(position.top_right, 2, 6, border_width = 1)
+if barstate.islast
+    table.cell(tbl, 0, 0, &quot;Band Width %&quot;, text_size = size.small)
+    table.cell(tbl, 1, 0, str.tostring(bw, &quot;#.##&quot;), text_size = size.small)
+    table.cell(tbl, 0, 1, &quot;N期最低 BW&quot;, text_size = size.small)
+    table.cell(tbl, 1, 1, str.tostring(bwLow, &quot;#.##&quot;), text_size = size.small)
+    table.cell(tbl, 0, 2, &quot;擠壓中&quot;, text_size = size.small)
+    table.cell(tbl, 1, 2, squeeze ? &quot;是 ⚠&quot; : (recentSqz ? &quot;剛結束&quot; : &quot;否&quot;), text_size = size.small, bgcolor = squeeze ? color.new(color.yellow, 60) : na)
+    table.cell(tbl, 0, 3, &quot;帶寬方向&quot;, text_size = size.small)
+    table.cell(tbl, 1, 3, expanding ? &quot;擴張 ↑&quot; : &quot;收縮 ↓&quot;, text_size = size.small)
+    table.cell(tbl, 0, 4, &quot;MACD&quot;, text_size = size.small)
+    table.cell(tbl, 1, 4, macdL &gt; 0 ? &quot;綠燈&quot; : &quot;紅燈&quot;, text_size = size.small, bgcolor = macdL &gt; 0 ? color.new(color.green, 70) : color.new(color.red, 70))
+    table.cell(tbl, 0, 5, &quot;EMA9 斜率&quot;, text_size = size.small)
+    table.cell(tbl, 1, 5, basisUp ? &quot;上升&quot; : (basisDn ? &quot;下降&quot; : &quot;走平&quot;), text_size = size.small)
+
+// 指標式警報 (亦可在警報對話框直接選用)
+alertcondition(longSig,  &quot;EMA9-BW 做多訊號&quot;, &quot;{{ticker}} EMA9 帶寬策略做多訊號 @{{close}}&quot;)
+alertcondition(shortSig, &quot;EMA9-BW 做空訊號&quot;, &quot;{{ticker}} EMA9 帶寬策略做空訊號 @{{close}}&quot;)
+alertcondition(squeeze and not squeeze[1], &quot;EMA9-BW 擠壓開始&quot;, &quot;{{ticker}} 帶寬進入擠壓，留意突破&quot;)
+</pre></details>
 <details class="pinebox"><summary><b>gap_and_go_alert.pine</b>
       <button class="copybtn" onclick="copyPine(event,'gap_and_go_alert.pine')">複製</button></summary>
       <pre id="pine-gap_and_go_alert.pine">//@version=5
