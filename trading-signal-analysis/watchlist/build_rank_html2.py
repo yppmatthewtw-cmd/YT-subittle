@@ -111,7 +111,7 @@ counts = {t[0]: sum(1 for r in rows if r["tier"] == t[0]) for t in TIERS}
 body = "\n".join(row_html(r) for r in rows)
 miss = "、".join(m["sym"] for m in missing)
 
-page = f'''<title>MACD 轉勢點時鐘排名</title>
+page = f'''<title>MACD 轉勢點時鐘排名 R1</title>
 <style>
 :root{{color-scheme:light dark;
  --bg:#f6f7f5;--panel:#fff;--ink:#16202b;--mut:#64748b;--line:#e2e6e3;--head:#eef1ed;--hover:#f2f5f1;
@@ -206,7 +206,7 @@ footer li{{margin:4px 0}}
 </style>
 <div class="wrap">
 <header>
-  <h1>MACD <em>轉勢點</em> 時鐘排名</h1>
+  <h1>MACD <em>轉勢點</em> 時鐘排名 <em>R1</em></h1>
   <div class="sw" role="group" aria-label="主題">
     <button type="button" data-m="auto" aria-pressed="true">系統</button>
     <button type="button" data-m="light" aria-pressed="false">☀️ 淺色</button>
@@ -215,7 +215,7 @@ footer li{{margin:4px 0}}
   <span class="meta">節點＝時鐘 <b>6 點鐘</b>（MACD 柱狀圖最負點）｜指針越接近 180°，分數越高｜
   來源：AI Sector R8 · 10MA Uptrend R15 · Combined Watchlist R17｜
   掃描 <b>{len(rows)}</b> 檔（union {len(rows)+len(missing)}，{len(missing)} 檔無日線資料）｜
-  資料基準 <b>{lastday}</b> 收盤（Yahoo 日線）｜Opus 5</span>
+  資料基準 <b>{lastday}</b> 收盤（Yahoo 日線）｜產生 2026.09.11 21:52 HKT｜Opus5;high</span>
 </header>
 
 <div class="rule">
