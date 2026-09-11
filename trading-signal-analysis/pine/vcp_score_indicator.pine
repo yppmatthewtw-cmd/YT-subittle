@@ -132,7 +132,11 @@ f_cert7() =>
             if hi > bp
                 array.push(depths, (hi - bp) / hi)
         nd = array.size(depths)
-        contr  := nd >= 2 ? (array.get(depths, 0) > 1e-4 ? array.get(depths, nd - 1) / array.get(depths, 0) : 1.0) : 1.0
+        contr := 1.0
+        if nd >= 2
+            d0 = array.get(depths, 0)
+            if d0 > 1e-4
+                contr := array.get(depths, nd - 1) / d0
         sContr := f_clamp01(1.0 - contr)
 
     ret21 = bar_index >= 21 ? close / close[21] - 1 : 0.0
