@@ -22,7 +22,8 @@ trading-signal-analysis/
 │   ├── ema9_bandwidth_strategy.pine    ← EMA9 中線 + 帶寬擠壓 中短線波段【策略/可回測】
 │   ├── macd_cycle_clock.pine           ← 1分鐘 MACD 柱狀圖升跌週期 + 左上角時鐘 (r0)
 │   ├── macd_cycle_clock_daily.pine     ← 日線版週期時鐘 (r0-D)，可疊加在任何時間框圖表
-│   └── combo_cycle_clock_ema9bw.pine   ← 合併檔：MODULE 1 日線時鐘 + MODULE 2 EMA9 帶寬策略
+│   ├── combo_cycle_clock_ema9bw.pine   ← 合併檔 R0：MODULE 1 日線時鐘 + MODULE 2 EMA9 帶寬策略
+│   └── combo_cycle_clock_ema9bw_r1.pine ← 合併檔 R1：時鐘預設移至右下角
 └── charts/
     ├── generate_chart.py         ← 圖表產生腳本
     └── ross_entry_exit_chart.png ← 典型交易日入市/賣出點標註圖
