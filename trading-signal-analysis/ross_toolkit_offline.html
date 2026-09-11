@@ -449,7 +449,10 @@ f_cert7() =&gt;
                     isMin := false
             if isMin and close[k + 3] &gt; c0 and close[k - 3] &gt; c0
                 nb0 = array.size(bOff)
-                if nb0 &gt; 0 and array.get(bOff, nb0 - 1) - k &lt;= 3
+                bool dup = false
+                if nb0 &gt; 0
+                    dup := array.get(bOff, nb0 - 1) - k &lt;= 3     // 3 根內重複
+                if dup
                     if c0 &lt; array.get(bPx, nb0 - 1)
                         array.set(bOff, nb0 - 1, k)
                         array.set(bPx,  nb0 - 1, c0)
@@ -459,11 +462,13 @@ f_cert7() =&gt;
 
     // 一底高於一底：窗內 ≥2 個底、價格嚴格遞增、最近一底在 25 根內
     nb = array.size(bOff)
-    hlOk = nb &gt;= 2 and array.get(bOff, nb - 1) &lt;= 24
-    if hlOk
-        for k = 1 to nb - 1
-            if array.get(bPx, k) &lt;= array.get(bPx, k - 1)
-                hlOk := false
+    bool hlOk = false
+    if nb &gt;= 2                                   // 先確認陣列非空再取值 (Pine 的 and 不短路)
+        hlOk := array.get(bOff, nb - 1) &lt;= 24
+        if hlOk
+            for k = 1 to nb - 1
+                if array.get(bPx, k) &lt;= array.get(bPx, k - 1)
+                    hlOk := false
 
     float sBreak = 0.0
     float sRetr  = 0.0
@@ -510,7 +515,7 @@ f_cert7() =&gt;
             if hi &gt; bp
                 array.push(depths, (hi - bp) / hi)
         nd = array.size(depths)
-        contr  := nd &gt;= 2 and array.get(depths, 0) &gt; 1e-4 ? array.get(depths, nd - 1) / array.get(depths, 0) : 1.0
+        contr  := nd &gt;= 2 ? (array.get(depths, 0) &gt; 1e-4 ? array.get(depths, nd - 1) / array.get(depths, 0) : 1.0) : 1.0
         sContr := f_clamp01(1.0 - contr)
 
     ret21 = bar_index &gt;= 21 ? close / close[21] - 1 : 0.0
@@ -1653,7 +1658,10 @@ f_cert7() =&gt;
                     isMin := false
             if isMin and close[k + 3] &gt; c0 and close[k - 3] &gt; c0
                 nb0 = array.size(bOff)
-                if nb0 &gt; 0 and array.get(bOff, nb0 - 1) - k &lt;= 3
+                bool dup = false
+                if nb0 &gt; 0
+                    dup := array.get(bOff, nb0 - 1) - k &lt;= 3     // 3 根內重複
+                if dup
                     if c0 &lt; array.get(bPx, nb0 - 1)
                         array.set(bOff, nb0 - 1, k)
                         array.set(bPx,  nb0 - 1, c0)
@@ -1663,11 +1671,13 @@ f_cert7() =&gt;
 
     // 一底高於一底：窗內 ≥2 個底、價格嚴格遞增、最近一底在 25 根內
     nb = array.size(bOff)
-    hlOk = nb &gt;= 2 and array.get(bOff, nb - 1) &lt;= 24
-    if hlOk
-        for k = 1 to nb - 1
-            if array.get(bPx, k) &lt;= array.get(bPx, k - 1)
-                hlOk := false
+    bool hlOk = false
+    if nb &gt;= 2                                   // 先確認陣列非空再取值 (Pine 的 and 不短路)
+        hlOk := array.get(bOff, nb - 1) &lt;= 24
+        if hlOk
+            for k = 1 to nb - 1
+                if array.get(bPx, k) &lt;= array.get(bPx, k - 1)
+                    hlOk := false
 
     float sBreak = 0.0
     float sRetr  = 0.0
@@ -1714,7 +1724,7 @@ f_cert7() =&gt;
             if hi &gt; bp
                 array.push(depths, (hi - bp) / hi)
         nd = array.size(depths)
-        contr  := nd &gt;= 2 and array.get(depths, 0) &gt; 1e-4 ? array.get(depths, nd - 1) / array.get(depths, 0) : 1.0
+        contr  := nd &gt;= 2 ? (array.get(depths, 0) &gt; 1e-4 ? array.get(depths, nd - 1) / array.get(depths, 0) : 1.0) : 1.0
         sContr := f_clamp01(1.0 - contr)
 
     ret21 = bar_index &gt;= 21 ? close / close[21] - 1 : 0.0
@@ -2745,7 +2755,10 @@ f_cert7() =&gt;
                     isMin := false
             if isMin and close[k + 3] &gt; c0 and close[k - 3] &gt; c0
                 nb0 = array.size(bOff)
-                if nb0 &gt; 0 and array.get(bOff, nb0 - 1) - k &lt;= 3
+                bool dup = false
+                if nb0 &gt; 0
+                    dup := array.get(bOff, nb0 - 1) - k &lt;= 3     // 3 根內重複
+                if dup
                     if c0 &lt; array.get(bPx, nb0 - 1)
                         array.set(bOff, nb0 - 1, k)
                         array.set(bPx,  nb0 - 1, c0)
@@ -2755,11 +2768,13 @@ f_cert7() =&gt;
 
     // 一底高於一底：窗內 ≥2 個底、價格嚴格遞增、最近一底在 25 根內
     nb = array.size(bOff)
-    hlOk = nb &gt;= 2 and array.get(bOff, nb - 1) &lt;= 24
-    if hlOk
-        for k = 1 to nb - 1
-            if array.get(bPx, k) &lt;= array.get(bPx, k - 1)
-                hlOk := false
+    bool hlOk = false
+    if nb &gt;= 2                                   // 先確認陣列非空再取值 (Pine 的 and 不短路)
+        hlOk := array.get(bOff, nb - 1) &lt;= 24
+        if hlOk
+            for k = 1 to nb - 1
+                if array.get(bPx, k) &lt;= array.get(bPx, k - 1)
+                    hlOk := false
 
     float sBreak = 0.0
     float sRetr  = 0.0
@@ -2806,7 +2821,7 @@ f_cert7() =&gt;
             if hi &gt; bp
                 array.push(depths, (hi - bp) / hi)
         nd = array.size(depths)
-        contr  := nd &gt;= 2 and array.get(depths, 0) &gt; 1e-4 ? array.get(depths, nd - 1) / array.get(depths, 0) : 1.0
+        contr  := nd &gt;= 2 ? (array.get(depths, 0) &gt; 1e-4 ? array.get(depths, nd - 1) / array.get(depths, 0) : 1.0) : 1.0
         sContr := f_clamp01(1.0 - contr)
 
     ret21 = bar_index &gt;= 21 ? close / close[21] - 1 : 0.0
