@@ -25,6 +25,7 @@ trading-signal-analysis/
 │   ├── combo_cycle_clock_ema9bw.pine   ← 合併檔 R0：MODULE 1 日線時鐘 + MODULE 2 EMA9 帶寬策略
 │   ├── combo_cycle_clock_ema9bw_r1.pine ← 合併檔 R1：時鐘預設移至右下角
 │   ├── combo_cycle_clock_ema9bw_r2.pine ← 合併檔 R2：+ MODULE 3 確定性 7 項 / VCP 分數等級面板
+│   ├── combo_cycle_clock_ema9bw_r3.pine ← 合併檔 R3：M3 兩框合併移至右中，四框黑邊
 │   ├── cert7_indicator.pine            ← 指標 3-A 確定性 7 項（獨立版，副圖）
 │   └── vcp_score_indicator.pine        ← 指標 3-B VCP 分數/等級 A–E（獨立版，副圖）
 └── charts/
