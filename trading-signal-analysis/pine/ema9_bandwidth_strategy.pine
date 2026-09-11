@@ -89,14 +89,18 @@ trendShortOK = not useTrend or close < ema21
 basisUp = basis > basis[2]
 basisDn = basis < basis[2]
 
+// 交叉判斷提到全域計算 (避免 CW10002：ta.* 在條件式內可能不每根執行)
+crossUp = ta.crossover(close, upper)
+crossDn = ta.crossunder(close, lower)
+
 // ───────────────────────────── 訊號 ─────────────────────────────
 flat = strategy.position_size == 0
 
-longBreak = useBreak and recentSqz and ta.crossover(close, upper) and expanding
+longBreak = useBreak and recentSqz and crossUp and expanding
 longPull  = usePull and basisUp and low <= basis and close > basis and close > open and close > close[1]
 longSig   = inRange and flat and (longBreak or longPull) and volOK and macdLongOK and trendLongOK
 
-shortBreak = useBreak and recentSqz and ta.crossunder(close, lower) and expanding
+shortBreak = useBreak and recentSqz and crossDn and expanding
 shortPull  = usePull and basisDn and high >= basis and close < basis and close < open and close < close[1]
 shortSig   = allowShort and inRange and flat and (shortBreak or shortPull) and volOK and macdShortOK and trendShortOK
 

@@ -643,6 +643,10 @@ trendShortOK = not useTrend or close &lt; ema21
 basisUp = basis &gt; basis[2]
 basisDn = basis &lt; basis[2]
 
+// 交叉判斷提到全域計算 (避免 CW10002：ta.* 在條件式內可能不每根執行)
+crossUp = ta.crossover(close, upper)
+crossDn = ta.crossunder(close, lower)
+
 // 模組整合：日線週期方向 / 尾段過濾 (預設關閉，關閉時恆為 true)
 dailyLongOK  = not useDailyCycle or up
 dailyShortOK = not useDailyCycle or not up
@@ -651,11 +655,11 @@ notLateOK    = not avoidLate or not late
 // ── M2 訊號 ──
 flat = strategy.position_size == 0
 
-longBreak = useBreak and recentSqz and ta.crossover(close, upper) and expanding
+longBreak = useBreak and recentSqz and crossUp and expanding
 longPull  = usePull and basisUp and low &lt;= basis and close &gt; basis and close &gt; open and close &gt; close[1]
 longSig   = inRange and flat and (longBreak or longPull) and volOK and macdLongOK and trendLongOK and dailyLongOK and notLateOK
 
-shortBreak = useBreak and recentSqz and ta.crossunder(close, lower) and expanding
+shortBreak = useBreak and recentSqz and crossDn and expanding
 shortPull  = usePull and basisDn and high &gt;= basis and close &lt; basis and close &lt; open and close &lt; close[1]
 shortSig   = allowShort and inRange and flat and (shortBreak or shortPull) and volOK and macdShortOK and trendShortOK and dailyShortOK and notLateOK
 
@@ -843,14 +847,18 @@ trendShortOK = not useTrend or close &lt; ema21
 basisUp = basis &gt; basis[2]
 basisDn = basis &lt; basis[2]
 
+// 交叉判斷提到全域計算 (避免 CW10002：ta.* 在條件式內可能不每根執行)
+crossUp = ta.crossover(close, upper)
+crossDn = ta.crossunder(close, lower)
+
 // ───────────────────────────── 訊號 ─────────────────────────────
 flat = strategy.position_size == 0
 
-longBreak = useBreak and recentSqz and ta.crossover(close, upper) and expanding
+longBreak = useBreak and recentSqz and crossUp and expanding
 longPull  = usePull and basisUp and low &lt;= basis and close &gt; basis and close &gt; open and close &gt; close[1]
 longSig   = inRange and flat and (longBreak or longPull) and volOK and macdLongOK and trendLongOK
 
-shortBreak = useBreak and recentSqz and ta.crossunder(close, lower) and expanding
+shortBreak = useBreak and recentSqz and crossDn and expanding
 shortPull  = usePull and basisDn and high &gt;= basis and close &lt; basis and close &lt; open and close &lt; close[1]
 shortSig   = allowShort and inRange and flat and (shortBreak or shortPull) and volOK and macdShortOK and trendShortOK
 
