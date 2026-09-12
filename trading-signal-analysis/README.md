@@ -33,6 +33,11 @@ trading-signal-analysis/
 │   ├── combo_r5d_cert.pine             ← R5-D 下方 pane：確定性指數曲線
 │   ├── split_r5.py                     ← 由 R4 產生 R5 四件套的拆檔腳本
 │   ├── r5_layout_patch.py              ← R5 版面補丁：四個資訊框等寬、貼右對齊、撐滿各自 pane（⑦ 版面 輸入）
+│   ├── combo_a_main_r6(mm.dd_hh.mm).pine        ← R6-A 主圖：+ 底部成交量、主力大單買入/賣出日另色
+│   ├── combo_b_macd_clock_r6(mm.dd_hh.mm).pine  ← R6-B：+ 頂/底背馳訊號、時鐘高解析度 (21 格)
+│   ├── combo_c_vcp_r6(mm.dd_hh.mm).pine         ← R6-C：等級標籤字級加大一倍
+│   ├── combo_d_cert_r6(mm.dd_hh.mm).pine        ← R6-D：只有高確定性 (≥ 門檻) 區段著色
+│   ├── build_r6.py                     ← 由 R5 產生 R6 四件套（檔名尾綴 r6(mm.dd_hh.mm)）
 │   ├── cert7_indicator.pine            ← 指標 3-A 確定性 7 項（獨立版，副圖）
 │   └── vcp_score_indicator.pine        ← 指標 3-B VCP 分數/等級 A–E（獨立版，副圖）
 └── charts/

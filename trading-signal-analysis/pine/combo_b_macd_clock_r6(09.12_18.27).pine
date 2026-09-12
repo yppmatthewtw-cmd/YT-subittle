@@ -1,0 +1,265 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  版本 r6(09:12_18:27)
+//  R6-B  下方 pane：MACD 柱狀圖 + 週期時鐘
+//
+//  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.12_18.27).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.12_18.27).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.12_18.27).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.12_18.27).pine
+//  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
+//
+//  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
+//  MACD 線與訊號線疊在同一 pane，週期背景與「上一段周期長度」標籤同時顯示，
+//  週期時鐘 table 置於本 pane 的最右邊（預設 右中；可改右上／右下）。
+//
+//  ⚠ 時鐘是格子陣列，pane 太矮會被壓扁 —— 請把本 pane 往下拖高（約 300px 以上）
+//     才會呈現正圓；或把「解析度」調小（13–15 格）。
+//  R6：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
+// ═══════════════════════════════════════════════════════════════════════════
+
+indicator("R6-B MACD + Cycle Clock r6(09:12_18:27)", shorttitle = "R6-B MACD Clock",
+     overlay = false, max_labels_count = 300, max_lines_count = 200)
+
+// ── M1 參數 ──
+grpM = "M1 ① MACD (日線)"
+m1src = input.source(close, "價格來源", group = grpM)
+fast  = input.int(12, "快線 EMA", minval = 2, group = grpM)
+slow  = input.int(26, "慢線 EMA", minval = 3, group = grpM)
+sigL  = input.int(9,  "訊號線", minval = 2, group = grpM)
+cycTF = input.timeframe("D", "週期計算時間框 (預設日線)", group = grpM)
+
+grpC = "M1 ② 週期估算"
+lookN  = input.int(8,  "平均週期長度取最近幾段", minval = 2, maxval = 50, group = grpC)
+defLen = input.int(12, "尚無歷史時的預設週期長度 (日)", minval = 2, group = grpC)
+lateAt = input.float(75, "進入尾段門檻 % (警報用)", minval = 50, maxval = 95, group = grpC)
+
+grpK = "M1 ③ 時鐘外觀"
+showClock = input.bool(true, "顯示時鐘", group = grpK)
+grid   = input.int(21, "解析度 (格數, 奇數；21 = 高解析，pane 較矮用 13–15)", minval = 9, maxval = 41, step = 2, group = grpK)
+tz     = input.string("America/New_York", "日期時區", group = grpK)
+cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK)
+cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK)
+cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK)
+showBg  = input.bool(true, "週期背景著色", group = grpK)
+showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK)
+
+grpDv = "M1 ④ 背馳 (頂 / 底)"
+showDiv = input.bool(true, "顯示頂背馳 / 底背馳", group = grpDv)
+divSrc  = input.string("柱狀圖", "背馳依據", options = ["柱狀圖", "MACD 線"], group = grpDv)
+lbL     = input.int(5, "轉折左側確認根數", minval = 1, maxval = 20, group = grpDv)
+lbR     = input.int(3, "轉折右側確認根數 (越小越早、越易誤判)", minval = 1, maxval = 10, group = grpDv)
+divMin  = input.int(5,  "兩個轉折最少相隔 (日)", minval = 1, group = grpDv)
+divMax  = input.int(60, "兩個轉折最多相隔 (日)", minval = 5, group = grpDv)
+divLine = input.bool(true, "日線圖上畫背馳連線", group = grpDv)
+
+// ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+grpL   = "⑦ 版面 (四個 pane 統一)"
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL)
+boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL)
+boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL)
+f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
+
+// ── M1 日線週期引擎 (在 security 的日線環境中執行) ──
+f_cycle() =>
+    [m, s, h] = ta.macd(m1src, fast, slow, sigL)
+    u  = h >= 0
+    fl = bar_index > 0 and u != u[1]
+    rs = h > h[1]
+    var int   cs = 0
+    var float ll = na
+    var ul = array.new_float()
+    var dl = array.new_float()
+    if fl
+        L = bar_index - cs
+        ll := L
+        a = u[1] ? ul : dl                 // 剛結束的是哪一種週期
+        array.push(a, L)
+        if array.size(a) > lookN
+            array.shift(a)
+        cs := bar_index
+    el = bar_index - cs + 1
+    au = array.size(ul) > 0 ? array.avg(ul) : defLen
+    ad = array.size(dl) > 0 ? array.avg(dl) : defLen
+    // ── 背馳（同樣在日線環境計算）：常規背馳
+    //    底背馳 = 價格更低的低點，但振盪器 (零軸下) 低點抬高；頂背馳 = 價格更高的高點，但振盪器 (零軸上) 高點降低
+    o    = divSrc == "柱狀圖" ? h : m
+    plF  = not na(ta.pivotlow(o, lbL, lbR))
+    phF  = not na(ta.pivothigh(o, lbL, lbR))
+    oL   = o[lbR]
+    oH   = o[lbR]
+    pvL  = low[lbR]
+    pvH  = high[lbR]
+    prevOL = ta.valuewhen(plF, oL, 1)
+    prevPL = ta.valuewhen(plF, pvL, 1)
+    prevBL = ta.valuewhen(plF, bar_index - lbR, 1)
+    prevOH = ta.valuewhen(phF, oH, 1)
+    prevPH = ta.valuewhen(phF, pvH, 1)
+    prevBH = ta.valuewhen(phF, bar_index - lbR, 1)
+    distL = bar_index - lbR - prevBL
+    distH = bar_index - lbR - prevBH
+    bull = plF and oL < 0 and oL > prevOL and pvL < prevPL and distL >= divMin and distL <= divMax
+    bear = phF and oH > 0 and oH < prevOH and pvH > prevPH and distH >= divMin and distH <= divMax
+    [m, s, h, u, fl, rs, el, au, ad, ll, bull, bear, oL, oH, prevOL, prevOH, distL, distH]
+
+[macdL, sigLine, hist, up, flip, rising, elapsed, avgUp, avgDn, lastLen,
+     bullRaw, bearRaw, divOL, divOH, divPrevOL, divPrevOH, divDistL, divDistH] =
+     request.security(syminfo.tickerid, cycTF, f_cycle(), lookahead = barmerge.lookahead_off)
+
+newDay  = timeframe.change(cycTF)          // 日線圖上每根都為 true；日內圖上每日第一根為 true
+flipEvt = flip and newDay                  // 每個交易日最多觸發一次
+
+expected = up ? avgUp : avgDn
+progRaw  = elapsed / expected
+prog     = math.min(progRaw, 0.97)
+overdue  = progRaw > 1.0
+late     = progRaw * 100 >= lateAt
+lateEvt  = late and not late[1] and newDay
+
+theta = up ? 270 + 180 * prog : 90 + 180 * prog        // 順時針、12 點鐘 = 0°
+theta := theta >= 360 ? theta - 360 : theta
+
+phaseTxt = up ? (rising ? "▲ 日線上昇周期 · 動能加速" : "▲ 日線上昇周期 · 動能減速")
+              : (rising ? "▼ 日線下跌周期 · 跌勢減弱" : "▼ 日線下跌周期 · 跌勢加速")
+
+// ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──
+histRising = hist > hist[1]
+hcol = up ? (histRising ? color.new(cUp, 0) : color.new(cUp, 55))
+          : (histRising ? color.new(cDn, 55) : color.new(cDn, 0))
+plot(hist,    "MACD Histogram", style = plot.style_columns, color = hcol)
+plot(macdL,   "MACD",   color = color.new(color.blue, 20),   linewidth = 2)
+plot(sigLine, "Signal", color = color.new(color.orange, 20), linewidth = 2)
+hline(0, "零軸", color = color.new(color.gray, 30), linestyle = hline.style_solid)
+bgcolor(showBg ? (up ? color.new(cUp, 92) : color.new(cDn, 92)) : na, title = "週期背景")
+
+// 週期切換處標註上一段長度（畫在零軸上／下）
+if showLbl and flipEvt
+    label.new(bar_index, 0, str.tostring(lastLen, "#") + "日",
+         style = up[1] ? label.style_label_down : label.style_label_up,
+         color = up[1] ? color.new(cUp, 20) : color.new(cDn, 20),
+         textcolor = color.white, size = size.tiny)
+
+// 轉勢點（本周期柱狀圖極值）標記 —— 時鐘 6 點鐘所對應的那一根
+var float extVal = na
+var int   extBar = na
+if flip
+    extVal := hist
+    extBar := bar_index
+else
+    if (not up and hist < nz(extVal, hist)) or (up and hist > nz(extVal, hist))
+        extVal := hist
+        extBar := bar_index
+// 以 location.absolute 畫在柱狀圖數值上；bool series 不能用 absolute，故傳入 hist
+plotshape(bar_index == extBar and not up ? hist : na, "本周期新低 (轉勢點候選)", shape.circle,
+     location.absolute, color.new(#eab308, 15), size = size.tiny)
+
+// ── M1 背馳繪圖（訊號在轉折確認後 lbR 根才出現，標籤回貼到轉折那根）──
+onCycTF = timeframe.period == cycTF
+bullDiv = showDiv and bullRaw and newDay
+bearDiv = showDiv and bearRaw and newDay
+divOff  = onCycTF ? -lbR : 0
+plotshape(bullDiv ? divOL : na, "底背馳", shape.labelup,   location.absolute, color.new(cUp, 0),
+     text = "底背馳", textcolor = color.white, size = size.small, offset = divOff)
+plotshape(bearDiv ? divOH : na, "頂背馳", shape.labeldown, location.absolute, color.new(cDn, 0),
+     text = "頂背馳", textcolor = color.white, size = size.small, offset = divOff)
+if divLine and onCycTF and bullDiv
+    line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 2)
+if divLine and onCycTF and bearDiv
+    line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 2)
+
+// ── M1 時鐘 (table) ──
+// 時鐘尺寸由 ⑦ 版面 的 boxW / boxH 推導：上下各一列文字 (hdrH%)，中間 grid 列平均分配
+hdrH  = 6.0
+cellW = boxW / grid
+cellH = (boxH - 2 * hdrH) / grid
+tpos  = f_boxPos(boxPos)
+
+var table clk = table.new(tpos, grid, grid + 2, bgcolor = color.new(color.black, 100),
+     frame_color = color.black, frame_width = 2)
+var bool merged = false
+
+if showClock and barstate.islast
+    // table.merge_cells 要求格子已存在：首次執行先鋪滿空格，再合併
+    if not merged
+        for ci = 0 to grid - 1
+            for cj = 0 to grid + 1
+                table.cell(clk, ci, cj, "", width = cellW, height = cellH)
+        table.merge_cells(clk, 0, 0, grid - 1, 0)                 // 上方狀態列
+        table.merge_cells(clk, 0, grid + 1, grid - 1, grid + 1)   // 下方統計列
+        merged := true
+
+    activeCol = up ? cUp : cDn
+    dateTxt = str.format_time(time, "MM/dd", tz)
+    table.cell(clk, 0, 0, phaseTxt + "  " + dateTxt, width = cellW, height = hdrH, text_color = color.white, bgcolor = color.new(activeCol, 10),
+         text_size = size.small, text_halign = text.align_center)
+
+    // 高解析度時鐘：環厚、指針寬、圓心半徑都隨格數放大；12/3/6/9 刻度；已走過的弧段亮色
+    c     = (grid - 1) / 2.0            // 圓心索引
+    r     = c - 0.5                     // 圓環半徑
+    ringW = math.max(0.55, grid / 22.0) // 環半厚 (格)
+    handW = math.max(0.45, grid / 34.0) // 指針半寬 (格)
+    ctrR  = math.max(0.6,  grid / 16.0) // 圓心半徑 (格)
+    th = math.toradians(theta)
+    ux = math.sin(th)                   // 指針方向單位向量 (x 向右, y 向下)
+    uy = -math.cos(th)
+    startA = up ? 270.0 : 90.0          // 本周期起點：上昇 9 點鐘、下跌 3 點鐘
+    swept  = theta - startA
+    swept := swept < 0 ? swept + 360 : swept   // 本周期已走過的角度 0–180
+
+    for i = 0 to grid - 1               // 欄 (x)
+        for j = 0 to grid - 1           // 列 (y)
+            dx = i - c
+            dy = j - c
+            d  = math.sqrt(dx * dx + dy * dy)
+            ang = math.todegrees(math.atan2(dx, -dy))  // 順時針、12 點鐘 = 0°
+            ang := ang < 0 ? ang + 360 : ang
+            rel = ang - startA
+            rel := rel < 0 ? rel + 360 : rel           // 相對本周期起點的角度
+            inCur    = rel < 180                       // 屬於本周期那一半環
+            done     = inCur and rel <= swept          // 已走過
+            topHalf  = ang >= 270 or ang < 90
+            isRing   = math.abs(d - r) <= ringW
+            isTick   = isRing and (math.abs(dx) <= 0.5 or math.abs(dy) <= 0.5)
+            along    = dx * ux + dy * uy
+            perp     = math.abs(dx * uy - dy * ux)
+            onHand   = along >= 0 and along <= r - ringW - 0.4 and perp <= handW
+            isCenter = d <= ctrR
+            inner    = d < r - ringW - 0.4 and d > r - ringW - 1.6   // 環內側一圈 (放刻度數字)
+
+            cellBg = color.new(color.black, 100)
+            cellTx = ""
+            if isCenter
+                cellBg := color.new(color.gray, 20)
+            else if onHand
+                cellBg := cHand
+            else if isTick
+                cellBg := color.new(color.white, 0)
+            else if isRing
+                halfCol = topHalf ? cUp : cDn
+                cellBg := color.new(halfCol, done ? 0 : inCur ? 55 : 82)
+            else if inner and grid >= 15
+                if math.abs(dx) <= 0.5
+                    cellTx := dy < 0 ? "12" : "6"
+                else if math.abs(dy) <= 0.5
+                    cellTx := dx < 0 ? "9" : "3"
+
+            table.cell(clk, i, j + 1, cellTx, width = cellW, height = cellH,
+                 bgcolor = cellBg, text_color = color.new(color.gray, 0), text_size = size.tiny,
+                 text_halign = text.align_center, text_valign = text.align_center)
+
+    statTxt = "第 " + str.tostring(elapsed) + " / 預期 " + str.tostring(expected, "#.#") + " 日 · " +
+         str.tostring(progRaw * 100, "#") + "%" + (overdue ? " ⚠超時" : late ? " ·尾段" : "") +
+         "\n均升 " + str.tostring(avgUp, "#.#") + " 日 · 均跌 " + str.tostring(avgDn, "#.#") + " 日" +
+         (timeframe.period != cycTF ? "\n(日線週期 疊加於 " + timeframe.period + " 圖)" : "") +
+         (not up and not na(extBar) ? "\n距轉勢點 " + str.tostring(bar_index - extBar) + " 根" : "")
+    table.cell(clk, 0, grid + 1, statTxt, width = cellW, height = hdrH, text_color = color.white,
+         bgcolor = color.new(color.gray, 30), text_size = size.tiny, text_halign = text.align_center)
+
+// ── M1 警報 ──
+alertcondition(flipEvt and up,     "M1 日線轉入上昇周期", "{{ticker}} 日線 MACD 柱狀圖轉正 — 進入上昇周期 (9 點鐘)")
+alertcondition(flipEvt and not up, "M1 日線轉入下跌周期", "{{ticker}} 日線 MACD 柱狀圖轉負 — 進入下跌周期 (3 點鐘)")
+alertcondition(lateEvt and up,     "M1 日線上昇周期進入尾段", "{{ticker}} 日線上昇周期已走 >75%，留意轉折 (接近 3 點鐘)")
+alertcondition(lateEvt and not up, "M1 日線下跌周期進入尾段", "{{ticker}} 日線下跌周期已走 >75%，留意反轉 (接近 9 點鐘)")
+alertcondition(bullDiv, "M1 底背馳", "{{ticker}} 日線 MACD 底背馳：價格創低但動能抬高 — 留意反轉向上")
+alertcondition(bearDiv, "M1 頂背馳", "{{ticker}} 日線 MACD 頂背馳：價格創高但動能降低 — 留意反轉向下")
