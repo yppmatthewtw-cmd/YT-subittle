@@ -32,6 +32,7 @@ trading-signal-analysis/
 │   ├── combo_r5c_vcp.pine              ← R5-C 下方 pane：VCP 指數曲線
 │   ├── combo_r5d_cert.pine             ← R5-D 下方 pane：確定性指數曲線
 │   ├── split_r5.py                     ← 由 R4 產生 R5 四件套的拆檔腳本
+│   ├── r5_layout_patch.py              ← R5 版面補丁：四個資訊框等寬、貼右對齊、撐滿各自 pane（⑦ 版面 輸入）
 │   ├── cert7_indicator.pine            ← 指標 3-A 確定性 7 項（獨立版，副圖）
 │   └── vcp_score_indicator.pine        ← 指標 3-B VCP 分數/等級 A–E（獨立版，副圖）
 └── charts/

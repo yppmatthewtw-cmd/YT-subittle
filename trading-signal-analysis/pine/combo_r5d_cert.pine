@@ -26,6 +26,13 @@ showCert  = input.bool(true, "顯示 7 分項面板 (本 pane 右側)", group = 
 certAlert = input.float(70, "確定性警報門檻 (≥)", minval = 0, maxval = 100, group = grpW)
 showParts = input.bool(false, "同時畫出 7 個分項細線", group = grpW)
 
+// ── ⑦ 版面（四支 R5 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+grpL   = "⑦ 版面 (四個 pane 統一)"
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL)
+boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL)
+boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL)
+f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
+
 f_clamp01(x) => math.max(0.0, math.min(1.0, x))
 
 f_pos(s) => s == "左上" ? position.top_left : s == "左中" ? position.middle_left : s == "左下" ? position.bottom_left :
@@ -228,7 +235,7 @@ hline(50, "50", color = color.new(color.gray, 60))
 bgcolor(hlOk ? color.new(#3FB68B, 92) : na, title = "一底高於一底 結構")
 
 // ── 7 分項面板（本 pane 右側）──
-var table tD = table.new(position.middle_right, 3, 9, bgcolor = color.new(#ffffff, 5),
+var table tD = table.new(f_boxPos(boxPos), 3, 9, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 var bool dInit = false
 if showCert and barstate.islast
@@ -239,21 +246,21 @@ if showCert and barstate.islast
         dInit := true
     hdrCol = certTotal >= certAlert ? color.new(#3FB68B, 10) :
              certTotal >= 50 ? color.new(#E5B15C, 10) : color.new(#6B7885, 10)
-    table.cell(tD, 0, 0, "確定性", text_color = color.white, bgcolor = hdrCol, text_size = size.small)
-    table.cell(tD, 1, 0, str.tostring(certTotal, "#.#"), text_color = color.white, bgcolor = hdrCol, text_size = size.small)
-    table.cell(tD, 2, 0, hlOk ? "HL ✓ " + str.tostring(nBot) + " 底" : "無 HL", text_color = color.white,
+    table.cell(tD, 0, 0, "確定性", width = boxW * 0.40, height = boxH / 9, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
+    table.cell(tD, 1, 0, str.tostring(certTotal, "#.#"), width = boxW * 0.38, height = boxH / 9, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
+    table.cell(tD, 2, 0, hlOk ? "HL ✓ " + str.tostring(nBot) + " 底" : "無 HL", width = boxW * 0.22, height = boxH / 9, text_color = color.white,
          bgcolor = hdrCol, text_size = size.tiny)
     names = array.from("突破 25%", "回升 10%", "守底 15%", "量縮 15%", "收縮 10%", "RS 10%", "均線 15%")
     vals  = array.from(cBreak, cRetr, cTime, cDv, cContr, cRs, cMa)
     for i = 0 to 6
         v = array.get(vals, i)
-        table.cell(tD, 0, i + 1, array.get(names, i), text_size = size.tiny, text_halign = text.align_left)
-        table.cell(tD, 1, i + 1, f_bar(v, 8), text_size = size.tiny,
+        table.cell(tD, 0, i + 1, array.get(names, i), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(tD, 1, i + 1, f_bar(v, 8), width = boxW * 0.38, height = boxH / 9, text_size = size.tiny,
              text_color = v >= 0.7 ? #3FB68B : v >= 0.4 ? #E5B15C : #8B98A5)
-        table.cell(tD, 2, i + 1, str.tostring(v * 100, "#"), text_size = size.tiny, text_halign = text.align_right)
-    table.cell(tD, 0, 8, "量比(跌/漲) " + str.tostring(dvRatio, "#.##"), text_size = size.tiny, text_color = color.gray)
-    table.cell(tD, 1, 8, "RS21 " + str.tostring(rs21 * 100, "+#.#") + "%", text_size = size.tiny, text_color = color.gray)
-    table.cell(tD, 2, 8, hlOk ? "守底 " + str.tostring(dHeld) + "日" : "–", text_size = size.tiny, text_color = color.gray)
+        table.cell(tD, 2, i + 1, str.tostring(v * 100, "#"), width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_halign = text.align_right)
+    table.cell(tD, 0, 8, "量比(跌/漲) " + str.tostring(dvRatio, "#.##"), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+    table.cell(tD, 1, 8, "RS21 " + str.tostring(rs21 * 100, "+#.#") + "%", width = boxW * 0.38, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+    table.cell(tD, 2, 8, hlOk ? "守底 " + str.tostring(dHeld) + "日" : "–", width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
 
 alertcondition(certTotal >= certAlert and certTotal[1] < certAlert, "確定性達門檻",
      "{{ticker}} 確定性總分升至門檻以上")

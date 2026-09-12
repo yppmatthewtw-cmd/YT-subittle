@@ -3805,6 +3805,13 @@ avoidLate     = input.bool(false, &quot;日線週期已進入尾段 (&gt;門檻%
 useVcpGrade   = input.bool(false, &quot;M3：只在 VCP 等級 A/B 時做多&quot;, group = grpI)
 minCert       = input.float(0, &quot;M3：確定性總分 ≥ 此值才做多 (0 = 不過濾)&quot;, minval = 0, maxval = 100, step = 5, group = grpI)
 
+// ── ⑦ 版面（四支 R5 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+grpL   = &quot;⑦ 版面 (四個 pane 統一)&quot;
+boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬；四支腳本設同值)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL)
+boxH   = input.float(100, &quot;資訊框高度 (% 本 pane 高；100 = 撐滿)&quot;, minval = 30, maxval = 100, step = 5, group = grpL)
+boxPos = input.string(&quot;右中&quot;, &quot;垂直位置 (高度 &lt;100 時才有差別)&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;], group = grpL)
+f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
+
 // ── M2 指標 ──
 basis = ta.ema(src, len)
 dev   = bandMode == &quot;StdDev&quot; ? mult * ta.stdev(src, len) : atrMult * ta.atr(len)
@@ -3919,29 +3926,29 @@ plotshape(shortSig, &quot;做空訊號&quot;, shape.triangledown, location.above
 plot(strategy.position_size != 0 ? stopPx : na, &quot;止損線&quot;, color = color.red,   style = plot.style_linebr, linewidth = 1)
 plot(strategy.position_size != 0 ? tpPx   : na, &quot;止盈線&quot;, color = color.green, style = plot.style_linebr, linewidth = 1)
 
-// M2 狀態面板 (右上角；M1 時鐘預設在左上角，互不重疊)
-var tbl = table.new(position.top_right, 2, 9, bgcolor = color.new(#ffffff, 5),
+// M2 狀態面板 (貼右；寬度/高度/位置由 ⑦ 版面 決定，與 R5-B/C/D 對齊)
+var tbl = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 if barstate.islast
-    table.cell(tbl, 0, 0, &quot;Band Width %&quot;, text_size = size.small)
-    table.cell(tbl, 1, 0, str.tostring(bw, &quot;#.##&quot;), text_size = size.small)
-    table.cell(tbl, 0, 1, &quot;N期最低 BW&quot;, text_size = size.small)
-    table.cell(tbl, 1, 1, str.tostring(bwLow, &quot;#.##&quot;), text_size = size.small)
-    table.cell(tbl, 0, 2, &quot;擠壓中&quot;, text_size = size.small)
-    table.cell(tbl, 1, 2, squeeze ? &quot;是 ⚠&quot; : (recentSqz ? &quot;剛結束&quot; : &quot;否&quot;), text_size = size.small, bgcolor = squeeze ? color.new(color.yellow, 60) : na)
-    table.cell(tbl, 0, 3, &quot;帶寬方向&quot;, text_size = size.small)
-    table.cell(tbl, 1, 3, expanding ? &quot;擴張 ↑&quot; : &quot;收縮 ↓&quot;, text_size = size.small)
-    table.cell(tbl, 0, 4, &quot;MACD (圖表TF)&quot;, text_size = size.small)
-    table.cell(tbl, 1, 4, m2_macd &gt; 0 ? &quot;綠燈&quot; : &quot;紅燈&quot;, text_size = size.small, bgcolor = m2_macd &gt; 0 ? color.new(color.green, 70) : color.new(color.red, 70))
-    table.cell(tbl, 0, 5, &quot;EMA9 斜率&quot;, text_size = size.small)
-    table.cell(tbl, 1, 5, basisUp ? &quot;上升&quot; : (basisDn ? &quot;下降&quot; : &quot;走平&quot;), text_size = size.small)
-    table.cell(tbl, 0, 6, &quot;日線週期 (R5-B)&quot;, text_size = size.small)
-    table.cell(tbl, 1, 6, (up ? &quot;上昇 &quot; : &quot;下跌 &quot;) + str.tostring(progRaw * 100, &quot;#&quot;) + &quot;%&quot; + (useDailyCycle ? &quot; ·過濾中&quot; : &quot;&quot;),
+    table.cell(tbl, 0, 0, &quot;Band Width %&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 0, str.tostring(bw, &quot;#.##&quot;), width = boxW * 0.45, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 0, 1, &quot;N期最低 BW&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 1, str.tostring(bwLow, &quot;#.##&quot;), width = boxW * 0.45, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 0, 2, &quot;擠壓中&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 2, squeeze ? &quot;是 ⚠&quot; : (recentSqz ? &quot;剛結束&quot; : &quot;否&quot;), width = boxW * 0.45, height = boxH / 9, text_size = size.small, bgcolor = squeeze ? color.new(color.yellow, 60) : na)
+    table.cell(tbl, 0, 3, &quot;帶寬方向&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 3, expanding ? &quot;擴張 ↑&quot; : &quot;收縮 ↓&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 0, 4, &quot;MACD (圖表TF)&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 4, m2_macd &gt; 0 ? &quot;綠燈&quot; : &quot;紅燈&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.small, bgcolor = m2_macd &gt; 0 ? color.new(color.green, 70) : color.new(color.red, 70))
+    table.cell(tbl, 0, 5, &quot;EMA9 斜率&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 5, basisUp ? &quot;上升&quot; : (basisDn ? &quot;下降&quot; : &quot;走平&quot;), width = boxW * 0.45, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 0, 6, &quot;日線週期 (R5-B)&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 6, (up ? &quot;上昇 &quot; : &quot;下跌 &quot;) + str.tostring(progRaw * 100, &quot;#&quot;) + &quot;%&quot; + (useDailyCycle ? &quot; ·過濾中&quot; : &quot;&quot;), width = boxW * 0.45, height = boxH / 9,
          text_size = size.small, bgcolor = up ? color.new(cUp, 70) : color.new(cDn, 70))
-    table.cell(tbl, 0, 7, &quot;VCP 等級 (R5-C)&quot;, text_size = size.small)
-    table.cell(tbl, 1, 7, f_gradeTxt(vcpGrade) + &quot; · &quot; + str.tostring(vcpScore, &quot;#&quot;) + (useVcpGrade ? &quot; ·過濾中&quot; : &quot;&quot;), text_size = size.small, bgcolor = color.new(f_gradeCol(vcpGrade), 60))
-    table.cell(tbl, 0, 8, &quot;確定性 (R5-D)&quot;, text_size = size.small)
-    table.cell(tbl, 1, 8, str.tostring(certTotal, &quot;#.#&quot;) + (minCert &gt; 0 ? &quot; ·門檻 &quot; + str.tostring(minCert, &quot;#&quot;) : &quot;&quot;), text_size = size.small, bgcolor = certTotal &gt;= certAlert ? color.new(#3FB68B, 60) : na)
+    table.cell(tbl, 0, 7, &quot;VCP 等級 (R5-C)&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 7, f_gradeTxt(vcpGrade) + &quot; · &quot; + str.tostring(vcpScore, &quot;#&quot;) + (useVcpGrade ? &quot; ·過濾中&quot; : &quot;&quot;), width = boxW * 0.45, height = boxH / 9, text_size = size.small, bgcolor = color.new(f_gradeCol(vcpGrade), 60))
+    table.cell(tbl, 0, 8, &quot;確定性 (R5-D)&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.small)
+    table.cell(tbl, 1, 8, str.tostring(certTotal, &quot;#.#&quot;) + (minCert &gt; 0 ? &quot; ·門檻 &quot; + str.tostring(minCert, &quot;#&quot;) : &quot;&quot;), width = boxW * 0.45, height = boxH / 9, text_size = size.small, bgcolor = certTotal &gt;= certAlert ? color.new(#3FB68B, 60) : na)
 
 // ── M2 警報 ──
 alertcondition(longSig,  &quot;M2 EMA9-BW 做多訊號&quot;, &quot;{{ticker}} EMA9 帶寬策略做多訊號 @{{close}}&quot;)
@@ -3987,16 +3994,20 @@ lateAt = input.float(75, &quot;進入尾段門檻 % (警報用)&quot;, minval = 
 
 grpK = &quot;M1 ③ 時鐘外觀&quot;
 showClock = input.bool(true, &quot;顯示時鐘&quot;, group = grpK)
-posOpt = input.string(&quot;右下&quot;, &quot;位置&quot;, options = [&quot;左上&quot;, &quot;右上&quot;, &quot;左下&quot;, &quot;右下&quot;], group = grpK)
 grid   = input.int(11, &quot;解析度 (格數, 建議奇數 9–13；pane 較矮用小值)&quot;, minval = 9, maxval = 21, group = grpK)
-cellW  = input.float(0.6, &quot;格寬 (% 圖表寬)&quot;, minval = 0.2, step = 0.1, group = grpK)
-cellH  = input.float(1.1, &quot;格高 (% 圖表高)&quot;, minval = 0.3, step = 0.1, group = grpK)
 tz     = input.string(&quot;America/New_York&quot;, &quot;日期時區&quot;, group = grpK)
 cUp    = input.color(color.new(#16a34a, 0),  &quot;上昇周期色&quot;, group = grpK)
 cDn    = input.color(color.new(#dc2626, 0),  &quot;下跌周期色&quot;, group = grpK)
 cHand  = input.color(color.new(#facc15, 0),  &quot;指針色&quot;, group = grpK)
 showBg  = input.bool(true, &quot;週期背景著色&quot;, group = grpK)
 showLbl = input.bool(true, &quot;在切換處標註上一段週期長度&quot;, group = grpK)
+
+// ── ⑦ 版面（四支 R5 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+grpL   = &quot;⑦ 版面 (四個 pane 統一)&quot;
+boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬；四支腳本設同值)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL)
+boxH   = input.float(100, &quot;資訊框高度 (% 本 pane 高；100 = 撐滿)&quot;, minval = 30, maxval = 100, step = 5, group = grpL)
+boxPos = input.string(&quot;右中&quot;, &quot;垂直位置 (高度 &lt;100 時才有差別)&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;], group = grpL)
+f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
 
 // ── M1 日線週期引擎 (在 security 的日線環境中執行) ──
 f_cycle() =&gt;
@@ -4072,9 +4083,11 @@ plotshape(bar_index == extBar and not up ? hist : na, &quot;本周期新低 (轉
      location.absolute, color.new(#eab308, 15), size = size.tiny)
 
 // ── M1 時鐘 (table) ──
-tpos = posOpt == &quot;右上&quot; ? position.top_right : posOpt == &quot;右中&quot; ? position.middle_right :
-       posOpt == &quot;右下&quot; ? position.bottom_right : posOpt == &quot;左上&quot; ? position.top_left :
-       posOpt == &quot;左中&quot; ? position.middle_left : position.bottom_left
+// 時鐘尺寸由 ⑦ 版面 的 boxW / boxH 推導：上下各一列文字 (hdrH%)，中間 grid 列平均分配
+hdrH  = 6.0
+cellW = boxW / grid
+cellH = (boxH - 2 * hdrH) / grid
+tpos  = f_boxPos(boxPos)
 
 var table clk = table.new(tpos, grid, grid + 2, bgcolor = color.new(color.black, 100),
      frame_color = color.black, frame_width = 2)
@@ -4091,7 +4104,7 @@ if showClock and barstate.islast
         merged := true
 
     activeCol = up ? cUp : cDn
-    table.cell(clk, 0, 0, phaseTxt, text_color = color.white, bgcolor = color.new(activeCol, 10),
+    table.cell(clk, 0, 0, phaseTxt, width = cellW, height = hdrH, text_color = color.white, bgcolor = color.new(activeCol, 10),
          text_size = size.small, text_halign = text.align_center)
 
     c  = (grid - 1) / 2.0            // 圓心索引
@@ -4132,7 +4145,7 @@ if showClock and barstate.islast
          &quot;\n均升 &quot; + str.tostring(avgUp, &quot;#.#&quot;) + &quot; 日 · 均跌 &quot; + str.tostring(avgDn, &quot;#.#&quot;) + &quot; 日&quot; +
          (timeframe.period != cycTF ? &quot;\n(日線週期 疊加於 &quot; + timeframe.period + &quot; 圖)&quot; : &quot;&quot;) +
          (not up and not na(extBar) ? &quot;\n距轉勢點 &quot; + str.tostring(bar_index - extBar) + &quot; 根&quot; : &quot;&quot;)
-    table.cell(clk, 0, grid + 1, statTxt, text_color = color.white,
+    table.cell(clk, 0, grid + 1, statTxt, width = cellW, height = hdrH, text_color = color.white,
          bgcolor = color.new(color.gray, 30), text_size = size.tiny, text_halign = text.align_center)
 
 // ── M1 警報 ──
@@ -4167,6 +4180,13 @@ bench = input.symbol(&quot;SPY&quot;, &quot;相對強度 (RS) 基準&quot;, grou
 
 grpW = &quot;② 面板&quot;
 showVcp = input.bool(true, &quot;顯示明細面板 (本 pane 右側)&quot;, group = grpW)
+
+// ── ⑦ 版面（四支 R5 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+grpL   = &quot;⑦ 版面 (四個 pane 統一)&quot;
+boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬；四支腳本設同值)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL)
+boxH   = input.float(100, &quot;資訊框高度 (% 本 pane 高；100 = 撐滿)&quot;, minval = 30, maxval = 100, step = 5, group = grpL)
+boxPos = input.string(&quot;右中&quot;, &quot;垂直位置 (高度 &lt;100 時才有差別)&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;], group = grpL)
+f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
 
 f_clamp01(x) =&gt; math.max(0.0, math.min(1.0, x))
 
@@ -4363,7 +4383,7 @@ if vcpGrade != vcpGrade[1]
          color = color.new(gCol, 15), textcolor = color.white, size = size.tiny)
 
 // ── 明細面板（本 pane 右側）──
-var table tV = table.new(position.middle_right, 2, 9, bgcolor = color.new(#ffffff, 5),
+var table tV = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 var bool vInit = false
 if showVcp and barstate.islast
@@ -4372,34 +4392,34 @@ if showVcp and barstate.islast
             table.cell(tV, 0, rj, &quot;&quot;)
             table.cell(tV, 1, rj, &quot;&quot;)
         vInit := true
-    table.cell(tV, 0, 0, &quot;VCP &quot; + str.tostring(vcpScore, &quot;#.#&quot;), text_color = color.white,
+    table.cell(tV, 0, 0, &quot;VCP &quot; + str.tostring(vcpScore, &quot;#.#&quot;), width = boxW * 0.45, height = boxH / 9, text_color = color.white,
          bgcolor = color.new(gCol, 10), text_size = size.small)
-    table.cell(tV, 1, 0, f_gradeTxt(vcpGrade), text_color = color.white,
+    table.cell(tV, 1, 0, f_gradeTxt(vcpGrade), width = boxW * 0.55, height = boxH / 9, text_color = color.white,
          bgcolor = color.new(gCol, 10), text_size = size.small)
-    table.cell(tV, 0, 1, &quot;距 52 週高&quot;, text_size = size.tiny)
-    table.cell(tV, 1, 1, str.tostring(-offHigh, &quot;#.#&quot;) + &quot;%&quot;, text_size = size.tiny,
+    table.cell(tV, 0, 1, &quot;距 52 週高&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 1, str.tostring(-offHigh, &quot;#.#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
          text_color = offHigh &lt;= 10 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 2, &quot;距 52 週低&quot;, text_size = size.tiny)
-    table.cell(tV, 1, 2, &quot;+&quot; + str.tostring(aboveLow, &quot;#&quot;) + &quot;%&quot;, text_size = size.tiny,
+    table.cell(tV, 0, 2, &quot;距 52 週低&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 2, &quot;+&quot; + str.tostring(aboveLow, &quot;#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
          text_color = aboveLow &gt;= 30 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 3, &quot;1 月 / 3 月&quot;, text_size = size.tiny)
-    table.cell(tV, 1, 3, str.tostring(chg1m, &quot;+#.#&quot;) + &quot;% / &quot; + str.tostring(chg3m, &quot;+#.#&quot;) + &quot;%&quot;,
+    table.cell(tV, 0, 3, &quot;1 月 / 3 月&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 3, str.tostring(chg1m, &quot;+#.#&quot;) + &quot;% / &quot; + str.tostring(chg3m, &quot;+#.#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = boxH / 9,
          text_size = size.tiny, text_color = extendedB ? #E5B15C : color.gray)
-    table.cell(tV, 0, 4, &quot;21 日收盤區間&quot;, text_size = size.tiny)
-    table.cell(tV, 1, 4, str.tostring(rng21, &quot;#.#&quot;) + &quot;%&quot; + (tightB ? &quot; 緊縮 ✓&quot; : &quot;&quot;),
+    table.cell(tV, 0, 4, &quot;21 日收盤區間&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 4, str.tostring(rng21, &quot;#.#&quot;) + &quot;%&quot; + (tightB ? &quot; 緊縮 ✓&quot; : &quot;&quot;), width = boxW * 0.55, height = boxH / 9,
          text_size = size.tiny, text_color = tightB ? #3FB68B : color.gray)
-    table.cell(tV, 0, 5, &quot;量比 10d/50d&quot;, text_size = size.tiny)
-    table.cell(tV, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + (volRatio &lt; 0.95 ? &quot; 量縮 ✓&quot; : &quot;&quot;),
+    table.cell(tV, 0, 5, &quot;量比 10d/50d&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + (volRatio &lt; 0.95 ? &quot; 量縮 ✓&quot; : &quot;&quot;), width = boxW * 0.55, height = boxH / 9,
          text_size = size.tiny, text_color = volRatio &lt; 0.95 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 6, &quot;趨勢模板&quot;, text_size = size.tiny)
+    table.cell(tV, 0, 6, &quot;趨勢模板&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
     table.cell(tV, 1, 6, (trendOK ? &quot;通過 ✓&quot; : &quot;未通過&quot;) + &quot;  MA50&quot; + (a50B ? &quot;✓&quot; : &quot;✗&quot;) +
-         &quot; MA200&quot; + (a200B ? &quot;✓&quot; : &quot;✗&quot;) + &quot; 50&gt;200&quot; + (crossB ? &quot;✓&quot; : &quot;✗&quot;),
+         &quot; MA200&quot; + (a200B ? &quot;✓&quot; : &quot;✗&quot;) + &quot; 50&gt;200&quot; + (crossB ? &quot;✓&quot; : &quot;✗&quot;), width = boxW * 0.55, height = boxH / 9,
          text_size = size.tiny, text_color = trendOK ? #3FB68B : #E0705F)
-    table.cell(tV, 0, 7, &quot;延伸判定&quot;, text_size = size.tiny)
-    table.cell(tV, 1, 7, extendedB ? &quot;21 日漲幅 &gt;15% → E&quot; : &quot;否&quot;, text_size = size.tiny,
+    table.cell(tV, 0, 7, &quot;延伸判定&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 7, extendedB ? &quot;21 日漲幅 &gt;15% → E&quot; : &quot;否&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
          text_color = extendedB ? #E5B15C : color.gray)
-    table.cell(tV, 0, 8, &quot;A=待突破 B=上升 C=修復&quot;, text_size = size.tiny, text_color = color.gray)
-    table.cell(tV, 1, 8, &quot;D=趨勢弱 E=延伸&quot;, text_size = size.tiny, text_color = color.gray)
+    table.cell(tV, 0, 8, &quot;A=待突破 B=上升 C=修復&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+    table.cell(tV, 1, 8, &quot;D=趨勢弱 E=延伸&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
 
 alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, &quot;VCP 轉 A 級 (待突破)&quot;, &quot;{{ticker}} VCP 等級轉為 A · VCP 待突破&quot;)
 alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&quot;, &quot;{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高&quot;)
@@ -4433,6 +4453,13 @@ grpW = &quot;② 面板&quot;
 showCert  = input.bool(true, &quot;顯示 7 分項面板 (本 pane 右側)&quot;, group = grpW)
 certAlert = input.float(70, &quot;確定性警報門檻 (≥)&quot;, minval = 0, maxval = 100, group = grpW)
 showParts = input.bool(false, &quot;同時畫出 7 個分項細線&quot;, group = grpW)
+
+// ── ⑦ 版面（四支 R5 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+grpL   = &quot;⑦ 版面 (四個 pane 統一)&quot;
+boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬；四支腳本設同值)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL)
+boxH   = input.float(100, &quot;資訊框高度 (% 本 pane 高；100 = 撐滿)&quot;, minval = 30, maxval = 100, step = 5, group = grpL)
+boxPos = input.string(&quot;右中&quot;, &quot;垂直位置 (高度 &lt;100 時才有差別)&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;], group = grpL)
+f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
 
 f_clamp01(x) =&gt; math.max(0.0, math.min(1.0, x))
 
@@ -4636,7 +4663,7 @@ hline(50, &quot;50&quot;, color = color.new(color.gray, 60))
 bgcolor(hlOk ? color.new(#3FB68B, 92) : na, title = &quot;一底高於一底 結構&quot;)
 
 // ── 7 分項面板（本 pane 右側）──
-var table tD = table.new(position.middle_right, 3, 9, bgcolor = color.new(#ffffff, 5),
+var table tD = table.new(f_boxPos(boxPos), 3, 9, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 var bool dInit = false
 if showCert and barstate.islast
@@ -4647,21 +4674,21 @@ if showCert and barstate.islast
         dInit := true
     hdrCol = certTotal &gt;= certAlert ? color.new(#3FB68B, 10) :
              certTotal &gt;= 50 ? color.new(#E5B15C, 10) : color.new(#6B7885, 10)
-    table.cell(tD, 0, 0, &quot;確定性&quot;, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
-    table.cell(tD, 1, 0, str.tostring(certTotal, &quot;#.#&quot;), text_color = color.white, bgcolor = hdrCol, text_size = size.small)
-    table.cell(tD, 2, 0, hlOk ? &quot;HL ✓ &quot; + str.tostring(nBot) + &quot; 底&quot; : &quot;無 HL&quot;, text_color = color.white,
+    table.cell(tD, 0, 0, &quot;確定性&quot;, width = boxW * 0.40, height = boxH / 9, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
+    table.cell(tD, 1, 0, str.tostring(certTotal, &quot;#.#&quot;), width = boxW * 0.38, height = boxH / 9, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
+    table.cell(tD, 2, 0, hlOk ? &quot;HL ✓ &quot; + str.tostring(nBot) + &quot; 底&quot; : &quot;無 HL&quot;, width = boxW * 0.22, height = boxH / 9, text_color = color.white,
          bgcolor = hdrCol, text_size = size.tiny)
     names = array.from(&quot;突破 25%&quot;, &quot;回升 10%&quot;, &quot;守底 15%&quot;, &quot;量縮 15%&quot;, &quot;收縮 10%&quot;, &quot;RS 10%&quot;, &quot;均線 15%&quot;)
     vals  = array.from(cBreak, cRetr, cTime, cDv, cContr, cRs, cMa)
     for i = 0 to 6
         v = array.get(vals, i)
-        table.cell(tD, 0, i + 1, array.get(names, i), text_size = size.tiny, text_halign = text.align_left)
-        table.cell(tD, 1, i + 1, f_bar(v, 8), text_size = size.tiny,
+        table.cell(tD, 0, i + 1, array.get(names, i), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(tD, 1, i + 1, f_bar(v, 8), width = boxW * 0.38, height = boxH / 9, text_size = size.tiny,
              text_color = v &gt;= 0.7 ? #3FB68B : v &gt;= 0.4 ? #E5B15C : #8B98A5)
-        table.cell(tD, 2, i + 1, str.tostring(v * 100, &quot;#&quot;), text_size = size.tiny, text_halign = text.align_right)
-    table.cell(tD, 0, 8, &quot;量比(跌/漲) &quot; + str.tostring(dvRatio, &quot;#.##&quot;), text_size = size.tiny, text_color = color.gray)
-    table.cell(tD, 1, 8, &quot;RS21 &quot; + str.tostring(rs21 * 100, &quot;+#.#&quot;) + &quot;%&quot;, text_size = size.tiny, text_color = color.gray)
-    table.cell(tD, 2, 8, hlOk ? &quot;守底 &quot; + str.tostring(dHeld) + &quot;日&quot; : &quot;–&quot;, text_size = size.tiny, text_color = color.gray)
+        table.cell(tD, 2, i + 1, str.tostring(v * 100, &quot;#&quot;), width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_halign = text.align_right)
+    table.cell(tD, 0, 8, &quot;量比(跌/漲) &quot; + str.tostring(dvRatio, &quot;#.##&quot;), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+    table.cell(tD, 1, 8, &quot;RS21 &quot; + str.tostring(rs21 * 100, &quot;+#.#&quot;) + &quot;%&quot;, width = boxW * 0.38, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+    table.cell(tD, 2, 8, hlOk ? &quot;守底 &quot; + str.tostring(dHeld) + &quot;日&quot; : &quot;–&quot;, width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
 
 alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;確定性達門檻&quot;,
      &quot;{{ticker}} 確定性總分升至門檻以上&quot;)

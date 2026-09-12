@@ -35,16 +35,20 @@ lateAt = input.float(75, "進入尾段門檻 % (警報用)", minval = 50, maxval
 
 grpK = "M1 ③ 時鐘外觀"
 showClock = input.bool(true, "顯示時鐘", group = grpK)
-posOpt = input.string("右下", "位置", options = ["左上", "右上", "左下", "右下"], group = grpK)
 grid   = input.int(11, "解析度 (格數, 建議奇數 9–13；pane 較矮用小值)", minval = 9, maxval = 21, group = grpK)
-cellW  = input.float(0.6, "格寬 (% 圖表寬)", minval = 0.2, step = 0.1, group = grpK)
-cellH  = input.float(1.1, "格高 (% 圖表高)", minval = 0.3, step = 0.1, group = grpK)
 tz     = input.string("America/New_York", "日期時區", group = grpK)
 cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK)
 cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK)
 cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK)
 showBg  = input.bool(true, "週期背景著色", group = grpK)
 showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK)
+
+// ── ⑦ 版面（四支 R5 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+grpL   = "⑦ 版面 (四個 pane 統一)"
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL)
+boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL)
+boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL)
+f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
 
 // ── M1 日線週期引擎 (在 security 的日線環境中執行) ──
 f_cycle() =>
@@ -120,9 +124,11 @@ plotshape(bar_index == extBar and not up ? hist : na, "本周期新低 (轉勢�
      location.absolute, color.new(#eab308, 15), size = size.tiny)
 
 // ── M1 時鐘 (table) ──
-tpos = posOpt == "右上" ? position.top_right : posOpt == "右中" ? position.middle_right :
-       posOpt == "右下" ? position.bottom_right : posOpt == "左上" ? position.top_left :
-       posOpt == "左中" ? position.middle_left : position.bottom_left
+// 時鐘尺寸由 ⑦ 版面 的 boxW / boxH 推導：上下各一列文字 (hdrH%)，中間 grid 列平均分配
+hdrH  = 6.0
+cellW = boxW / grid
+cellH = (boxH - 2 * hdrH) / grid
+tpos  = f_boxPos(boxPos)
 
 var table clk = table.new(tpos, grid, grid + 2, bgcolor = color.new(color.black, 100),
      frame_color = color.black, frame_width = 2)
@@ -139,7 +145,7 @@ if showClock and barstate.islast
         merged := true
 
     activeCol = up ? cUp : cDn
-    table.cell(clk, 0, 0, phaseTxt, text_color = color.white, bgcolor = color.new(activeCol, 10),
+    table.cell(clk, 0, 0, phaseTxt, width = cellW, height = hdrH, text_color = color.white, bgcolor = color.new(activeCol, 10),
          text_size = size.small, text_halign = text.align_center)
 
     c  = (grid - 1) / 2.0            // 圓心索引
@@ -180,7 +186,7 @@ if showClock and barstate.islast
          "\n均升 " + str.tostring(avgUp, "#.#") + " 日 · 均跌 " + str.tostring(avgDn, "#.#") + " 日" +
          (timeframe.period != cycTF ? "\n(日線週期 疊加於 " + timeframe.period + " 圖)" : "") +
          (not up and not na(extBar) ? "\n距轉勢點 " + str.tostring(bar_index - extBar) + " 根" : "")
-    table.cell(clk, 0, grid + 1, statTxt, text_color = color.white,
+    table.cell(clk, 0, grid + 1, statTxt, width = cellW, height = hdrH, text_color = color.white,
          bgcolor = color.new(color.gray, 30), text_size = size.tiny, text_halign = text.align_center)
 
 // ── M1 警報 ──

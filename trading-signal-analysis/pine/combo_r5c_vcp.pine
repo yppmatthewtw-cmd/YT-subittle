@@ -23,6 +23,13 @@ bench = input.symbol("SPY", "相對強度 (RS) 基準", group = grpV)
 grpW = "② 面板"
 showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW)
 
+// ── ⑦ 版面（四支 R5 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+grpL   = "⑦ 版面 (四個 pane 統一)"
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL)
+boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL)
+boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL)
+f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
+
 f_clamp01(x) => math.max(0.0, math.min(1.0, x))
 
 f_pos(s) => s == "左上" ? position.top_left : s == "左中" ? position.middle_left : s == "左下" ? position.bottom_left :
@@ -218,7 +225,7 @@ if vcpGrade != vcpGrade[1]
          color = color.new(gCol, 15), textcolor = color.white, size = size.tiny)
 
 // ── 明細面板（本 pane 右側）──
-var table tV = table.new(position.middle_right, 2, 9, bgcolor = color.new(#ffffff, 5),
+var table tV = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 var bool vInit = false
 if showVcp and barstate.islast
@@ -227,34 +234,34 @@ if showVcp and barstate.islast
             table.cell(tV, 0, rj, "")
             table.cell(tV, 1, rj, "")
         vInit := true
-    table.cell(tV, 0, 0, "VCP " + str.tostring(vcpScore, "#.#"), text_color = color.white,
+    table.cell(tV, 0, 0, "VCP " + str.tostring(vcpScore, "#.#"), width = boxW * 0.45, height = boxH / 9, text_color = color.white,
          bgcolor = color.new(gCol, 10), text_size = size.small)
-    table.cell(tV, 1, 0, f_gradeTxt(vcpGrade), text_color = color.white,
+    table.cell(tV, 1, 0, f_gradeTxt(vcpGrade), width = boxW * 0.55, height = boxH / 9, text_color = color.white,
          bgcolor = color.new(gCol, 10), text_size = size.small)
-    table.cell(tV, 0, 1, "距 52 週高", text_size = size.tiny)
-    table.cell(tV, 1, 1, str.tostring(-offHigh, "#.#") + "%", text_size = size.tiny,
+    table.cell(tV, 0, 1, "距 52 週高", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 1, str.tostring(-offHigh, "#.#") + "%", width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
          text_color = offHigh <= 10 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 2, "距 52 週低", text_size = size.tiny)
-    table.cell(tV, 1, 2, "+" + str.tostring(aboveLow, "#") + "%", text_size = size.tiny,
+    table.cell(tV, 0, 2, "距 52 週低", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 2, "+" + str.tostring(aboveLow, "#") + "%", width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
          text_color = aboveLow >= 30 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 3, "1 月 / 3 月", text_size = size.tiny)
-    table.cell(tV, 1, 3, str.tostring(chg1m, "+#.#") + "% / " + str.tostring(chg3m, "+#.#") + "%",
+    table.cell(tV, 0, 3, "1 月 / 3 月", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 3, str.tostring(chg1m, "+#.#") + "% / " + str.tostring(chg3m, "+#.#") + "%", width = boxW * 0.55, height = boxH / 9,
          text_size = size.tiny, text_color = extendedB ? #E5B15C : color.gray)
-    table.cell(tV, 0, 4, "21 日收盤區間", text_size = size.tiny)
-    table.cell(tV, 1, 4, str.tostring(rng21, "#.#") + "%" + (tightB ? " 緊縮 ✓" : ""),
+    table.cell(tV, 0, 4, "21 日收盤區間", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 4, str.tostring(rng21, "#.#") + "%" + (tightB ? " 緊縮 ✓" : ""), width = boxW * 0.55, height = boxH / 9,
          text_size = size.tiny, text_color = tightB ? #3FB68B : color.gray)
-    table.cell(tV, 0, 5, "量比 10d/50d", text_size = size.tiny)
-    table.cell(tV, 1, 5, str.tostring(volRatio, "#.##") + (volRatio < 0.95 ? " 量縮 ✓" : ""),
+    table.cell(tV, 0, 5, "量比 10d/50d", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 5, str.tostring(volRatio, "#.##") + (volRatio < 0.95 ? " 量縮 ✓" : ""), width = boxW * 0.55, height = boxH / 9,
          text_size = size.tiny, text_color = volRatio < 0.95 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 6, "趨勢模板", text_size = size.tiny)
+    table.cell(tV, 0, 6, "趨勢模板", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
     table.cell(tV, 1, 6, (trendOK ? "通過 ✓" : "未通過") + "  MA50" + (a50B ? "✓" : "✗") +
-         " MA200" + (a200B ? "✓" : "✗") + " 50>200" + (crossB ? "✓" : "✗"),
+         " MA200" + (a200B ? "✓" : "✗") + " 50>200" + (crossB ? "✓" : "✗"), width = boxW * 0.55, height = boxH / 9,
          text_size = size.tiny, text_color = trendOK ? #3FB68B : #E0705F)
-    table.cell(tV, 0, 7, "延伸判定", text_size = size.tiny)
-    table.cell(tV, 1, 7, extendedB ? "21 日漲幅 >15% → E" : "否", text_size = size.tiny,
+    table.cell(tV, 0, 7, "延伸判定", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 1, 7, extendedB ? "21 日漲幅 >15% → E" : "否", width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
          text_color = extendedB ? #E5B15C : color.gray)
-    table.cell(tV, 0, 8, "A=待突破 B=上升 C=修復", text_size = size.tiny, text_color = color.gray)
-    table.cell(tV, 1, 8, "D=趨勢弱 E=延伸", text_size = size.tiny, text_color = color.gray)
+    table.cell(tV, 0, 8, "A=待突破 B=上升 C=修復", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+    table.cell(tV, 1, 8, "D=趨勢弱 E=延伸", width = boxW * 0.55, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
 
 alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, "VCP 轉 A 級 (待突破)", "{{ticker}} VCP 等級轉為 A · VCP 待突破")
 alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, "VCP 轉 E 級 (延伸)", "{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高")
