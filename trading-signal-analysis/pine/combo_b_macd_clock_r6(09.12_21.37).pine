@@ -1,13 +1,13 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:12_18:27)
+//  版本 r6(09:12_21:37)
 //  R6-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.12_18.27).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.12_18.27).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.12_18.27).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.12_18.27).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.12_21.37).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.12_21.37).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.12_21.37).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.12_21.37).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -19,7 +19,7 @@
 //  R6：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R6-B MACD + Cycle Clock r6(09:12_18:27)", shorttitle = "R6-B MACD Clock",
+indicator("R6-B MACD + Cycle Clock r6(09:12_21:37)", shorttitle = "R6-B MACD Clock",
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -168,6 +168,12 @@ if divLine and onCycTF and bullDiv
 if divLine and onCycTF and bearDiv
     line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 2)
 
+// Pine 沒有 math.atan2，自行實作（回傳弧度，範圍 -π..π）
+f_atan2(y, x) =>
+    x > 0 ? math.atan(y / x) :
+     x < 0 ? (y >= 0 ? math.atan(y / x) + math.pi : math.atan(y / x) - math.pi) :
+     (y > 0 ? math.pi / 2 : y < 0 ? -math.pi / 2 : 0.0)
+
 // ── M1 時鐘 (table) ──
 // 時鐘尺寸由 ⑦ 版面 的 boxW / boxH 推導：上下各一列文字 (hdrH%)，中間 grid 列平均分配
 hdrH  = 6.0
@@ -212,7 +218,7 @@ if showClock and barstate.islast
             dx = i - c
             dy = j - c
             d  = math.sqrt(dx * dx + dy * dy)
-            ang = math.todegrees(math.atan2(dx, -dy))  // 順時針、12 點鐘 = 0°
+            ang = math.todegrees(f_atan2(dx, -dy))     // 順時針、12 點鐘 = 0°
             ang := ang < 0 ? ang + 360 : ang
             rel = ang - startA
             rel := rel < 0 ? rel + 360 : rel           // 相對本周期起點的角度

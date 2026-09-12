@@ -180,6 +180,12 @@ if divLine and onCycTF and bullDiv
 if divLine and onCycTF and bearDiv
     line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 2)
 
+// Pine 沒有 math.atan2，自行實作（回傳弧度，範圍 -π..π）
+f_atan2(y, x) =>
+    x > 0 ? math.atan(y / x) :
+     x < 0 ? (y >= 0 ? math.atan(y / x) + math.pi : math.atan(y / x) - math.pi) :
+     (y > 0 ? math.pi / 2 : y < 0 ? -math.pi / 2 : 0.0)
+
 // ── M1 時鐘 (table) ──'''
 b = must(b, "\n// ── M1 時鐘 (table) ──", DIV_DRAW, "B 背馳繪圖")
 
@@ -207,7 +213,7 @@ NEW_CLOCK = '''    activeCol = up ? cUp : cDn
             dx = i - c
             dy = j - c
             d  = math.sqrt(dx * dx + dy * dy)
-            ang = math.todegrees(math.atan2(dx, -dy))  // 順時針、12 點鐘 = 0°
+            ang = math.todegrees(f_atan2(dx, -dy))     // 順時針、12 點鐘 = 0°
             ang := ang < 0 ? ang + 360 : ang
             rel = ang - startA
             rel := rel < 0 ? rel + 360 : rel           // 相對本周期起點的角度
