@@ -3,10 +3,11 @@
 由 R5 四件套產生 R6 四件套（檔名尾綴 r6(mm.dd_hh.mm)，腳本標題內為 r6(mm:dd_hh:mm)）。
 
 R6 變更：
-  A  主圖底部加入成交量柱；「主力大單買入 / 賣出」交易日以另色標示 + 狀態框新增一列 + 警報
+  A  主力大單買入 / 賣出日 ◆ 標記 + 狀態框新增一列 + 警報（成交量柱改畫在 R6-C）
   B  MACD 加入頂背馳 / 底背馳（日線環境計算；日線圖上畫連線）；時鐘解析度提高 (預設 21 格)、
      環厚 / 指針寬隨解析度放大、已走過弧段亮色、12/3/6/9 刻度
-  C  等級變動標籤字級加大一倍 (tiny → normal，可調)
+  C  成交量柱移到本 pane（以 50 日均量 = 25 標準化，直接對照量比）；等級標籤去雜訊 (持續 N 根才標、只留最近 M 個)、
+     字級加大一倍；等級背景預設關閉、曲線加粗
   D  只有「高確定性」(≥ 門檻) 區段著色；其餘灰色無色；門檻線 + 區間填色 + 進入高確定性標記
 用法：python3 build_r6.py            → 產生四個 combo_*_r6(mm.dd_hh.mm).pine
 """
@@ -49,21 +50,15 @@ a = (P / NAMES["a"][1]).read_text(encoding="utf-8")
 a = common(a, "a")
 
 VOL_BLOCK = '''
-// ── ⑧ 主圖底部成交量 + 主力大單日 ──
-// 成交量柱以 plotcandle 畫在價格區間下方：柱底 = 最近 volWin 根最低價再往下 3%，
-// 柱高按視窗內最大量等比縮放到價格區間的 volArea%。主力大單 = 量 ≥ bigX × 均量，
-// 且收在當日區間上緣 (買入) / 下緣 (賣出)。
-grpVol  = "⑧ 成交量 (主圖底部)"
-showVol = input.bool(true, "顯示成交量柱", group = grpVol)
-volLen  = input.int(50, "均量期數", minval = 5, group = grpVol)
+// ── ⑧ 主力大單日（成交量柱本身畫在 R6-C pane，主圖只留 ◆ 標記 / 狀態列 / 警報）──
+// 主力大單 = 量 ≥ bigX × 均量，且收在當日區間上緣 (買入) / 下緣 (賣出)。
+grpVol  = "⑧ 主力大單 (成交量柱在 R6-C)"
+volLen  = input.int(50, "均量期數 (與 R6-C 設同值)", minval = 5, group = grpVol)
 bigX    = input.float(2.0, "主力大單門檻 (× 均量)", minval = 1.2, step = 0.1, group = grpVol)
 bigPos  = input.float(0.6, "主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之", minval = 0.5, maxval = 1, step = 0.05, group = grpVol)
-volArea = input.float(18, "成交量區佔價格區間高度 %", minval = 5, maxval = 40, group = grpVol)
-volWin  = input.int(150, "定位視窗 (根)", minval = 20, group = grpVol)
-markBig = input.bool(true, "K 線旁另加 ◆ 標記", group = grpVol)
+markBig = input.bool(true, "K 線旁加 ◆ 標記 (藍 = 主買、橙 = 主賣)", group = grpVol)
 cBuy    = input.color(#2563eb, "主力買入色", group = grpVol)
 cSell   = input.color(#f97316, "主力賣出色", group = grpVol)
-cVolN   = input.color(color.new(color.gray, 65), "一般成交量色", group = grpVol)
 
 vAvg    = ta.sma(volume, volLen)
 rngPos  = high != low ? (close - low) / (high - low) : 0.5
@@ -72,18 +67,9 @@ bigBuy  = bigVol and close > open and rngPos >= bigPos
 bigSell = bigVol and close < open and rngPos <= 1 - bigPos
 nBuy20  = math.sum(bigBuy  ? 1 : 0, 20)
 nSell20 = math.sum(bigSell ? 1 : 0, 20)
-
-winLo = ta.lowest(low, volWin)
-winHi = ta.highest(high, volWin)
-vMax  = ta.highest(volume, volWin)
-vBase = winLo - (winHi - winLo) * 0.03
-vTop  = vBase + (winHi - winLo) * volArea / 100 * (vMax > 0 ? volume / vMax : 0)
-volCol = bigBuy ? cBuy : bigSell ? cSell : cVolN
-plotcandle(showVol ? vBase : na, showVol ? vTop : na, showVol ? vBase : na, showVol ? vTop : na,
-     "成交量 (主圖底部)", color = volCol, wickcolor = color.new(color.gray, 100), bordercolor = volCol)
 plotshape(markBig and bigBuy,  "主力大單買入日", shape.diamond, location.belowbar, cBuy,  size = size.tiny)
 plotshape(markBig and bigSell, "主力大單賣出日", shape.diamond, location.abovebar, cSell, size = size.tiny)
-plot(volume, "成交量", color = volCol, display = display.data_window)
+plot(volume, "成交量", color = bigBuy ? cBuy : bigSell ? cSell : color.gray, display = display.data_window)
 plot(vAvg,   "均量",   color = color.gray, display = display.data_window)
 
 '''
@@ -264,8 +250,59 @@ c = must(c, 'showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", 
             'showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW)\n'
             'lblSz   = input.string("中", "等級標籤字級 (R6：預設放大一倍)", options = ["小", "中", "大"], group = grpW)\n'
             'f_lblSz(s) => s == "小" ? size.small : s == "大" ? size.large : size.normal\n', "C 字級輸入")
-c = must(c, '''         color = color.new(gCol, 15), textcolor = color.white, size = size.tiny)''',
-            '''         color = color.new(gCol, 15), textcolor = color.white, size = f_lblSz(lblSz))''', "C 標籤字級")
+c = must(c, 'lblSz   = input.string("中", "等級標籤字級 (R6：預設放大一倍)", options = ["小", "中", "大"], group = grpW)\n',
+            'lblSz   = input.string("中", "等級標籤字級 (R6：預設放大一倍)", options = ["小", "中", "大"], group = grpW)\n'
+            'lblHold = input.int(3, "等級需持續幾根才標註 (去雜訊)", minval = 1, maxval = 20, group = grpW)\n'
+            'lblMax  = input.int(8, "最多保留最近幾個標籤", minval = 1, maxval = 50, group = grpW)\n'
+            'showGBg = input.bool(false, "等級背景著色 (R6 預設關閉)", group = grpW)\n', "C 標籤去雜訊輸入")
+
+VOL_C = '''
+// ── ⑧ 成交量柱（自 R6-A 移入本 pane）：以 volLen 日均量 = 25 標準化，柱高直接就是「量比 × 25」──
+//    50 日均量 = 25 (灰虛線)；10 日均量線 / 25 = VCP 明細裡的「量比 10d/50d」；2 倍均量 = 50；超過 4 倍 (100) 截頂。
+grpVol  = "⑧ 成交量 (本 pane，均量 = 25)"
+showVolC = input.bool(true, "顯示成交量柱", group = grpVol)
+volLen  = input.int(50, "均量期數 (基準 = 25)", minval = 5, group = grpVol)
+bigX    = input.float(2.0, "主力大單門檻 (× 均量；與 R6-A 設同值)", minval = 1.2, step = 0.1, group = grpVol)
+bigPos  = input.float(0.6, "主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之", minval = 0.5, maxval = 1, step = 0.05, group = grpVol)
+cBuy    = input.color(#2563eb, "主力買入色", group = grpVol)
+cSell   = input.color(#f97316, "主力賣出色", group = grpVol)
+cVolN   = input.color(color.new(color.gray, 70), "一般成交量色", group = grpVol)
+
+vAvgC   = ta.sma(volume, volLen)
+v10C    = ta.sma(volume, 10)
+rngPosC = high != low ? (close - low) / (high - low) : 0.5
+bigVolC = volume >= vAvgC * bigX
+bigBuyC  = bigVolC and close > open and rngPosC >= bigPos
+bigSellC = bigVolC and close < open and rngPosC <= 1 - bigPos
+volN  = vAvgC > 0 ? math.min(volume / vAvgC * 25, 100) : na
+v10N  = vAvgC > 0 ? math.min(v10C / vAvgC * 25, 100) : na
+volColC = bigBuyC ? cBuy : bigSellC ? cSell : cVolN
+plot(showVolC ? volN : na, "成交量 (均量=25)", style = plot.style_columns, color = volColC)
+plot(showVolC ? v10N : na, "10 日均量 (÷50日均量×25)", color = color.new(#9333ea, 30), linewidth = 1)
+hline(25, "50 日均量基準 = 25", color = color.new(color.gray, 40), linestyle = hline.style_dotted)
+hline(50, "2 倍均量 = 50", color = color.new(color.gray, 70), linestyle = hline.style_dotted)
+
+'''
+c = must(c, "// ── 曲線 ──\n", VOL_C.lstrip("\n") + "// ── 曲線 ──\n", "C 成交量區塊")
+c = must(c, 'plot(vcpScore, "VCP 指數", color = color.new(gCol, 0), linewidth = 2)',
+            'plot(vcpScore, "VCP 指數", color = color.new(gCol, 0), linewidth = 3)', "C 曲線加粗")
+c = must(c, 'bgcolor(color.new(gCol, 90), title = "等級背景 (綠A 藍B 灰C 深灰D 黃E)")',
+            'bgcolor(showGBg ? color.new(gCol, 92) : na, title = "等級背景 (綠A 藍B 灰C 深灰D 黃E；預設關閉)")', "C 背景")
+OLD_LBL = '''// 等級變動處標註
+if vcpGrade != vcpGrade[1]
+    label.new(bar_index, vcpScore, f_gradeTxt(vcpGrade), style = label.style_label_left,
+         color = color.new(gCol, 15), textcolor = color.white, size = size.tiny)'''
+NEW_LBL = '''// 等級變動標註（去雜訊）：新等級持續 lblHold 根、且與上一個標籤不同才標；只保留最近 lblMax 個
+gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
+var int   lastLblGrade = -1
+var label[] gLbls = array.new_label()
+if gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
+    lastLblGrade := vcpGrade
+    array.push(gLbls, label.new(bar_index, vcpScore, f_gradeTxt(vcpGrade), style = label.style_label_left,
+         color = color.new(gCol, 15), textcolor = color.white, size = f_lblSz(lblSz)))
+    if array.size(gLbls) > lblMax
+        label.delete(array.shift(gLbls))'''
+c = must(c, OLD_LBL, NEW_LBL, "C 標籤去雜訊")
 (P / NAMES["c"][0]).write_text(c, encoding="utf-8")
 
 # ═══════════════════════════════ R6-D ═══════════════════════════════

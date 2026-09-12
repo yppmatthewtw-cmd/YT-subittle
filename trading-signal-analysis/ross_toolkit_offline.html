@@ -621,18 +621,18 @@ if showCert and barstate.islast
 
 alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;M3 確定性達門檻&quot;, &quot;{{ticker}} 確定性總分升至門檻以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>combo_a_main_r6(09.12_21.37).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'combo_a_main_r6(09.12_21.37).pine')">複製</button></summary>
-      <pre id="pine-combo_a_main_r6(09.12_21.37).pine">//@version=5
+<details class="pinebox"><summary><b>combo_a_main_r6(09.13_00.04).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'combo_a_main_r6(09.13_00.04).pine')">複製</button></summary>
+      <pre id="pine-combo_a_main_r6(09.13_00.04).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:12_21:37)
+//  版本 r6(09:13_00:04)
 //  R6-A  主圖：EMA9 Band Width Strategy
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.12_21.37).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.12_21.37).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.12_21.37).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.12_21.37).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_00.04).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_00.04).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_00.04).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_00.04).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 2（EMA9 中線 ± 帶寬、擠壓突破 / 回踩進場、風控出場）。
@@ -640,7 +640,7 @@ alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;
 //  但它們的圖形改由 R6-B / R6-C / R6-D 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
 // ═══════════════════════════════════════════════════════════════════════════
 
-strategy(&quot;R6-A EMA9 BW (main) r6(09:12_21:37)&quot;, shorttitle = &quot;R6-A EMA9-BW&quot;,
+strategy(&quot;R6-A EMA9 BW (main) r6(09:13_00:04)&quot;, shorttitle = &quot;R6-A EMA9-BW&quot;,
      overlay = true, initial_capital = 10000,
      default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
      commission_type = strategy.commission.percent, commission_value = 0.05,
@@ -1082,21 +1082,15 @@ plotshape(shortSig, &quot;做空訊號&quot;, shape.triangledown, location.above
 plot(strategy.position_size != 0 ? stopPx : na, &quot;止損線&quot;, color = color.red,   style = plot.style_linebr, linewidth = 1)
 plot(strategy.position_size != 0 ? tpPx   : na, &quot;止盈線&quot;, color = color.green, style = plot.style_linebr, linewidth = 1)
 
-// ── ⑧ 主圖底部成交量 + 主力大單日 ──
-// 成交量柱以 plotcandle 畫在價格區間下方：柱底 = 最近 volWin 根最低價再往下 3%，
-// 柱高按視窗內最大量等比縮放到價格區間的 volArea%。主力大單 = 量 ≥ bigX × 均量，
-// 且收在當日區間上緣 (買入) / 下緣 (賣出)。
-grpVol  = &quot;⑧ 成交量 (主圖底部)&quot;
-showVol = input.bool(true, &quot;顯示成交量柱&quot;, group = grpVol)
-volLen  = input.int(50, &quot;均量期數&quot;, minval = 5, group = grpVol)
+// ── ⑧ 主力大單日（成交量柱本身畫在 R6-C pane，主圖只留 ◆ 標記 / 狀態列 / 警報）──
+// 主力大單 = 量 ≥ bigX × 均量，且收在當日區間上緣 (買入) / 下緣 (賣出)。
+grpVol  = &quot;⑧ 主力大單 (成交量柱在 R6-C)&quot;
+volLen  = input.int(50, &quot;均量期數 (與 R6-C 設同值)&quot;, minval = 5, group = grpVol)
 bigX    = input.float(2.0, &quot;主力大單門檻 (× 均量)&quot;, minval = 1.2, step = 0.1, group = grpVol)
 bigPos  = input.float(0.6, &quot;主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之&quot;, minval = 0.5, maxval = 1, step = 0.05, group = grpVol)
-volArea = input.float(18, &quot;成交量區佔價格區間高度 %&quot;, minval = 5, maxval = 40, group = grpVol)
-volWin  = input.int(150, &quot;定位視窗 (根)&quot;, minval = 20, group = grpVol)
-markBig = input.bool(true, &quot;K 線旁另加 ◆ 標記&quot;, group = grpVol)
+markBig = input.bool(true, &quot;K 線旁加 ◆ 標記 (藍 = 主買、橙 = 主賣)&quot;, group = grpVol)
 cBuy    = input.color(#2563eb, &quot;主力買入色&quot;, group = grpVol)
 cSell   = input.color(#f97316, &quot;主力賣出色&quot;, group = grpVol)
-cVolN   = input.color(color.new(color.gray, 65), &quot;一般成交量色&quot;, group = grpVol)
 
 vAvg    = ta.sma(volume, volLen)
 rngPos  = high != low ? (close - low) / (high - low) : 0.5
@@ -1105,18 +1099,9 @@ bigBuy  = bigVol and close &gt; open and rngPos &gt;= bigPos
 bigSell = bigVol and close &lt; open and rngPos &lt;= 1 - bigPos
 nBuy20  = math.sum(bigBuy  ? 1 : 0, 20)
 nSell20 = math.sum(bigSell ? 1 : 0, 20)
-
-winLo = ta.lowest(low, volWin)
-winHi = ta.highest(high, volWin)
-vMax  = ta.highest(volume, volWin)
-vBase = winLo - (winHi - winLo) * 0.03
-vTop  = vBase + (winHi - winLo) * volArea / 100 * (vMax &gt; 0 ? volume / vMax : 0)
-volCol = bigBuy ? cBuy : bigSell ? cSell : cVolN
-plotcandle(showVol ? vBase : na, showVol ? vTop : na, showVol ? vBase : na, showVol ? vTop : na,
-     &quot;成交量 (主圖底部)&quot;, color = volCol, wickcolor = color.new(color.gray, 100), bordercolor = volCol)
 plotshape(markBig and bigBuy,  &quot;主力大單買入日&quot;, shape.diamond, location.belowbar, cBuy,  size = size.tiny)
 plotshape(markBig and bigSell, &quot;主力大單賣出日&quot;, shape.diamond, location.abovebar, cSell, size = size.tiny)
-plot(volume, &quot;成交量&quot;, color = volCol, display = display.data_window)
+plot(volume, &quot;成交量&quot;, color = bigBuy ? cBuy : bigSell ? cSell : color.gray, display = display.data_window)
 plot(vAvg,   &quot;均量&quot;,   color = color.gray, display = display.data_window)
 
 // M2 狀態面板 (貼右；寬度/高度/位置由 ⑦ 版面 決定，與 R6-B/C/D 對齊)
@@ -1155,18 +1140,18 @@ alertcondition(squeeze and not squeeze[1], &quot;M2 EMA9-BW 擠壓開始&quot;, 
 alertcondition(bigBuy,  &quot;⑧ 主力大單買入日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間上緣 — 主力大單買入&quot;)
 alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間下緣 — 主力大單賣出&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>combo_b_macd_clock_r6(09.12_21.37).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'combo_b_macd_clock_r6(09.12_21.37).pine')">複製</button></summary>
-      <pre id="pine-combo_b_macd_clock_r6(09.12_21.37).pine">//@version=5
+<details class="pinebox"><summary><b>combo_b_macd_clock_r6(09.13_00.04).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'combo_b_macd_clock_r6(09.13_00.04).pine')">複製</button></summary>
+      <pre id="pine-combo_b_macd_clock_r6(09.13_00.04).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:12_21:37)
+//  版本 r6(09:13_00:04)
 //  R6-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.12_21.37).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.12_21.37).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.12_21.37).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.12_21.37).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_00.04).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_00.04).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_00.04).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_00.04).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -1178,7 +1163,7 @@ alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 
 //  R6：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R6-B MACD + Cycle Clock r6(09:12_21:37)&quot;, shorttitle = &quot;R6-B MACD Clock&quot;,
+indicator(&quot;R6-B MACD + Cycle Clock r6(09:13_00:04)&quot;, shorttitle = &quot;R6-B MACD Clock&quot;,
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -1429,18 +1414,18 @@ alertcondition(lateEvt and not up, &quot;M1 日線下跌周期進入尾段&quot;
 alertcondition(bullDiv, &quot;M1 底背馳&quot;, &quot;{{ticker}} 日線 MACD 底背馳：價格創低但動能抬高 — 留意反轉向上&quot;)
 alertcondition(bearDiv, &quot;M1 頂背馳&quot;, &quot;{{ticker}} 日線 MACD 頂背馳：價格創高但動能降低 — 留意反轉向下&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>combo_c_vcp_r6(09.12_21.37).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'combo_c_vcp_r6(09.12_21.37).pine')">複製</button></summary>
-      <pre id="pine-combo_c_vcp_r6(09.12_21.37).pine">//@version=5
+<details class="pinebox"><summary><b>combo_c_vcp_r6(09.13_00.04).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'combo_c_vcp_r6(09.13_00.04).pine')">複製</button></summary>
+      <pre id="pine-combo_c_vcp_r6(09.13_00.04).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:12_21:37)
+//  版本 r6(09:13_00:04)
 //  R6-C  下方 pane：VCP 指數曲線
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.12_21.37).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.12_21.37).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.12_21.37).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.12_21.37).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_00.04).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_00.04).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_00.04).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_00.04).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
@@ -1448,7 +1433,7 @@ alertcondition(bearDiv, &quot;M1 頂背馳&quot;, &quot;{{ticker}} 日線 MACD �
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R6-C VCP Score r6(09:12_21:37)&quot;, shorttitle = &quot;R6-C VCP&quot;, overlay = false)
+indicator(&quot;R6-C VCP Score r6(09:13_00:04)&quot;, shorttitle = &quot;R6-C VCP&quot;, overlay = false)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV)
@@ -1457,6 +1442,9 @@ bench = input.symbol(&quot;SPY&quot;, &quot;相對強度 (RS) 基準&quot;, grou
 grpW = &quot;② 面板&quot;
 showVcp = input.bool(true, &quot;顯示明細面板 (本 pane 右側)&quot;, group = grpW)
 lblSz   = input.string(&quot;中&quot;, &quot;等級標籤字級 (R6：預設放大一倍)&quot;, options = [&quot;小&quot;, &quot;中&quot;, &quot;大&quot;], group = grpW)
+lblHold = input.int(3, &quot;等級需持續幾根才標註 (去雜訊)&quot;, minval = 1, maxval = 20, group = grpW)
+lblMax  = input.int(8, &quot;最多保留最近幾個標籤&quot;, minval = 1, maxval = 50, group = grpW)
+showGBg = input.bool(false, &quot;等級背景著色 (R6 預設關閉)&quot;, group = grpW)
 f_lblSz(s) =&gt; s == &quot;小&quot; ? size.small : s == &quot;大&quot; ? size.large : size.normal
 
 // ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
@@ -1647,18 +1635,49 @@ f_gradeCol(g) =&gt; g == 0 ? #3FB68B : g == 1 ? #5CA3D6 : g == 2 ? #6B7885 : g =
 [vcpScore, vcpGrade, offHigh, aboveLow, chg1m, chg3m, rng21, volRatio, trendOK, tightB, extendedB, a50B, a200B, crossB] =
      request.security(syminfo.tickerid, m3TF, f_vcp(), lookahead = barmerge.lookahead_off)
 
+// ── ⑧ 成交量柱（自 R6-A 移入本 pane）：以 volLen 日均量 = 25 標準化，柱高直接就是「量比 × 25」──
+//    50 日均量 = 25 (灰虛線)；10 日均量線 / 25 = VCP 明細裡的「量比 10d/50d」；2 倍均量 = 50；超過 4 倍 (100) 截頂。
+grpVol  = &quot;⑧ 成交量 (本 pane，均量 = 25)&quot;
+showVolC = input.bool(true, &quot;顯示成交量柱&quot;, group = grpVol)
+volLen  = input.int(50, &quot;均量期數 (基準 = 25)&quot;, minval = 5, group = grpVol)
+bigX    = input.float(2.0, &quot;主力大單門檻 (× 均量；與 R6-A 設同值)&quot;, minval = 1.2, step = 0.1, group = grpVol)
+bigPos  = input.float(0.6, &quot;主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之&quot;, minval = 0.5, maxval = 1, step = 0.05, group = grpVol)
+cBuy    = input.color(#2563eb, &quot;主力買入色&quot;, group = grpVol)
+cSell   = input.color(#f97316, &quot;主力賣出色&quot;, group = grpVol)
+cVolN   = input.color(color.new(color.gray, 70), &quot;一般成交量色&quot;, group = grpVol)
+
+vAvgC   = ta.sma(volume, volLen)
+v10C    = ta.sma(volume, 10)
+rngPosC = high != low ? (close - low) / (high - low) : 0.5
+bigVolC = volume &gt;= vAvgC * bigX
+bigBuyC  = bigVolC and close &gt; open and rngPosC &gt;= bigPos
+bigSellC = bigVolC and close &lt; open and rngPosC &lt;= 1 - bigPos
+volN  = vAvgC &gt; 0 ? math.min(volume / vAvgC * 25, 100) : na
+v10N  = vAvgC &gt; 0 ? math.min(v10C / vAvgC * 25, 100) : na
+volColC = bigBuyC ? cBuy : bigSellC ? cSell : cVolN
+plot(showVolC ? volN : na, &quot;成交量 (均量=25)&quot;, style = plot.style_columns, color = volColC)
+plot(showVolC ? v10N : na, &quot;10 日均量 (÷50日均量×25)&quot;, color = color.new(#9333ea, 30), linewidth = 1)
+hline(25, &quot;50 日均量基準 = 25&quot;, color = color.new(color.gray, 40), linestyle = hline.style_dotted)
+hline(50, &quot;2 倍均量 = 50&quot;, color = color.new(color.gray, 70), linestyle = hline.style_dotted)
+
 // ── 曲線 ──
 gCol = f_gradeCol(vcpGrade)
-plot(vcpScore, &quot;VCP 指數&quot;, color = color.new(gCol, 0), linewidth = 2)
+plot(vcpScore, &quot;VCP 指數&quot;, color = color.new(gCol, 0), linewidth = 3)
 plot(vcpGrade, &quot;VCP 等級 (0=A…4=E)&quot;, color = color.gray, display = display.data_window)
 hline(60, &quot;60 強&quot;, color = color.new(#3FB68B, 45), linestyle = hline.style_dashed)
 hline(40, &quot;40 弱&quot;, color = color.new(#E0705F, 45), linestyle = hline.style_dashed)
-bgcolor(color.new(gCol, 90), title = &quot;等級背景 (綠A 藍B 灰C 深灰D 黃E)&quot;)
+bgcolor(showGBg ? color.new(gCol, 92) : na, title = &quot;等級背景 (綠A 藍B 灰C 深灰D 黃E；預設關閉)&quot;)
 
-// 等級變動處標註
-if vcpGrade != vcpGrade[1]
-    label.new(bar_index, vcpScore, f_gradeTxt(vcpGrade), style = label.style_label_left,
-         color = color.new(gCol, 15), textcolor = color.white, size = f_lblSz(lblSz))
+// 等級變動標註（去雜訊）：新等級持續 lblHold 根、且與上一個標籤不同才標；只保留最近 lblMax 個
+gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
+var int   lastLblGrade = -1
+var label[] gLbls = array.new_label()
+if gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
+    lastLblGrade := vcpGrade
+    array.push(gLbls, label.new(bar_index, vcpScore, f_gradeTxt(vcpGrade), style = label.style_label_left,
+         color = color.new(gCol, 15), textcolor = color.white, size = f_lblSz(lblSz)))
+    if array.size(gLbls) &gt; lblMax
+        label.delete(array.shift(gLbls))
 
 // ── 明細面板（本 pane 右側）──
 var table tV = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
@@ -4547,18 +4566,18 @@ alertcondition(squeeze and not squeeze[1], &quot;M2 EMA9-BW 擠壓開始&quot;, 
 
 // ═══════════════════════════  END OF MODULE 2  ═══════════════════════════════
 </pre></details>
-<details class="pinebox"><summary><b>combo_d_cert_r6(09.12_21.37).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'combo_d_cert_r6(09.12_21.37).pine')">複製</button></summary>
-      <pre id="pine-combo_d_cert_r6(09.12_21.37).pine">//@version=5
+<details class="pinebox"><summary><b>combo_d_cert_r6(09.13_00.04).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'combo_d_cert_r6(09.13_00.04).pine')">複製</button></summary>
+      <pre id="pine-combo_d_cert_r6(09.13_00.04).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:12_21:37)
+//  版本 r6(09:13_00:04)
 //  R6-D  下方 pane：確定性指數曲線
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.12_21.37).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.12_21.37).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.12_21.37).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.12_21.37).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_00.04).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_00.04).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_00.04).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_00.04).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 3-A。把 7 項加權後的 0–100 確定性總分畫成一條曲線，
@@ -4567,7 +4586,7 @@ alertcondition(squeeze and not squeeze[1], &quot;M2 EMA9-BW 擠壓開始&quot;, 
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo build_r17_data.py）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R6-D Certainty 7 r6(09:12_21:37)&quot;, shorttitle = &quot;R6-D Cert7&quot;, overlay = false)
+indicator(&quot;R6-D Certainty 7 r6(09:13_00:04)&quot;, shorttitle = &quot;R6-D Cert7&quot;, overlay = false)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV)
