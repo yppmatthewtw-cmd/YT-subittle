@@ -27,6 +27,11 @@ trading-signal-analysis/
 │   ├── combo_cycle_clock_ema9bw_r2.pine ← 合併檔 R2：+ MODULE 3 確定性 7 項 / VCP 分數等級面板
 │   ├── combo_cycle_clock_ema9bw_r3.pine ← 合併檔 R3：M3 兩框合併移至右中，四框黑邊
 │   ├── combo_cycle_clock_ema9bw_r4.pine ← 合併檔 R4：修正資訊框在部分標的完全不顯示的執行期錯誤
+│   ├── combo_r5a_main.pine             ← R5-A 主圖：EMA9 帶寬策略 + 狀態面板
+│   ├── combo_r5b_macd_clock.pine       ← R5-B 下方 pane：MACD 柱狀圖 + 週期時鐘（時鐘在最右）
+│   ├── combo_r5c_vcp.pine              ← R5-C 下方 pane：VCP 指數曲線
+│   ├── combo_r5d_cert.pine             ← R5-D 下方 pane：確定性指數曲線
+│   ├── split_r5.py                     ← 由 R4 產生 R5 四件套的拆檔腳本
 │   ├── cert7_indicator.pine            ← 指標 3-A 確定性 7 項（獨立版，副圖）
 │   └── vcp_score_indicator.pine        ← 指標 3-B VCP 分數/等級 A–E（獨立版，副圖）
 └── charts/
