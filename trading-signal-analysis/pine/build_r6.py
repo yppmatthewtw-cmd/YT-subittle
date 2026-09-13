@@ -165,6 +165,18 @@ NEW_CYCLE_TAIL = '''    el = bar_index - cs + 1
      request.security(syminfo.tickerid, cycTF, f_cycle(), lookahead = barmerge.lookahead_off)
 '''
 b = must(b, OLD_CYCLE_TAIL, NEW_CYCLE_TAIL, "B 週期引擎尾段")
+b = must(b, '''plotshape(bar_index == extBar and not up ? hist : na, "本周期新低 (轉勢點候選)", shape.circle,
+     location.absolute, color.new(#eab308, 15), size = size.tiny)''',
+'''plotshape(bar_index == extBar and not up ? hist : na, "本周期新低 (轉勢點候選)", shape.circle,
+     location.absolute, color.new(#eab308, 15), size = size.tiny)
+
+// 「N日」週期長度（次要備註）：透明無底色，貼在剛結束那段週期的最高柱 (上昇) / 最低柱 (下跌) 頂端，
+// 不超出柱狀圖本身的高度範圍；extVal[1] / extBar[1] = 翻轉當根之前記錄到的上一段週期極值與其位置
+if showLbl and flipEvt and not na(extVal[1]) and not na(extBar[1])
+    label.new(extBar[1], extVal[1], str.tostring(lastLen, "#") + "日",
+         style = up[1] ? label.style_label_down : label.style_label_up,
+         color = color.new(color.white, 100),
+         textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny)''', "B N日 new block")
 
 DIV_DRAW = '''
 // ── M1 背馳標註：▲/▼ 畫在轉折點；備註框離開柱狀圖 (近期振幅 × noteGap)，虛線指回轉折點；
@@ -217,11 +229,7 @@ b = must(b, '''if showLbl and flipEvt
          color = up[1] ? color.new(cUp, 20) : color.new(cDn, 20),
          textcolor = color.white, size = size.tiny)''',
 '''oscHi = ta.highest(math.max(math.max(hist, macdL), sigLine), 60)
-oscLo = ta.lowest(math.min(math.min(hist, macdL), sigLine), 60)
-if showLbl and flipEvt
-    // 次要備註：透明無底色、字不反白；剛結束的是上昇週期 → 放在近期振幅上方，下跌週期 → 下方
-    label.new(bar_index, up[1] ? oscHi * 1.25 : oscLo * 1.25, str.tostring(lastLen, "#") + "日",
-         style = label.style_none, textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny)''', "B 週期長度標籤")
+oscLo = ta.lowest(math.min(math.min(hist, macdL), sigLine), 60)''', "B 週期長度標籤")
 
 
 OLD_CLOCK = b[b.index("    activeCol = up ? cUp : cDn"):b.index("    statTxt = ")]
@@ -356,7 +364,7 @@ if gradeEvt
     if array.size(gL) > lblMax
         label.delete(array.shift(gL))
         line.delete(array.shift(gN))
-plotshape(gradeEvt ? vcpScore : na, "等級變動點", shape.circle, location.absolute, color.new(color.white, 0), size = size.tiny)'''
+// （R6：不在曲線上加圓點——白點會蓋住曲線，看起來像斷線；虛線直接接到曲線）'''
 c = must(c, OLD_LBL, NEW_LBL, "C 標籤去雜訊")
 (P / NAMES["c"][0]).write_text(c, encoding="utf-8")
 
