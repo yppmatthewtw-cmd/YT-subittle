@@ -199,10 +199,17 @@ divOff  = onCycTF ? -lbR : 0
 '''
 b = must(b, "// ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──", DIV_SIG.lstrip("\n") + "// ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──", "B 背馳訊號前置")
 # 快慢線調幼、變淡
+# 柱狀圖 / 線條配色與粗細比照 TradingView 內建 MACD：升加速 #26a69a、升減速 #b2dfdb、跌減弱 #ffcdd2、跌加速 #ff5252，
+# MACD 線 #2962FF、Signal #ff6d00 各 1px，零軸 #787b86 半透明。四色仍依日線週期引擎的 hist 判斷。
+b = must(b, '''hcol = up ? (histRising ? color.new(cUp, 0) : color.new(cUp, 55))
+          : (histRising ? color.new(cDn, 55) : color.new(cDn, 0))''',
+            '''hcol = hist >= 0 ? (histRising ? #26a69a : #b2dfdb) : (histRising ? #ffcdd2 : #ff5252)   // 同內建 MACD 四色''', "B 柱色")
 b = must(b, 'plot(macdL,   "MACD",   color = color.new(color.blue, 20),   linewidth = 2)',
-            'plot(macdL,   "MACD",   color = color.new(color.blue, 45),   linewidth = 1)', "B MACD 線")
+            'plot(macdL,   "MACD",   color = #2962FF, linewidth = 1)', "B MACD 線")
 b = must(b, 'plot(sigLine, "Signal", color = color.new(color.orange, 20), linewidth = 2)',
-            'plot(sigLine, "Signal", color = color.new(color.orange, 45), linewidth = 1)', "B Signal 線")
+            'plot(sigLine, "Signal", color = #ff6d00, linewidth = 1)', "B Signal 線")
+b = must(b, 'hline(0, "零軸", color = color.new(color.gray, 30), linestyle = hline.style_solid)',
+            'hline(0, "零軸", color = color.new(#787b86, 50), linestyle = hline.style_solid)', "B 零軸")
 # 「N日」週期長度：透明文字、不反白，放在近期振幅之外 (上昇週期結束 → 上方；下跌週期結束 → 下方)
 b = must(b, '''if showLbl and flipEvt
     label.new(bar_index, 0, str.tostring(lastLen, "#") + "日",

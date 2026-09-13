@@ -1,13 +1,13 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:13_14:22)
+//  版本 r6(09:13_17:27)
 //  R6-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_14.22).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_14.22).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_14.22).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_14.22).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_17.27).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_17.27).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_17.27).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_17.27).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -19,7 +19,7 @@
 //  R6：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R6-B MACD + Cycle Clock r6(09:13_14:22)", shorttitle = "R6-B MACD Clock",
+indicator("R6-B MACD + Cycle Clock r6(09:13_17:27)", shorttitle = "R6-B MACD Clock",
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -138,12 +138,11 @@ divOff  = onCycTF ? -lbR : 0
 
 // ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──
 histRising = hist > hist[1]
-hcol = up ? (histRising ? color.new(cUp, 0) : color.new(cUp, 55))
-          : (histRising ? color.new(cDn, 55) : color.new(cDn, 0))
+hcol = hist >= 0 ? (histRising ? #26a69a : #b2dfdb) : (histRising ? #ffcdd2 : #ff5252)   // 同內建 MACD 四色
 plot(hist,    "MACD Histogram", style = plot.style_columns, color = hcol, display = display.pane + display.data_window + display.price_scale)
-plot(macdL,   "MACD",   color = color.new(color.blue, 45),   linewidth = 1, display = display.pane + display.data_window + display.price_scale)
-plot(sigLine, "Signal", color = color.new(color.orange, 45), linewidth = 1, display = display.pane + display.data_window + display.price_scale)
-hline(0, "零軸", color = color.new(color.gray, 30), linestyle = hline.style_solid)
+plot(macdL,   "MACD",   color = #2962FF, linewidth = 1, display = display.pane + display.data_window + display.price_scale)
+plot(sigLine, "Signal", color = #ff6d00, linewidth = 1, display = display.pane + display.data_window + display.price_scale)
+hline(0, "零軸", color = color.new(#787b86, 50), linestyle = hline.style_solid)
 bgcolor(showBg ? (up ? color.new(cUp, 92) : color.new(cDn, 92)) : na, title = "週期背景")
 
 // 週期切換處標註上一段長度（畫在零軸上／下）

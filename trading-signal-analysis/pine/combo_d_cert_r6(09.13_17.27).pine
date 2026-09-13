@@ -1,32 +1,33 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:13_14:22)
-//  R6-C  下方 pane：VCP 指數曲線
+//  版本 r6(09:13_17:27)
+//  R6-D  下方 pane：確定性指數曲線
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_14.22).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_14.22).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_14.22).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_14.22).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_17.27).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_17.27).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_17.27).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_17.27).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
-//  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
-//  背景依 A/B/C/D/E 等級著色，60 / 40 兩條參考線，右側面板列出構成分數的明細。
-//  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
+//  本檔內容：MODULE 3-A。把 7 項加權後的 0–100 確定性總分畫成一條曲線，
+//  7 個分項各自可選顯示為細線，有「一底高於一底」結構時背景轉綠，
+//  右側面板列出 7 項各自的進度條與分數。
+//  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo build_r17_data.py）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R6-C VCP Score r6(09:13_14:22)", shorttitle = "R6-C VCP", overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator("R6-D Certainty 7 r6(09:13_17:27)", shorttitle = "R6-D Cert7", overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = "M3 ① 資料來源"
 m3TF  = input.timeframe("D", "計算時間框 (預設日線)", group = grpV, display = display.none)
 bench = input.symbol("SPY", "相對強度 (RS) 基準", group = grpV, display = display.none)
 
 grpW = "② 面板"
-showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW, display = display.none)
-lblHold = input.int(3, "等級備註：新等級需持續幾根才標註 (去雜訊)", minval = 1, maxval = 20, group = grpW, display = display.none)
-lblMax  = input.int(8, "等級備註：最多保留最近幾個", minval = 1, maxval = 40, group = grpW, display = display.none)
-lblGap  = input.float(18, "備註框與曲線距離 (0–100 刻度)", minval = 5, maxval = 40, group = grpW, display = display.none)
-showGBg = input.bool(false, "等級背景著色 (R6 預設關閉)", group = grpW, display = display.none)
+showCert  = input.bool(true, "顯示 7 分項面板 (本 pane 右側)", group = grpW, display = display.none)
+certAlert = input.float(70, "確定性警報門檻 (≥)", minval = 0, maxval = 100, group = grpW, display = display.none)
+showParts = input.bool(false, "同時畫出 7 個分項細線", group = grpW, display = display.none)
+showHLbg  = input.bool(false, "一底高於一底 結構背景 (淡綠；R6 預設關閉)", group = grpW, display = display.none)
+noteGap   = input.float(18, "備註框與曲線距離 (0–100 刻度)", minval = 5, maxval = 40, group = grpW, display = display.none)
 
 // ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
 grpL   = "⑦ 版面 (四個 pane 統一)"
@@ -219,99 +220,71 @@ f_vcp() =>
 f_gradeTxt(g) => g == 0 ? "A · VCP 待突破" : g == 1 ? "B · 上升結構" : g == 2 ? "C · 基底修復中" : g == 3 ? "D · 趨勢弱" : "E · 突破延伸中"
 f_gradeCol(g) => g == 0 ? #3FB68B : g == 1 ? #5CA3D6 : g == 2 ? #6B7885 : g == 3 ? #4A555F : #E5B15C
 
-[vcpScore, vcpGrade, offHigh, aboveLow, chg1m, chg3m, rng21, volRatio, trendOK, tightB, extendedB, a50B, a200B, crossB] =
-     request.security(syminfo.tickerid, m3TF, f_vcp(), lookahead = barmerge.lookahead_off)
-
-// ── ⑧ 成交量柱（自 R6-A 移入本 pane）：以 volLen 日均量 = 25 標準化，柱高直接就是「量比 × 25」──
-//    50 日均量 = 25 (灰虛線)；10 日均量線 / 25 = VCP 明細裡的「量比 10d/50d」；2 倍均量 = 50；超過 4 倍 (100) 截頂。
-grpVol  = "⑧ 成交量 (本 pane，均量 = 25)"
-showVolC = input.bool(true, "顯示成交量柱", group = grpVol, display = display.none)
-volLen  = input.int(50, "均量期數 (基準 = 25)", minval = 5, group = grpVol, display = display.none)
-bigX    = input.float(2.0, "主力大單門檻 (× 均量；與 R6-A 設同值)", minval = 1.2, step = 0.1, group = grpVol, display = display.none)
-bigPos  = input.float(0.6, "主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之", minval = 0.5, maxval = 1, step = 0.05, group = grpVol, display = display.none)
-cBuy    = input.color(#2563eb, "主力買入色", group = grpVol, display = display.none)
-cSell   = input.color(#f97316, "主力賣出色", group = grpVol, display = display.none)
-cVolN   = input.color(color.new(color.gray, 70), "一般成交量色", group = grpVol, display = display.none)
-
-vAvgC   = ta.sma(volume, volLen)
-v10C    = ta.sma(volume, 10)
-rngPosC = high != low ? (close - low) / (high - low) : 0.5
-bigVolC = volume >= vAvgC * bigX
-bigBuyC  = bigVolC and close > open and rngPosC >= bigPos
-bigSellC = bigVolC and close < open and rngPosC <= 1 - bigPos
-volN  = vAvgC > 0 ? math.min(volume / vAvgC * 25, 100) : na
-v10N  = vAvgC > 0 ? math.min(v10C / vAvgC * 25, 100) : na
-volColC = bigBuyC ? cBuy : bigSellC ? cSell : cVolN
-plot(showVolC ? volN : na, "成交量 (均量=25)", style = plot.style_columns, color = volColC, display = display.pane + display.data_window + display.price_scale)
-plot(showVolC ? v10N : na, "10 日均量 (÷50日均量×25)", color = color.new(#9333ea, 30), linewidth = 1, display = display.pane + display.data_window + display.price_scale)
-hline(25, "50 日均量基準 = 25", color = color.new(color.gray, 40), linestyle = hline.style_dotted)
-hline(50, "2 倍均量 = 50", color = color.new(color.gray, 70), linestyle = hline.style_dotted)
+[cBreak, cRetr, cTime, cDv, cContr, cMa, hlOk, dvRatio, contrRatio, dHeld, brokeHi, ret21, nBot] =
+     request.security(syminfo.tickerid, m3TF, f_cert7(), lookahead = barmerge.lookahead_off)
+benchRet21 = request.security(bench, m3TF, bar_index >= 21 ? close / close[21] - 1 : 0.0,
+     lookahead = barmerge.lookahead_off)
+rs21 = ret21 - nz(benchRet21)
+cRs  = f_clamp01(0.5 + rs21 / 0.2)
+certTotal = 100 * (0.25 * cBreak + 0.10 * cRetr + 0.15 * cTime + 0.15 * cDv +
+                   0.10 * cContr + 0.10 * cRs + 0.15 * cMa)
 
 // ── 曲線 ──
-gCol = f_gradeCol(vcpGrade)
-plot(vcpScore, "VCP 指數", color = color.new(gCol, 0), linewidth = 3, display = display.pane + display.data_window + display.price_scale)
-plot(vcpGrade, "VCP 等級 (0=A…4=E)", color = color.gray, display = display.data_window)
-hline(60, "60 強", color = color.new(#3FB68B, 45), linestyle = hline.style_dashed)
-hline(40, "40 弱", color = color.new(#E0705F, 45), linestyle = hline.style_dashed)
-bgcolor(showGBg ? color.new(gCol, 92) : na, title = "等級背景 (綠A 藍B 灰C 深灰D 黃E；預設關閉)")
+// ── 曲線：只有「高確定性」(總分 ≥ 門檻) 的區段著色；其餘灰色、無填色、無背景 ──
+hiCert  = certTotal >= certAlert
+certCol = hiCert ? color.new(#3FB68B, 0) : color.new(#8B98A5, 35)
+pCert = plot(certTotal, "確定性總分", color = certCol, linewidth = 2, display = display.pane + display.data_window + display.price_scale)
+// 進入高確定性備註：淺綠底白字框放在曲線下方 (noteGap)，虛線指回穿越點；只保留最近 8 個
+hiEvt = hiCert and not hiCert[1]
+var label[] hL = array.new_label()
+var line[]  hN = array.new_line()
+if hiEvt
+    [lb, ln] = f_note(bar_index, certTotal, certTotal - noteGap, "高確定 " + str.tostring(certTotal, "#"), #3FB68B, false)
+    array.push(hL, lb)
+    array.push(hN, ln)
+    if array.size(hL) > 8
+        label.delete(array.shift(hL))
+        line.delete(array.shift(hN))
+plotshape(hiEvt ? certTotal : na, "進入高確定性點", shape.circle, location.absolute, color.new(#3FB68B, 0), size = size.tiny)
+pThr  = plot(certAlert, "高確定性分界 (門檻)", color = color.new(#3FB68B, 30), linewidth = 1, display = display.pane + display.data_window + display.price_scale)
+fill(pCert, pThr, color = hiCert ? color.new(#3FB68B, 70) : na, title = "高確定性區 (曲線 ≥ 門檻)")
+bgcolor(hiCert ? color.new(#3FB68B, 88) : na, title = "高確定性背景")
+plot(showParts ? cBreak * 100 : na, "突破 25%", color = color.new(color.green, 45), display = display.pane + display.data_window + display.price_scale)
+plot(showParts ? cRetr  * 100 : na, "回升 10%", color = color.new(color.lime, 45), display = display.pane + display.data_window + display.price_scale)
+plot(showParts ? cTime  * 100 : na, "守底 15%", color = color.new(color.blue, 45), display = display.pane + display.data_window + display.price_scale)
+plot(showParts ? cDv    * 100 : na, "量縮 15%", color = color.new(color.purple, 45), display = display.pane + display.data_window + display.price_scale)
+plot(showParts ? cContr * 100 : na, "收縮 10%", color = color.new(color.orange, 45), display = display.pane + display.data_window + display.price_scale)
+plot(showParts ? cRs    * 100 : na, "RS 10%",   color = color.new(color.red, 45), display = display.pane + display.data_window + display.price_scale)
+plot(showParts ? cMa    * 100 : na, "均線 15%", color = color.new(color.gray, 45), display = display.pane + display.data_window + display.price_scale)
+hline(50, "50", color = color.new(color.gray, 60))
+bgcolor(showHLbg and hlOk ? color.new(#3FB68B, 94) : na, title = "一底高於一底 結構 (預設關閉)")
 
-// ── 等級變動備註：淺色底白字框，放在曲線上方 (轉強 A/B) 或下方 (C/D/E)，虛線指回曲線上的變動點 ──
-//    新等級持續 lblHold 根、且與上一個備註不同才標；只保留最近 lblMax 個；貼近 0/100 邊界時自動翻到另一側
-gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
-var int     lastLblGrade = -1
-var label[] gL = array.new_label()
-var line[]  gN = array.new_line()
-gradeEvt = gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
-if gradeEvt
-    lastLblGrade := vcpGrade
-    above = vcpGrade <= 1 ? vcpScore <= 100 - lblGap : vcpScore < lblGap
-    [lb, ln] = f_note(bar_index, vcpScore, above ? vcpScore + lblGap : vcpScore - lblGap,
-         f_gradeTxt(vcpGrade), f_gradeCol(vcpGrade), above)
-    array.push(gL, lb)
-    array.push(gN, ln)
-    if array.size(gL) > lblMax
-        label.delete(array.shift(gL))
-        line.delete(array.shift(gN))
-plotshape(gradeEvt ? vcpScore : na, "等級變動點", shape.circle, location.absolute, color.new(color.white, 0), size = size.tiny)
-
-// ── 明細面板（本 pane 右側）──
-var table tV = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
+// ── 7 分項面板（本 pane 右側）──
+var table tD = table.new(f_boxPos(boxPos), 3, 9, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
-var bool vInit = false
-if showVcp and barstate.islast
-    if not vInit
-        for rj = 0 to 8
-            table.cell(tV, 0, rj, "")
-            table.cell(tV, 1, rj, "")
-        vInit := true
-    table.cell(tV, 0, 0, "VCP " + str.tostring(vcpScore, "#.#"), width = boxW * 0.45, height = boxH / 9, text_color = color.white,
-         bgcolor = color.new(gCol, 10), text_size = size.small)
-    table.cell(tV, 1, 0, f_gradeTxt(vcpGrade), width = boxW * 0.55, height = boxH / 9, text_color = color.white,
-         bgcolor = color.new(gCol, 10), text_size = size.small)
-    table.cell(tV, 0, 1, "距 52 週高", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
-    table.cell(tV, 1, 1, str.tostring(-offHigh, "#.#") + "%", width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
-         text_color = offHigh <= 10 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 2, "距 52 週低", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
-    table.cell(tV, 1, 2, "+" + str.tostring(aboveLow, "#") + "%", width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
-         text_color = aboveLow >= 30 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 3, "1 月 / 3 月", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
-    table.cell(tV, 1, 3, str.tostring(chg1m, "+#.#") + "% / " + str.tostring(chg3m, "+#.#") + "%", width = boxW * 0.55, height = boxH / 9,
-         text_size = size.tiny, text_color = extendedB ? #E5B15C : color.gray)
-    table.cell(tV, 0, 4, "21 日收盤區間", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
-    table.cell(tV, 1, 4, str.tostring(rng21, "#.#") + "%" + (tightB ? " 緊縮 ✓" : ""), width = boxW * 0.55, height = boxH / 9,
-         text_size = size.tiny, text_color = tightB ? #3FB68B : color.gray)
-    table.cell(tV, 0, 5, "量比 10d/50d", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
-    table.cell(tV, 1, 5, str.tostring(volRatio, "#.##") + (volRatio < 0.95 ? " 量縮 ✓" : ""), width = boxW * 0.55, height = boxH / 9,
-         text_size = size.tiny, text_color = volRatio < 0.95 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 6, "趨勢模板", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
-    table.cell(tV, 1, 6, (trendOK ? "通過 ✓" : "未通過") + "  MA50" + (a50B ? "✓" : "✗") +
-         " MA200" + (a200B ? "✓" : "✗") + " 50>200" + (crossB ? "✓" : "✗"), width = boxW * 0.55, height = boxH / 9,
-         text_size = size.tiny, text_color = trendOK ? #3FB68B : #E0705F)
-    table.cell(tV, 0, 7, "延伸判定", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
-    table.cell(tV, 1, 7, extendedB ? "21 日漲幅 >15% → E" : "否", width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
-         text_color = extendedB ? #E5B15C : color.gray)
-    table.cell(tV, 0, 8, "A=待突破 B=上升 C=修復", width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
-    table.cell(tV, 1, 8, "D=趨勢弱 E=延伸", width = boxW * 0.55, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+var bool dInit = false
+if showCert and barstate.islast
+    if not dInit
+        for cc = 0 to 2
+            for rj = 0 to 8
+                table.cell(tD, cc, rj, "")
+        dInit := true
+    hdrCol = hiCert ? color.new(#3FB68B, 10) : color.new(#6B7885, 10)   // 只有高確定性才上色
+    table.cell(tD, 0, 0, "確定性", width = boxW * 0.40, height = boxH / 9, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
+    table.cell(tD, 1, 0, str.tostring(certTotal, "#.#"), width = boxW * 0.38, height = boxH / 9, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
+    table.cell(tD, 2, 0, hlOk ? "HL ✓ " + str.tostring(nBot) + " 底" : "無 HL", width = boxW * 0.22, height = boxH / 9, text_color = color.white,
+         bgcolor = hdrCol, text_size = size.tiny)
+    names = array.from("突破 25%", "回升 10%", "守底 15%", "量縮 15%", "收縮 10%", "RS 10%", "均線 15%")
+    vals  = array.from(cBreak, cRetr, cTime, cDv, cContr, cRs, cMa)
+    for i = 0 to 6
+        v = array.get(vals, i)
+        table.cell(tD, 0, i + 1, array.get(names, i), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(tD, 1, i + 1, f_bar(v, 8), width = boxW * 0.38, height = boxH / 9, text_size = size.tiny,
+             text_color = v >= 0.7 ? #3FB68B : v >= 0.4 ? #E5B15C : #8B98A5)
+        table.cell(tD, 2, i + 1, str.tostring(v * 100, "#"), width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_halign = text.align_right)
+    table.cell(tD, 0, 8, "量比(跌/漲) " + str.tostring(dvRatio, "#.##"), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+    table.cell(tD, 1, 8, "RS21 " + str.tostring(rs21 * 100, "+#.#") + "%", width = boxW * 0.38, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+    table.cell(tD, 2, 8, hlOk ? "守底 " + str.tostring(dHeld) + "日" : "–", width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
 
-alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, "VCP 轉 A 級 (待突破)", "{{ticker}} VCP 等級轉為 A · VCP 待突破")
-alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, "VCP 轉 E 級 (延伸)", "{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高")
+alertcondition(certTotal >= certAlert and certTotal[1] < certAlert, "確定性達門檻",
+     "{{ticker}} 確定性總分升至門檻以上")
