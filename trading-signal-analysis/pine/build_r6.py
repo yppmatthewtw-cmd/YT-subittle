@@ -4,7 +4,7 @@
 
 R6 變更：
   A  主力大單買入 / 賣出日 ◆ 標記 + 狀態框新增一列 + 警報（成交量柱改畫在 R6-C）
-  B  MACD 加入頂背馳 / 底背馳（依 MACD 快線轉折；日線環境計算；日線圖上畫連線）；時鐘解析度提高 (預設 21 格)、
+  B  MACD 加入頂背馳 / 底背馳（依 MACD 快線轉折；日線環境計算；日線圖上畫連線）、快線 升破前頂 / 跌破前底 訊號；時鐘解析度提高 (預設 21 格)、
      環厚 / 指針寬隨解析度放大、已走過弧段亮色、12/3/6/9 刻度
   C  成交量柱移到本 pane（以 50 日均量 = 25 標準化，直接對照量比）；等級標籤去雜訊 (持續 N 根才標、只留最近 M 個)、
      字級加大一倍；等級背景預設關閉、曲線加粗
@@ -125,6 +125,10 @@ divMax  = input.int(60, "兩個轉折最多相隔 (日)", minval = 5, group = gr
 divLine = input.bool(true, "日線圖上畫背馳連線", group = grpDv)
 noteGap = input.float(0.12, "備註框與轉折點距離 (近期振幅倍數)", minval = 0.03, maxval = 1.0, step = 0.01, group = grpDv)
 
+grpBk = "M1 ⑤ MACD 快線 升破前頂 / 跌破前底"
+showBrk = input.bool(true, "顯示 升破前頂 / 跌破前底 訊號", group = grpBk)
+showLvl = input.bool(true, "畫前頂 / 前底 水平虛線 (日線圖)", group = grpBk)
+
 '''
 b = must(b, "// ── ⑦ 版面（四支 R6 腳本", DIV_INPUTS + "// ── ⑦ 版面（四支 R6 腳本", "B 背馳輸入")
 
@@ -158,10 +162,20 @@ NEW_CYCLE_TAIL = '''    el = bar_index - cs + 1
     distH = bar_index - lbR - prevBH
     bull = plF and oL < 0 and oL > prevOL and pvL < prevPL and distL >= divMin and distL <= divMax
     bear = phF and oH > 0 and oH < prevOH and pvH > prevPH and distH >= divMin and distH <= divMax
-    [m, s, h, u, fl, rs, el, au, ad, ll, bull, bear, oL, oH, prevOL, prevOH, distL, distH]
+    // ── MACD 快線 升破前頂 / 跌破前底：前頂 = 最近一個已確認的快線轉折高點，前底 = 轉折低點；
+    //    快線由下往上穿越前頂 = 升破前頂 (動能創新高)，由上往下穿越前底 = 跌破前底 (動能創新低)
+    mPHn  = not na(ta.pivothigh(m, lbL, lbR))
+    mPLn  = not na(ta.pivotlow(m, lbL, lbR))
+    lastPH = ta.valuewhen(mPHn, m[lbR], 0)
+    lastPL = ta.valuewhen(mPLn, m[lbR], 0)
+    brkUp = ta.crossover(m, lastPH)
+    brkDn = ta.crossunder(m, lastPL)
+    [m, s, h, u, fl, rs, el, au, ad, ll, bull, bear, oL, oH, prevOL, prevOH, distL, distH,
+         mPHn, mPLn, lastPH, lastPL, brkUp, brkDn]
 
 [macdL, sigLine, hist, up, flip, rising, elapsed, avgUp, avgDn, lastLen,
-     bullRaw, bearRaw, divOL, divOH, divPrevOL, divPrevOH, divDistL, divDistH] =
+     bullRaw, bearRaw, divOL, divOH, divPrevOL, divPrevOH, divDistL, divDistH,
+     phNewRaw, plNewRaw, lastPH, lastPL, brkUpRaw, brkDnRaw] =
      request.security(syminfo.tickerid, cycTF, f_cycle(), lookahead = barmerge.lookahead_off)
 '''
 b = must(b, OLD_CYCLE_TAIL, NEW_CYCLE_TAIL, "B 週期引擎尾段")
@@ -192,6 +206,34 @@ if bearDiv
     [lbT, lnT] = f_note(bar_index + divOff, divOH, divOH - divGap, "頂背馳", cDn, false)   // 框在峰頂下方 (曲線內側)
     if divLine and onCycTF
         line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 3, style = line.style_solid)
+
+// ── M1 ⑤ MACD 快線 升破前頂 / 跌破前底 ──
+//    前頂 / 前底以水平虛線從轉折點向右延伸 (日線圖)，直到下一個轉折確認；穿越時畫 ◆ + 備註框 (框在曲線內側)
+brkUpEvt = showBrk and brkUpRaw and newDay
+brkDnEvt = showBrk and brkDnRaw and newDay
+phNew    = phNewRaw and newDay
+plNew    = plNewRaw and newDay
+var line lvH = na
+var line lvL = na
+if showBrk and showLvl and onCycTF
+    if phNew
+        if not na(lvH)
+            line.set_x2(lvH, bar_index - lbR)
+            line.set_extend(lvH, extend.none)
+        lvH := line.new(bar_index - lbR, lastPH, bar_index, lastPH, color = color.new(cDn, 40),
+             style = line.style_dotted, width = 1, extend = extend.right)
+    if plNew
+        if not na(lvL)
+            line.set_x2(lvL, bar_index - lbR)
+            line.set_extend(lvL, extend.none)
+        lvL := line.new(bar_index - lbR, lastPL, bar_index, lastPL, color = color.new(cUp, 40),
+             style = line.style_dotted, width = 1, extend = extend.right)
+plotshape(brkUpEvt ? lastPH : na, "升破前頂 ◆", shape.diamond, location.absolute, color.new(cUp, 0), size = size.small)
+plotshape(brkDnEvt ? lastPL : na, "跌破前底 ◆", shape.diamond, location.absolute, color.new(cDn, 0), size = size.small)
+if brkUpEvt
+    [lbU, lnU] = f_note(bar_index, lastPH, lastPH - divGap, "升破前頂", cUp, false)   // 框在前頂之下 (曲線內側)
+if brkDnEvt
+    [lbD, lnD] = f_note(bar_index, lastPL, lastPL + divGap, "跌破前底", cDn, true)    // 框在前底之上 (曲線內側)
 
 // Pine 沒有 math.atan2，自行實作（回傳弧度，範圍 -π..π）
 f_atan2(y, x) =>
@@ -297,6 +339,8 @@ b = b.replace(OLD_CLOCK, NEW_CLOCK)
 b = b.rstrip("\n") + '''
 alertcondition(bullDiv, "M1 底背馳", "{{ticker}} 日線 MACD 底背馳：價格創低但動能抬高 — 留意反轉向上")
 alertcondition(bearDiv, "M1 頂背馳", "{{ticker}} 日線 MACD 頂背馳：價格創高但動能降低 — 留意反轉向下")
+alertcondition(brkUpEvt, "M1 MACD 升破前頂", "{{ticker}} 日線 MACD 快線升破前一個轉折高點 — 動能創新高")
+alertcondition(brkDnEvt, "M1 MACD 跌破前底", "{{ticker}} 日線 MACD 快線跌破前一個轉折低點 — 動能創新低")
 '''
 (P / NAMES["b"][0]).write_text(b, encoding="utf-8")
 
