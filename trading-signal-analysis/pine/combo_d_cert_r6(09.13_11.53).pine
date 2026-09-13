@@ -1,13 +1,13 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:13_09:56)
+//  版本 r6(09:13_11:53)
 //  R6-D  下方 pane：確定性指數曲線
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_09.56).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_09.56).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_09.56).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_09.56).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_11.53).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_11.53).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_11.53).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_11.53).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 3-A。把 7 項加權後的 0–100 確定性總分畫成一條曲線，
@@ -16,7 +16,7 @@
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo build_r17_data.py）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R6-D Certainty 7 r6(09:13_09:56)", shorttitle = "R6-D Cert7", overlay = false)
+indicator("R6-D Certainty 7 r6(09:13_11:53)", shorttitle = "R6-D Cert7", overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = "M3 ① 資料來源"
 m3TF  = input.timeframe("D", "計算時間框 (預設日線)", group = grpV, display = display.none)
@@ -27,6 +27,7 @@ showCert  = input.bool(true, "顯示 7 分項面板 (本 pane 右側)", group = 
 certAlert = input.float(70, "確定性警報門檻 (≥)", minval = 0, maxval = 100, group = grpW, display = display.none)
 showParts = input.bool(false, "同時畫出 7 個分項細線", group = grpW, display = display.none)
 showHLbg  = input.bool(false, "一底高於一底 結構背景 (淡綠；R6 預設關閉)", group = grpW, display = display.none)
+noteGap   = input.float(18, "備註框與曲線距離 (0–100 刻度)", minval = 5, maxval = 40, group = grpW, display = display.none)
 
 // ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
 grpL   = "⑦ 版面 (四個 pane 統一)"
@@ -34,6 +35,12 @@ boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)"
 boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
 boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL, display = display.none)
 f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
+// 備註框：淺色底 + 白字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
+f_note(x, yAnchor, yBox, txt, col, above) =>
+    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
+         color = color.new(col, 40), textcolor = color.white, size = size.small)
+    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
+    [lb, ln]
 
 f_clamp01(x) => math.max(0.0, math.min(1.0, x))
 
@@ -226,10 +233,19 @@ certTotal = 100 * (0.25 * cBreak + 0.10 * cRetr + 0.15 * cTime + 0.15 * cDv +
 // ── 曲線：只有「高確定性」(總分 ≥ 門檻) 的區段著色；其餘灰色、無填色、無背景 ──
 hiCert  = certTotal >= certAlert
 certCol = hiCert ? color.new(#3FB68B, 0) : color.new(#8B98A5, 35)
-// 備註在曲線之前呼叫 → 下一層；透明文字、pane 底端，不擋曲線
-plotchar(hiCert and not hiCert[1], "進入高確定性", "▲", location.bottom, color.new(#3FB68B, 0),
-     text = "高確定", textcolor = color.new(#3FB68B, 0), size = size.tiny)
 pCert = plot(certTotal, "確定性總分", color = certCol, linewidth = 2, display = display.pane + display.data_window + display.price_scale)
+// 進入高確定性備註：淺綠底白字框放在曲線下方 (noteGap)，虛線指回穿越點；只保留最近 8 個
+hiEvt = hiCert and not hiCert[1]
+var label[] hL = array.new_label()
+var line[]  hN = array.new_line()
+if hiEvt
+    [lb, ln] = f_note(bar_index, certTotal, certTotal - noteGap, "高確定 " + str.tostring(certTotal, "#"), #3FB68B, false)
+    array.push(hL, lb)
+    array.push(hN, ln)
+    if array.size(hL) > 8
+        label.delete(array.shift(hL))
+        line.delete(array.shift(hN))
+plotshape(hiEvt ? certTotal : na, "進入高確定性點", shape.circle, location.absolute, color.new(#3FB68B, 0), size = size.tiny)
 pThr  = plot(certAlert, "高確定性分界 (門檻)", color = color.new(#3FB68B, 30), linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 fill(pCert, pThr, color = hiCert ? color.new(#3FB68B, 70) : na, title = "高確定性區 (曲線 ≥ 門檻)")
 bgcolor(hiCert ? color.new(#3FB68B, 88) : na, title = "高確定性背景")

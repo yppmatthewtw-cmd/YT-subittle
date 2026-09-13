@@ -34,6 +34,16 @@ def common(src, key):
         src = src.replace(old, new)
     # 標題加版本
     src = re.sub(r'^(strategy|indicator)\("([^"]+)"', lambda m: f'{m.group(1)}("{m.group(2)} r6({TS_TITLE})"', src, count=1, flags=re.M)
+    # 備註框 helper（四支共用）：有底色 (淺) + 白字，離錨點一段距離，虛線指回錨點；回傳 [label, line]
+    src = src.replace(
+        'f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right\n',
+        'f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right\n'
+        '// 備註框：淺色底 + 白字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點\n'
+        'f_note(x, yAnchor, yBox, txt, col, above) =>\n'
+        '    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,\n'
+        '         color = color.new(col, 40), textcolor = color.white, size = size.small)\n'
+        '    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)\n'
+        '    [lb, ln]\n', 1)
     # 檔頭加版本行
     src = src.replace("// ═══════════════════════════════════════════════════════════════════════════\n//  R6-",
                       f"// ═══════════════════════════════════════════════════════════════════════════\n//  版本 r6({TS_TITLE})\n//  R6-", 1)
@@ -109,6 +119,7 @@ lbR     = input.int(3, "轉折右側確認根數 (越小越早、越易誤判)",
 divMin  = input.int(5,  "兩個轉折最少相隔 (日)", minval = 1, group = grpDv)
 divMax  = input.int(60, "兩個轉折最多相隔 (日)", minval = 5, group = grpDv)
 divLine = input.bool(true, "日線圖上畫背馳連線", group = grpDv)
+noteGap = input.float(0.35, "備註框與轉折點距離 (近期振幅倍數)", minval = 0.1, maxval = 1.0, step = 0.05, group = grpDv)
 
 '''
 b = must(b, "// ── ⑦ 版面（四支 R6 腳本", DIV_INPUTS + "// ── ⑦ 版面（四支 R6 腳本", "B 背馳輸入")
@@ -152,11 +163,19 @@ NEW_CYCLE_TAIL = '''    el = bar_index - cs + 1
 b = must(b, OLD_CYCLE_TAIL, NEW_CYCLE_TAIL, "B 週期引擎尾段")
 
 DIV_DRAW = '''
-// ── M1 背馳連線（drawing 物件永遠在最上層，不會被柱狀圖遮住）──
-if divLine and onCycTF and bullDiv
-    line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 3, style = line.style_arrow_right)
-if divLine and onCycTF and bearDiv
-    line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 3, style = line.style_arrow_right)
+// ── M1 背馳標註：▲/▼ 畫在轉折點；備註框離開柱狀圖 (近期振幅 × noteGap)，虛線指回轉折點；
+//    備註框與曲線同一座標系，縮放 / 捲動同步。底背馳框在 ▲ 下方，頂背馳框在 ▼ 上方。背馳連線加粗帶箭頭。
+divGap = math.max((oscHi - oscLo) * noteGap, 1e-9)
+plotshape(bullDiv ? divOL : na, "底背馳 ▲", shape.triangleup,   location.absolute, color.new(cUp, 0), size = size.small, offset = divOff)
+plotshape(bearDiv ? divOH : na, "頂背馳 ▼", shape.triangledown, location.absolute, color.new(cDn, 0), size = size.small, offset = divOff)
+if bullDiv
+    [lbB, lnB] = f_note(bar_index + divOff, divOL, divOL - divGap, "底背馳", cUp, false)
+    if divLine and onCycTF
+        line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 3, style = line.style_arrow_right)
+if bearDiv
+    [lbT, lnT] = f_note(bar_index + divOff, divOH, divOH + divGap, "頂背馳", cDn, true)
+    if divLine and onCycTF
+        line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 3, style = line.style_arrow_right)
 
 // Pine 沒有 math.atan2，自行實作（回傳弧度，範圍 -π..π）
 f_atan2(y, x) =>
@@ -167,14 +186,11 @@ f_atan2(y, x) =>
 // ── M1 時鐘 (table) ──'''
 b = must(b, "\n// ── M1 時鐘 (table) ──", DIV_DRAW, "B 背馳繪圖")
 DIV_SIG = '''
-// ── M1 背馳訊號（在柱狀圖 / MACD 線之前呼叫 → 文字位於下一層，不擋曲線）──
-//    訊號在轉折確認後 lbR 根才出現，文字回貼到轉折那根；頂背馳字在 pane 頂端、底背馳字在 pane 底端，透明無底色
+// ── M1 背馳訊號（訊號在轉折確認後 lbR 根才出現；日線圖上回貼到轉折那根）──
 onCycTF = timeframe.period == cycTF
 bullDiv = showDiv and bullRaw and newDay
 bearDiv = showDiv and bearRaw and newDay
 divOff  = onCycTF ? -lbR : 0
-plotchar(bullDiv, "底背馳", "▲", location.bottom, color.new(cUp, 0), text = "底背馳", textcolor = color.new(cUp, 0), size = size.tiny, offset = divOff)
-plotchar(bearDiv, "頂背馳", "▼", location.top,    color.new(cDn, 0), text = "頂背馳", textcolor = color.new(cDn, 0), size = size.tiny, offset = divOff)
 
 '''
 b = must(b, "// ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──", DIV_SIG.lstrip("\n") + "// ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──", "B 背馳訊號前置")
@@ -271,7 +287,10 @@ c = common(c, "c")
 c = must(c, 'showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW)\n',
             'showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW)\n'
             'lblHold = input.int(3, "等級備註：新等級需持續幾根才標註 (去雜訊)", minval = 1, maxval = 20, group = grpW)\n'
+            'lblMax  = input.int(8, "等級備註：最多保留最近幾個", minval = 1, maxval = 40, group = grpW)\n'
+            'lblGap  = input.float(18, "備註框與曲線距離 (0–100 刻度)", minval = 5, maxval = 40, group = grpW)\n'
             'showGBg = input.bool(false, "等級背景著色 (R6 預設關閉)", group = grpW)\n', "C 備註輸入")
+c = must(c, 'shorttitle = "R6-C VCP", overlay = false)', 'shorttitle = "R6-C VCP", overlay = false, max_labels_count = 100, max_lines_count = 100)', "C 宣告")
 VOL_C = '''
 // ── ⑧ 成交量柱（自 R6-A 移入本 pane）：以 volLen 日均量 = 25 標準化，柱高直接就是「量比 × 25」──
 //    50 日均量 = 25 (灰虛線)；10 日均量線 / 25 = VCP 明細裡的「量比 10d/50d」；2 倍均量 = 50；超過 4 倍 (100) 截頂。
@@ -299,21 +318,7 @@ hline(25, "50 日均量基準 = 25", color = color.new(color.gray, 40), linestyl
 hline(50, "2 倍均量 = 50", color = color.new(color.gray, 70), linestyle = hline.style_dotted)
 
 '''
-LBL_C = '''
-// ── 等級變動備註（在成交量柱與曲線之前呼叫 → 位於下一層；透明文字、無底色）──
-//    新等級持續 lblHold 根、且與上一個備註不同才標；A/B (轉強) 字在 pane 頂端，C/D/E 在 pane 底端
-gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
-var int lastLblGrade = -1
-gradeEvt = gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
-if gradeEvt
-    lastLblGrade := vcpGrade
-plotchar(gradeEvt and vcpGrade == 0, "A · VCP 待突破", "", location.top,    #3FB68B, text = "A · VCP 待突破", textcolor = #3FB68B, size = size.normal)
-plotchar(gradeEvt and vcpGrade == 1, "B · 上升結構",   "", location.top,    #5CA3D6, text = "B · 上升結構",   textcolor = #5CA3D6, size = size.normal)
-plotchar(gradeEvt and vcpGrade == 2, "C · 基底修復中", "", location.bottom, #6B7885, text = "C · 基底修復中", textcolor = #6B7885, size = size.normal)
-plotchar(gradeEvt and vcpGrade == 3, "D · 趨勢弱",     "", location.bottom, #4A555F, text = "D · 趨勢弱",     textcolor = #4A555F, size = size.normal)
-plotchar(gradeEvt and vcpGrade == 4, "E · 突破延伸中", "", location.bottom, #E5B15C, text = "E · 突破延伸中", textcolor = #E5B15C, size = size.normal)
-
-'''
+LBL_C = ""
 c = must(c, "// ── 曲線 ──\n", LBL_C.lstrip("\n") + VOL_C.lstrip("\n") + "// ── 曲線 ──\n", "C 成交量區塊")
 c = must(c, 'plot(vcpScore, "VCP 指數", color = color.new(gCol, 0), linewidth = 2)',
             'plot(vcpScore, "VCP 指數", color = color.new(gCol, 0), linewidth = 3)', "C 曲線加粗")
@@ -323,7 +328,24 @@ OLD_LBL = '''// 等級變動處標註
 if vcpGrade != vcpGrade[1]
     label.new(bar_index, vcpScore, f_gradeTxt(vcpGrade), style = label.style_label_left,
          color = color.new(gCol, 15), textcolor = color.white, size = size.tiny)'''
-NEW_LBL = ""
+NEW_LBL = '''// ── 等級變動備註：淺色底白字框，放在曲線上方 (轉強 A/B) 或下方 (C/D/E)，虛線指回曲線上的變動點 ──
+//    新等級持續 lblHold 根、且與上一個備註不同才標；只保留最近 lblMax 個；貼近 0/100 邊界時自動翻到另一側
+gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
+var int     lastLblGrade = -1
+var label[] gL = array.new_label()
+var line[]  gN = array.new_line()
+gradeEvt = gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
+if gradeEvt
+    lastLblGrade := vcpGrade
+    above = vcpGrade <= 1 ? vcpScore <= 100 - lblGap : vcpScore < lblGap
+    [lb, ln] = f_note(bar_index, vcpScore, above ? vcpScore + lblGap : vcpScore - lblGap,
+         f_gradeTxt(vcpGrade), f_gradeCol(vcpGrade), above)
+    array.push(gL, lb)
+    array.push(gN, ln)
+    if array.size(gL) > lblMax
+        label.delete(array.shift(gL))
+        line.delete(array.shift(gN))
+plotshape(gradeEvt ? vcpScore : na, "等級變動點", shape.circle, location.absolute, color.new(color.white, 0), size = size.tiny)'''
 c = must(c, OLD_LBL, NEW_LBL, "C 標籤去雜訊")
 (P / NAMES["c"][0]).write_text(c, encoding="utf-8")
 
@@ -334,10 +356,19 @@ OLD_D_PLOT = d[d.index("certCol = certTotal >= certAlert"):d.index('bgcolor(hlOk
 NEW_D_PLOT = '''// ── 曲線：只有「高確定性」(總分 ≥ 門檻) 的區段著色；其餘灰色、無填色、無背景 ──
 hiCert  = certTotal >= certAlert
 certCol = hiCert ? color.new(#3FB68B, 0) : color.new(#8B98A5, 35)
-// 備註在曲線之前呼叫 → 下一層；透明文字、pane 底端，不擋曲線
-plotchar(hiCert and not hiCert[1], "進入高確定性", "▲", location.bottom, color.new(#3FB68B, 0),
-     text = "高確定", textcolor = color.new(#3FB68B, 0), size = size.tiny)
 pCert = plot(certTotal, "確定性總分", color = certCol, linewidth = 2)
+// 進入高確定性備註：淺綠底白字框放在曲線下方 (noteGap)，虛線指回穿越點；只保留最近 8 個
+hiEvt = hiCert and not hiCert[1]
+var label[] hL = array.new_label()
+var line[]  hN = array.new_line()
+if hiEvt
+    [lb, ln] = f_note(bar_index, certTotal, certTotal - noteGap, "高確定 " + str.tostring(certTotal, "#"), #3FB68B, false)
+    array.push(hL, lb)
+    array.push(hN, ln)
+    if array.size(hL) > 8
+        label.delete(array.shift(hL))
+        line.delete(array.shift(hN))
+plotshape(hiEvt ? certTotal : na, "進入高確定性點", shape.circle, location.absolute, color.new(#3FB68B, 0), size = size.tiny)
 pThr  = plot(certAlert, "高確定性分界 (門檻)", color = color.new(#3FB68B, 30), linewidth = 1)
 fill(pCert, pThr, color = hiCert ? color.new(#3FB68B, 70) : na, title = "高確定性區 (曲線 ≥ 門檻)")
 bgcolor(hiCert ? color.new(#3FB68B, 88) : na, title = "高確定性背景")
@@ -353,7 +384,9 @@ bgcolor(showHLbg and hlOk ? color.new(#3FB68B, 94) : na, title = "一底高於�
 d = d.replace(OLD_D_PLOT, NEW_D_PLOT)
 d = must(d, 'showParts = input.bool(false, "同時畫出 7 個分項細線", group = grpW)\n',
             'showParts = input.bool(false, "同時畫出 7 個分項細線", group = grpW)\n'
-            'showHLbg  = input.bool(false, "一底高於一底 結構背景 (淡綠；R6 預設關閉)", group = grpW)\n', "D 輸入")
+            'showHLbg  = input.bool(false, "一底高於一底 結構背景 (淡綠；R6 預設關閉)", group = grpW)\n'
+            'noteGap   = input.float(18, "備註框與曲線距離 (0–100 刻度)", minval = 5, maxval = 40, group = grpW)\n', "D 輸入")
+d = must(d, 'shorttitle = "R6-D Cert7", overlay = false)', 'shorttitle = "R6-D Cert7", overlay = false, max_labels_count = 100, max_lines_count = 100)', "D 宣告")
 d = must(d, '''    hdrCol = certTotal >= certAlert ? color.new(#3FB68B, 10) :
              certTotal >= 50 ? color.new(#E5B15C, 10) : color.new(#6B7885, 10)''',
             '''    hdrCol = hiCert ? color.new(#3FB68B, 10) : color.new(#6B7885, 10)   // 只有高確定性才上色''', "D 表頭色")

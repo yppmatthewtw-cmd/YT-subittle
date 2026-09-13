@@ -1,13 +1,13 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:13_09:56)
+//  版本 r6(09:13_11:53)
 //  R6-C  下方 pane：VCP 指數曲線
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_09.56).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_09.56).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_09.56).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_09.56).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_11.53).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_11.53).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_11.53).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_11.53).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
@@ -15,7 +15,7 @@
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R6-C VCP Score r6(09:13_09:56)", shorttitle = "R6-C VCP", overlay = false)
+indicator("R6-C VCP Score r6(09:13_11:53)", shorttitle = "R6-C VCP", overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = "M3 ① 資料來源"
 m3TF  = input.timeframe("D", "計算時間框 (預設日線)", group = grpV, display = display.none)
@@ -24,6 +24,8 @@ bench = input.symbol("SPY", "相對強度 (RS) 基準", group = grpV, display = 
 grpW = "② 面板"
 showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW, display = display.none)
 lblHold = input.int(3, "等級備註：新等級需持續幾根才標註 (去雜訊)", minval = 1, maxval = 20, group = grpW, display = display.none)
+lblMax  = input.int(8, "等級備註：最多保留最近幾個", minval = 1, maxval = 40, group = grpW, display = display.none)
+lblGap  = input.float(18, "備註框與曲線距離 (0–100 刻度)", minval = 5, maxval = 40, group = grpW, display = display.none)
 showGBg = input.bool(false, "等級背景著色 (R6 預設關閉)", group = grpW, display = display.none)
 
 // ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
@@ -32,6 +34,12 @@ boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)"
 boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
 boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL, display = display.none)
 f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
+// 備註框：淺色底 + 白字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
+f_note(x, yAnchor, yBox, txt, col, above) =>
+    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
+         color = color.new(col, 40), textcolor = color.white, size = size.small)
+    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
+    [lb, ln]
 
 f_clamp01(x) => math.max(0.0, math.min(1.0, x))
 
@@ -214,19 +222,6 @@ f_gradeCol(g) => g == 0 ? #3FB68B : g == 1 ? #5CA3D6 : g == 2 ? #6B7885 : g == 3
 [vcpScore, vcpGrade, offHigh, aboveLow, chg1m, chg3m, rng21, volRatio, trendOK, tightB, extendedB, a50B, a200B, crossB] =
      request.security(syminfo.tickerid, m3TF, f_vcp(), lookahead = barmerge.lookahead_off)
 
-// ── 等級變動備註（在成交量柱與曲線之前呼叫 → 位於下一層；透明文字、無底色）──
-//    新等級持續 lblHold 根、且與上一個備註不同才標；A/B (轉強) 字在 pane 頂端，C/D/E 在 pane 底端
-gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
-var int lastLblGrade = -1
-gradeEvt = gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
-if gradeEvt
-    lastLblGrade := vcpGrade
-plotchar(gradeEvt and vcpGrade == 0, "A · VCP 待突破", "", location.top,    #3FB68B, text = "A · VCP 待突破", textcolor = #3FB68B, size = size.normal)
-plotchar(gradeEvt and vcpGrade == 1, "B · 上升結構",   "", location.top,    #5CA3D6, text = "B · 上升結構",   textcolor = #5CA3D6, size = size.normal)
-plotchar(gradeEvt and vcpGrade == 2, "C · 基底修復中", "", location.bottom, #6B7885, text = "C · 基底修復中", textcolor = #6B7885, size = size.normal)
-plotchar(gradeEvt and vcpGrade == 3, "D · 趨勢弱",     "", location.bottom, #4A555F, text = "D · 趨勢弱",     textcolor = #4A555F, size = size.normal)
-plotchar(gradeEvt and vcpGrade == 4, "E · 突破延伸中", "", location.bottom, #E5B15C, text = "E · 突破延伸中", textcolor = #E5B15C, size = size.normal)
-
 // ── ⑧ 成交量柱（自 R6-A 移入本 pane）：以 volLen 日均量 = 25 標準化，柱高直接就是「量比 × 25」──
 //    50 日均量 = 25 (灰虛線)；10 日均量線 / 25 = VCP 明細裡的「量比 10d/50d」；2 倍均量 = 50；超過 4 倍 (100) 截頂。
 grpVol  = "⑧ 成交量 (本 pane，均量 = 25)"
@@ -260,7 +255,24 @@ hline(60, "60 強", color = color.new(#3FB68B, 45), linestyle = hline.style_dash
 hline(40, "40 弱", color = color.new(#E0705F, 45), linestyle = hline.style_dashed)
 bgcolor(showGBg ? color.new(gCol, 92) : na, title = "等級背景 (綠A 藍B 灰C 深灰D 黃E；預設關閉)")
 
-
+// ── 等級變動備註：淺色底白字框，放在曲線上方 (轉強 A/B) 或下方 (C/D/E)，虛線指回曲線上的變動點 ──
+//    新等級持續 lblHold 根、且與上一個備註不同才標；只保留最近 lblMax 個；貼近 0/100 邊界時自動翻到另一側
+gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
+var int     lastLblGrade = -1
+var label[] gL = array.new_label()
+var line[]  gN = array.new_line()
+gradeEvt = gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
+if gradeEvt
+    lastLblGrade := vcpGrade
+    above = vcpGrade <= 1 ? vcpScore <= 100 - lblGap : vcpScore < lblGap
+    [lb, ln] = f_note(bar_index, vcpScore, above ? vcpScore + lblGap : vcpScore - lblGap,
+         f_gradeTxt(vcpGrade), f_gradeCol(vcpGrade), above)
+    array.push(gL, lb)
+    array.push(gN, ln)
+    if array.size(gL) > lblMax
+        label.delete(array.shift(gL))
+        line.delete(array.shift(gN))
+plotshape(gradeEvt ? vcpScore : na, "等級變動點", shape.circle, location.absolute, color.new(color.white, 0), size = size.tiny)
 
 // ── 明細面板（本 pane 右側）──
 var table tV = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
