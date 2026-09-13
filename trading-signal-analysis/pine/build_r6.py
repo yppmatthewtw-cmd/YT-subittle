@@ -4,7 +4,7 @@
 
 R6 變更：
   A  主力大單買入 / 賣出日 ◆ 標記 + 狀態框新增一列 + 警報（成交量柱改畫在 R6-C）
-  B  MACD 加入頂背馳 / 底背馳（日線環境計算；日線圖上畫連線）；時鐘解析度提高 (預設 21 格)、
+  B  MACD 加入頂背馳 / 底背馳（依 MACD 快線轉折；日線環境計算；日線圖上畫連線）；時鐘解析度提高 (預設 21 格)、
      環厚 / 指針寬隨解析度放大、已走過弧段亮色、12/3/6/9 刻度
   C  成交量柱移到本 pane（以 50 日均量 = 25 標準化，直接對照量比）；等級標籤去雜訊 (持續 N 根才標、只留最近 M 個)、
      字級加大一倍；等級背景預設關閉、曲線加粗
@@ -117,7 +117,7 @@ b = must(b, "//  ⚠ 時鐘是格子陣列，pane 太矮會被壓扁 —— 請�
 
 DIV_INPUTS = '''grpDv = "M1 ④ 背馳 (頂 / 底)"
 showDiv = input.bool(true, "顯示頂背馳 / 底背馳", group = grpDv)
-divSrc  = input.string("柱狀圖", "背馳依據", options = ["柱狀圖", "MACD 線"], group = grpDv)
+divSrc  = input.string("MACD 線", "背馳依據 (預設 MACD 快線)", options = ["MACD 線", "柱狀圖"], group = grpDv)
 lbL     = input.int(5, "轉折左側確認根數", minval = 1, maxval = 20, group = grpDv)
 lbR     = input.int(3, "轉折右側確認根數 (越小越早、越易誤判)", minval = 1, maxval = 10, group = grpDv)
 divMin  = input.int(5,  "兩個轉折最少相隔 (日)", minval = 1, group = grpDv)
@@ -179,17 +179,17 @@ if showLbl and flipEvt and not na(extVal[1]) and not na(extBar[1])
          textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny)''', "B N日 new block")
 
 DIV_DRAW = '''
-// ── M1 背馳標註：▲/▼ 畫在轉折點；備註框離開柱狀圖 (近期振幅 × noteGap)，虛線指回轉折點；
-//    備註框與曲線同一座標系，縮放 / 捲動同步。底背馳框在 ▲ 下方，頂背馳框在 ▼ 上方。背馳連線加粗、實線無箭頭。
+// ── M1 背馳標註（依據 MACD 快線的轉折）：▲/▼ 畫在轉折點；備註框放在曲線「內側」（谷底之上 / 峰頂之下，
+//    距離 = 近期振幅 × noteGap），不佔用 pane 上下多餘空間；虛線指回轉折點；與曲線同一座標系，縮放 / 捲動同步。背馳連線加粗、實線無箭頭。
 divGap = math.max((oscHi - oscLo) * noteGap, 1e-9)
 plotshape(bullDiv ? divOL : na, "底背馳 ▲", shape.triangleup,   location.absolute, color.new(cUp, 0), size = size.small, offset = divOff)
 plotshape(bearDiv ? divOH : na, "頂背馳 ▼", shape.triangledown, location.absolute, color.new(cDn, 0), size = size.small, offset = divOff)
 if bullDiv
-    [lbB, lnB] = f_note(bar_index + divOff, divOL, divOL - divGap, "底背馳", cUp, false)
+    [lbB, lnB] = f_note(bar_index + divOff, divOL, divOL + divGap, "底背馳", cUp, true)    // 框在谷底上方 (曲線內側)
     if divLine and onCycTF
         line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 3, style = line.style_solid)
 if bearDiv
-    [lbT, lnT] = f_note(bar_index + divOff, divOH, divOH + divGap, "頂背馳", cDn, true)
+    [lbT, lnT] = f_note(bar_index + divOff, divOH, divOH - divGap, "頂背馳", cDn, false)   // 框在峰頂下方 (曲線內側)
     if divLine and onCycTF
         line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 3, style = line.style_solid)
 
