@@ -1,0 +1,162 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  MACD Cycle Clock (1-min intraday)  —  r0
+//
+//  1) 週期定義：MACD Histogram ≥ 0 = 上昇周期；< 0 = 下跌周期
+//     每次柱狀圖穿越零軸 = 週期切換，並記錄每段週期長度（根數）
+//     用最近 N 段同類週期的平均長度估算「本段週期預期長度」
+//
+//  2) 時鐘 (預設左上角)：
+//     以格子陣列畫圓環 —— 上半圓 = 上昇周期 (綠)，下半圓 = 下跌周期 (紅)
+//     指針順時針轉動：
+//        9 點鐘 → 12 點 → 3 點   = 上昇周期 (起點 → 中段 → 尾段)
+//        3 點鐘 → 6 點  → 9 點   = 下跌周期 (起點 → 中段 → 尾段)
+//     指針位置 = 本段週期已走根數 ÷ 預期長度（超過平均長度時停在 97% 並提示「超時」）
+//     圓心顯示 K 線時間 (HH:mm)，上方一行顯示週期狀態，下方一行顯示統計
+//
+//  面板下方同時繪出 MACD 柱狀圖 (四色：升加速/升減速/跌減弱/跌加速)，
+//  背景以淡綠/淡紅標示週期，週期切換處標註上一段長度。
+//
+//  用法：TradingView → Pine Editor 貼上 → 加入圖表 (1 分鐘圖)
+//        警報：轉入上昇 / 轉入下跌 / 週期進入尾段 (>75%)
+// ═══════════════════════════════════════════════════════════════════════════
+indicator("MACD Cycle Clock (1m) r0", shorttitle = "Cycle Clock", overlay = false,
+     max_labels_count = 300)
+
+// ───────────────────────────── 參數 ─────────────────────────────
+grpM = "① MACD"
+src  = input.source(close, "價格來源", group = grpM)
+fast = input.int(12, "快線 EMA", minval = 2, group = grpM)
+slow = input.int(26, "慢線 EMA", minval = 3, group = grpM)
+sigL = input.int(9,  "訊號線", minval = 2, group = grpM)
+
+grpC = "② 週期估算"
+lookN  = input.int(10, "平均週期長度取最近幾段", minval = 2, maxval = 50, group = grpC)
+defLen = input.int(8,  "尚無歷史時的預設週期長度 (根)", minval = 2, group = grpC)
+lateAt = input.float(75, "進入尾段門檻 % (警報用)", minval = 50, maxval = 95, group = grpC)
+
+grpK = "③ 時鐘外觀"
+posOpt = input.string("左上", "位置", options = ["左上", "右上", "左下", "右下"], group = grpK)
+grid   = input.int(13, "解析度 (格數, 建議奇數 11–17)", minval = 9, maxval = 21, group = grpK)
+cellW  = input.float(0.9, "格寬 (% 圖表寬)", minval = 0.3, step = 0.1, group = grpK)
+cellH  = input.float(1.7, "格高 (% 圖表高)", minval = 0.5, step = 0.1, group = grpK)
+tz     = input.string("America/New_York", "時鐘時區", group = grpK)
+cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK)
+cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK)
+cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK)
+showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK)
+
+// ───────────────────────────── MACD 與週期 ─────────────────────────────
+[macdL, sigLine, hist] = ta.macd(src, fast, slow, sigL)
+up   = hist >= 0
+flip = bar_index > 0 and up != up[1]
+rising = hist > hist[1]
+
+var int   cycStart = 0
+var float lastLen  = na
+var upLens = array.new_float()
+var dnLens = array.new_float()
+
+if flip
+    cycLen = bar_index - cycStart
+    lastLen := cycLen
+    arr = up[1] ? upLens : dnLens          // 剛結束的是哪一種週期
+    array.push(arr, cycLen)
+    if array.size(arr) > lookN
+        array.shift(arr)
+    cycStart := bar_index
+
+elapsed  = bar_index - cycStart + 1
+avgUp    = array.size(upLens) > 0 ? array.avg(upLens) : defLen
+avgDn    = array.size(dnLens) > 0 ? array.avg(dnLens) : defLen
+expected = up ? avgUp : avgDn
+progRaw  = elapsed / expected
+prog     = math.min(progRaw, 0.97)
+overdue  = progRaw > 1.0
+late     = progRaw * 100 >= lateAt
+
+// 指針角度：順時針、12 點鐘 = 0°
+theta = up ? 270 + 180 * prog : 90 + 180 * prog
+theta := theta >= 360 ? theta - 360 : theta
+
+phaseTxt = up ? (rising ? "▲ 上昇周期 · 動能加速" : "▲ 上昇周期 · 動能減速")
+              : (rising ? "▼ 下跌周期 · 跌勢減弱" : "▼ 下跌周期 · 跌勢加速")
+
+// ───────────────────────────── 面板繪圖 ─────────────────────────────
+hcol = up ? (rising ? color.new(cUp, 0) : color.new(cUp, 50))
+          : (rising ? color.new(cDn, 50) : color.new(cDn, 0))
+plot(hist, "MACD Histogram", style = plot.style_columns, color = hcol)
+plot(macdL,   "MACD",   color = color.new(color.blue, 30))
+plot(sigLine, "Signal", color = color.new(color.orange, 30))
+hline(0, "零軸", color = color.new(color.gray, 40))
+bgcolor(up ? color.new(cUp, 93) : color.new(cDn, 93), title = "週期背景")
+
+if showLbl and flip
+    // 標註剛結束那段週期的長度（放在切換前一根）
+    label.new(bar_index - 1, 0, str.tostring(lastLen, "#") + "根",
+         style = up[1] ? label.style_label_down : label.style_label_up,
+         color = up[1] ? color.new(cUp, 20) : color.new(cDn, 20),
+         textcolor = color.white, size = size.tiny)
+
+// ───────────────────────────── 時鐘 (table) ─────────────────────────────
+tpos = posOpt == "左上" ? position.top_left : posOpt == "右上" ? position.top_right :
+       posOpt == "左下" ? position.bottom_left : position.bottom_right
+
+var table clk = table.new(tpos, grid, grid + 2, bgcolor = color.new(color.black, 100), frame_width = 0)
+var bool merged = false
+
+if barstate.islast
+    if not merged
+        table.merge_cells(clk, 0, 0, grid - 1, 0)                 // 上方狀態列
+        table.merge_cells(clk, 0, grid + 1, grid - 1, grid + 1)   // 下方統計列
+        merged := true
+
+    activeCol = up ? cUp : cDn
+    table.cell(clk, 0, 0, phaseTxt, text_color = color.white, bgcolor = color.new(activeCol, 10),
+         text_size = size.small, text_halign = text.align_center)
+
+    c  = (grid - 1) / 2.0            // 圓心索引
+    r  = c - 0.5                     // 圓環半徑
+    th = math.toradians(theta)
+    ux = math.sin(th)                // 指針方向單位向量 (x 向右, y 向下)
+    uy = -math.cos(th)
+    timeTxt = str.format_time(time, "HH:mm", tz)
+
+    for i = 0 to grid - 1            // 欄 (x)
+        for j = 0 to grid - 1        // 列 (y)
+            dx = i - c
+            dy = j - c
+            d  = math.sqrt(dx * dx + dy * dy)
+            isRing   = math.abs(d - r) <= 0.55
+            topHalf  = dy < 0 or (dy == 0 and dx < 0)     // 9 點鐘 → 12 → 3 點鐘(不含) 為上半
+            along    = dx * ux + dy * uy
+            perp     = math.abs(dx * uy - dy * ux)
+            onHand   = along >= 0 and along <= r - 0.9 and perp <= 0.5
+            isCenter = d < 0.6
+
+            cellBg = color.new(color.black, 100)
+            cellTx = ""
+            if isCenter
+                cellBg := color.new(color.gray, 20)
+                cellTx := timeTxt
+            else if onHand
+                cellBg := cHand
+            else if isRing
+                cellBg := topHalf ? color.new(cUp, up ? 0 : 75) : color.new(cDn, up ? 75 : 0)
+
+            table.cell(clk, i, j + 1, cellTx, width = cellW, height = cellH,
+                 bgcolor = cellBg, text_color = color.white, text_size = size.tiny,
+                 text_halign = text.align_center, text_valign = text.align_center)
+
+    statTxt = "第 " + str.tostring(elapsed) + " / 預期 " + str.tostring(expected, "#.#") + " 根 · " +
+         str.tostring(progRaw * 100, "#") + "%" + (overdue ? " ⚠超時" : late ? " ·尾段" : "") +
+         "\n均升 " + str.tostring(avgUp, "#.#") + " 根 · 均跌 " + str.tostring(avgDn, "#.#") + " 根" +
+         (timeframe.period != "1" ? "\n(設計用於 1 分鐘圖)" : "")
+    table.cell(clk, 0, grid + 1, statTxt, text_color = color.white,
+         bgcolor = color.new(color.gray, 30), text_size = size.tiny, text_halign = text.align_center)
+
+// ───────────────────────────── 警報 ─────────────────────────────
+alertcondition(flip and up,       "轉入上昇周期", "{{ticker}} MACD 柱狀圖轉正 — 進入上昇周期 (9 點鐘)")
+alertcondition(flip and not up,   "轉入下跌周期", "{{ticker}} MACD 柱狀圖轉負 — 進入下跌周期 (3 點鐘)")
+alertcondition(late and not late[1] and up,     "上昇周期進入尾段", "{{ticker}} 上昇周期已走 >75%，留意轉折 (接近 3 點鐘)")
+alertcondition(late and not late[1] and not up, "下跌周期進入尾段", "{{ticker}} 下跌周期已走 >75%，留意反轉 (接近 9 點鐘)")

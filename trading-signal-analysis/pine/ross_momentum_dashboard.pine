@@ -1,0 +1,49 @@
+//@version=5
+// Ross Momentum 主指標：VWAP + EMA9/20 + MACD 紅綠燈背景 + RVOL 警報
+// 對應規則: #2 VWAP動態支撐 / #24 MACD綠燈紅燈 / #26 均線排列 / #68 無量突破不追
+// 用法: 貼到 TradingView Pine Editor -> 加到 1 分鐘圖 -> 右上角「警報」選本指標的 alert 條件
+indicator("Ross Momentum Dashboard", overlay = true)
+
+// ---- 參數 ----
+volMultBreak = input.float(5.0,  "突破量能倍數 (RVOL)", minval = 1)
+volMultDump  = input.float(3.0,  "跌破VWAP放量倍數",   minval = 1)
+volAvgLen    = input.int(20,     "平均量週期")
+
+// ---- 指標 ----
+vwapLine = ta.vwap
+ema9  = ta.ema(close, 9)
+ema20 = ta.ema(close, 20)
+[macdLine, sigLine, histLine] = ta.macd(close, 12, 26, 9)
+avgVol = ta.sma(volume, volAvgLen)
+rvol   = volume / avgVol
+
+plot(vwapLine, "VWAP",   color = color.purple, linewidth = 2)
+plot(ema9,     "EMA 9",  color = color.orange)
+plot(ema20,    "EMA 20", color = color.blue)
+
+// MACD 紅綠燈背景 (#24: 綠燈才可做多; 紅燈禁止做多)
+bgcolor(macdLine > 0 ? color.new(color.green, 92) : color.new(color.red, 94),
+        title = "MACD 紅綠燈")
+
+// ---- 訊號 ----
+// 1) VWAP 站穩再突破 (#2)
+holdVwap  = close > vwapLine and low <= vwapLine        // 回踩VWAP收上
+// 2) 放量跌破 VWAP = 止損/趨勢反轉 (#2)
+breakVwap = ta.crossunder(close, vwapLine) and rvol >= volMultDump
+// 3) MACD 轉燈 (#24)
+greenOn   = ta.crossover(macdLine, 0)
+redOn     = ta.crossunder(macdLine, 0)
+// 4) 均線多頭排列成立 (#26)
+bullStack = ema9 > ema20 and close > ema9
+
+plotshape(holdVwap and macdLine > 0, "VWAP站穩", shape.triangleup,
+          location.belowbar, color.green, size = size.tiny, text = "VWAP")
+plotshape(breakVwap, "放量跌破VWAP", shape.triangledown,
+          location.abovebar, color.red, size = size.tiny, text = "DUMP")
+
+// ---- 警報 ----
+alertcondition(holdVwap and macdLine > 0 and rvol >= 2,
+     "VWAP站穩+綠燈", "{{ticker}} 回踩VWAP站穩 + MACD綠燈, RVOL={{volume}}")
+alertcondition(breakVwap, "放量跌破VWAP(止損)", "{{ticker}} 放量跌破VWAP — 止損/不再做多")
+alertcondition(greenOn, "MACD轉綠燈", "{{ticker}} MACD 轉正 — 可以評估做多")
+alertcondition(redOn,   "MACD轉紅燈", "{{ticker}} MACD 轉負 — 禁止做多, 持倉考慮出場")
