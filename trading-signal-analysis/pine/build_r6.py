@@ -152,19 +152,11 @@ NEW_CYCLE_TAIL = '''    el = bar_index - cs + 1
 b = must(b, OLD_CYCLE_TAIL, NEW_CYCLE_TAIL, "B 週期引擎尾段")
 
 DIV_DRAW = '''
-// ── M1 背馳繪圖（訊號在轉折確認後 lbR 根才出現，標籤回貼到轉折那根）──
-onCycTF = timeframe.period == cycTF
-bullDiv = showDiv and bullRaw and newDay
-bearDiv = showDiv and bearRaw and newDay
-divOff  = onCycTF ? -lbR : 0
-plotshape(bullDiv ? divOL : na, "底背馳", shape.labelup,   location.absolute, color.new(cUp, 0),
-     text = "底背馳", textcolor = color.white, size = size.small, offset = divOff)
-plotshape(bearDiv ? divOH : na, "頂背馳", shape.labeldown, location.absolute, color.new(cDn, 0),
-     text = "頂背馳", textcolor = color.white, size = size.small, offset = divOff)
+// ── M1 背馳連線（drawing 物件永遠在最上層，不會被柱狀圖遮住）──
 if divLine and onCycTF and bullDiv
-    line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 2)
+    line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 3, style = line.style_arrow_right)
 if divLine and onCycTF and bearDiv
-    line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 2)
+    line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 3, style = line.style_arrow_right)
 
 // Pine 沒有 math.atan2，自行實作（回傳弧度，範圍 -π..π）
 f_atan2(y, x) =>
@@ -174,6 +166,36 @@ f_atan2(y, x) =>
 
 // ── M1 時鐘 (table) ──'''
 b = must(b, "\n// ── M1 時鐘 (table) ──", DIV_DRAW, "B 背馳繪圖")
+DIV_SIG = '''
+// ── M1 背馳訊號（在柱狀圖 / MACD 線之前呼叫 → 文字位於下一層，不擋曲線）──
+//    訊號在轉折確認後 lbR 根才出現，文字回貼到轉折那根；頂背馳字在 pane 頂端、底背馳字在 pane 底端，透明無底色
+onCycTF = timeframe.period == cycTF
+bullDiv = showDiv and bullRaw and newDay
+bearDiv = showDiv and bearRaw and newDay
+divOff  = onCycTF ? -lbR : 0
+plotchar(bullDiv, "底背馳", "▲", location.bottom, color.new(cUp, 0), text = "底背馳", textcolor = color.new(cUp, 0), size = size.tiny, offset = divOff)
+plotchar(bearDiv, "頂背馳", "▼", location.top,    color.new(cDn, 0), text = "頂背馳", textcolor = color.new(cDn, 0), size = size.tiny, offset = divOff)
+
+'''
+b = must(b, "// ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──", DIV_SIG.lstrip("\n") + "// ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──", "B 背馳訊號前置")
+# 快慢線調幼、變淡
+b = must(b, 'plot(macdL,   "MACD",   color = color.new(color.blue, 20),   linewidth = 2)',
+            'plot(macdL,   "MACD",   color = color.new(color.blue, 45),   linewidth = 1)', "B MACD 線")
+b = must(b, 'plot(sigLine, "Signal", color = color.new(color.orange, 20), linewidth = 2)',
+            'plot(sigLine, "Signal", color = color.new(color.orange, 45), linewidth = 1)', "B Signal 線")
+# 「N日」週期長度：透明文字、不反白，放在近期振幅之外 (上昇週期結束 → 上方；下跌週期結束 → 下方)
+b = must(b, '''if showLbl and flipEvt
+    label.new(bar_index, 0, str.tostring(lastLen, "#") + "日",
+         style = up[1] ? label.style_label_down : label.style_label_up,
+         color = up[1] ? color.new(cUp, 20) : color.new(cDn, 20),
+         textcolor = color.white, size = size.tiny)''',
+'''oscHi = ta.highest(math.max(math.max(hist, macdL), sigLine), 60)
+oscLo = ta.lowest(math.min(math.min(hist, macdL), sigLine), 60)
+if showLbl and flipEvt
+    // 次要備註：透明無底色、字不反白；剛結束的是上昇週期 → 放在近期振幅上方，下跌週期 → 下方
+    label.new(bar_index, up[1] ? oscHi * 1.25 : oscLo * 1.25, str.tostring(lastLen, "#") + "日",
+         style = label.style_none, textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny)''', "B 週期長度標籤")
+
 
 OLD_CLOCK = b[b.index("    activeCol = up ? cUp : cDn"):b.index("    statTxt = ")]
 NEW_CLOCK = '''    activeCol = up ? cUp : cDn
@@ -248,14 +270,8 @@ c = (P / NAMES["c"][1]).read_text(encoding="utf-8")
 c = common(c, "c")
 c = must(c, 'showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW)\n',
             'showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW)\n'
-            'lblSz   = input.string("中", "等級標籤字級 (R6：預設放大一倍)", options = ["小", "中", "大"], group = grpW)\n'
-            'f_lblSz(s) => s == "小" ? size.small : s == "大" ? size.large : size.normal\n', "C 字級輸入")
-c = must(c, 'lblSz   = input.string("中", "等級標籤字級 (R6：預設放大一倍)", options = ["小", "中", "大"], group = grpW)\n',
-            'lblSz   = input.string("中", "等級標籤字級 (R6：預設放大一倍)", options = ["小", "中", "大"], group = grpW)\n'
-            'lblHold = input.int(3, "等級需持續幾根才標註 (去雜訊)", minval = 1, maxval = 20, group = grpW)\n'
-            'lblMax  = input.int(8, "最多保留最近幾個標籤", minval = 1, maxval = 50, group = grpW)\n'
-            'showGBg = input.bool(false, "等級背景著色 (R6 預設關閉)", group = grpW)\n', "C 標籤去雜訊輸入")
-
+            'lblHold = input.int(3, "等級備註：新等級需持續幾根才標註 (去雜訊)", minval = 1, maxval = 20, group = grpW)\n'
+            'showGBg = input.bool(false, "等級背景著色 (R6 預設關閉)", group = grpW)\n', "C 備註輸入")
 VOL_C = '''
 // ── ⑧ 成交量柱（自 R6-A 移入本 pane）：以 volLen 日均量 = 25 標準化，柱高直接就是「量比 × 25」──
 //    50 日均量 = 25 (灰虛線)；10 日均量線 / 25 = VCP 明細裡的「量比 10d/50d」；2 倍均量 = 50；超過 4 倍 (100) 截頂。
@@ -283,7 +299,22 @@ hline(25, "50 日均量基準 = 25", color = color.new(color.gray, 40), linestyl
 hline(50, "2 倍均量 = 50", color = color.new(color.gray, 70), linestyle = hline.style_dotted)
 
 '''
-c = must(c, "// ── 曲線 ──\n", VOL_C.lstrip("\n") + "// ── 曲線 ──\n", "C 成交量區塊")
+LBL_C = '''
+// ── 等級變動備註（在成交量柱與曲線之前呼叫 → 位於下一層；透明文字、無底色）──
+//    新等級持續 lblHold 根、且與上一個備註不同才標；A/B (轉強) 字在 pane 頂端，C/D/E 在 pane 底端
+gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
+var int lastLblGrade = -1
+gradeEvt = gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
+if gradeEvt
+    lastLblGrade := vcpGrade
+plotchar(gradeEvt and vcpGrade == 0, "A · VCP 待突破", "", location.top,    #3FB68B, text = "A · VCP 待突破", textcolor = #3FB68B, size = size.normal)
+plotchar(gradeEvt and vcpGrade == 1, "B · 上升結構",   "", location.top,    #5CA3D6, text = "B · 上升結構",   textcolor = #5CA3D6, size = size.normal)
+plotchar(gradeEvt and vcpGrade == 2, "C · 基底修復中", "", location.bottom, #6B7885, text = "C · 基底修復中", textcolor = #6B7885, size = size.normal)
+plotchar(gradeEvt and vcpGrade == 3, "D · 趨勢弱",     "", location.bottom, #4A555F, text = "D · 趨勢弱",     textcolor = #4A555F, size = size.normal)
+plotchar(gradeEvt and vcpGrade == 4, "E · 突破延伸中", "", location.bottom, #E5B15C, text = "E · 突破延伸中", textcolor = #E5B15C, size = size.normal)
+
+'''
+c = must(c, "// ── 曲線 ──\n", LBL_C.lstrip("\n") + VOL_C.lstrip("\n") + "// ── 曲線 ──\n", "C 成交量區塊")
 c = must(c, 'plot(vcpScore, "VCP 指數", color = color.new(gCol, 0), linewidth = 2)',
             'plot(vcpScore, "VCP 指數", color = color.new(gCol, 0), linewidth = 3)', "C 曲線加粗")
 c = must(c, 'bgcolor(color.new(gCol, 90), title = "等級背景 (綠A 藍B 灰C 深灰D 黃E)")',
@@ -292,16 +323,7 @@ OLD_LBL = '''// 等級變動處標註
 if vcpGrade != vcpGrade[1]
     label.new(bar_index, vcpScore, f_gradeTxt(vcpGrade), style = label.style_label_left,
          color = color.new(gCol, 15), textcolor = color.white, size = size.tiny)'''
-NEW_LBL = '''// 等級變動標註（去雜訊）：新等級持續 lblHold 根、且與上一個標籤不同才標；只保留最近 lblMax 個
-gradeChangedAgo = ta.barssince(vcpGrade != vcpGrade[1])
-var int   lastLblGrade = -1
-var label[] gLbls = array.new_label()
-if gradeChangedAgo == lblHold - 1 and vcpGrade != lastLblGrade
-    lastLblGrade := vcpGrade
-    array.push(gLbls, label.new(bar_index, vcpScore, f_gradeTxt(vcpGrade), style = label.style_label_left,
-         color = color.new(gCol, 15), textcolor = color.white, size = f_lblSz(lblSz)))
-    if array.size(gLbls) > lblMax
-        label.delete(array.shift(gLbls))'''
+NEW_LBL = ""
 c = must(c, OLD_LBL, NEW_LBL, "C 標籤去雜訊")
 (P / NAMES["c"][0]).write_text(c, encoding="utf-8")
 
@@ -312,12 +334,13 @@ OLD_D_PLOT = d[d.index("certCol = certTotal >= certAlert"):d.index('bgcolor(hlOk
 NEW_D_PLOT = '''// ── 曲線：只有「高確定性」(總分 ≥ 門檻) 的區段著色；其餘灰色、無填色、無背景 ──
 hiCert  = certTotal >= certAlert
 certCol = hiCert ? color.new(#3FB68B, 0) : color.new(#8B98A5, 35)
+// 備註在曲線之前呼叫 → 下一層；透明文字、pane 底端，不擋曲線
+plotchar(hiCert and not hiCert[1], "進入高確定性", "▲", location.bottom, color.new(#3FB68B, 0),
+     text = "高確定", textcolor = color.new(#3FB68B, 0), size = size.tiny)
 pCert = plot(certTotal, "確定性總分", color = certCol, linewidth = 2)
 pThr  = plot(certAlert, "高確定性分界 (門檻)", color = color.new(#3FB68B, 30), linewidth = 1)
 fill(pCert, pThr, color = hiCert ? color.new(#3FB68B, 70) : na, title = "高確定性區 (曲線 ≥ 門檻)")
 bgcolor(hiCert ? color.new(#3FB68B, 88) : na, title = "高確定性背景")
-plotshape(hiCert and not hiCert[1] ? certTotal : na, "進入高確定性", shape.labelup, location.absolute,
-     color.new(#3FB68B, 0), text = "高確定", textcolor = color.white, size = size.small)
 plot(showParts ? cBreak * 100 : na, "突破 25%", color = color.new(color.green, 45))
 plot(showParts ? cRetr  * 100 : na, "回升 10%", color = color.new(color.lime, 45))
 plot(showParts ? cTime  * 100 : na, "守底 15%", color = color.new(color.blue, 45))
@@ -335,6 +358,57 @@ d = must(d, '''    hdrCol = certTotal >= certAlert ? color.new(#3FB68B, 10) :
              certTotal >= 50 ? color.new(#E5B15C, 10) : color.new(#6B7885, 10)''',
             '''    hdrCol = hiCert ? color.new(#3FB68B, 10) : color.new(#6B7885, 10)   // 只有高確定性才上色''', "D 表頭色")
 (P / NAMES["d"][0]).write_text(d, encoding="utf-8")
+
+# ═══════════════════════════════ 狀態列瘦身 ═══════════════════════════════
+def _close_paren(t, i):
+    """t[i] 是 '(' 之後第一個字元；回傳對應右括號位置（跳過字串）。"""
+    depth, q = 0, None
+    while i < len(t):
+        ch = t[i]
+        if q:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == q:
+                q = None
+        elif ch in "\"'":
+            q = ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            if depth == 0:
+                return i
+            depth -= 1
+        i += 1
+    raise ValueError("unbalanced")
+
+
+def add_kw(t, call_re, kw):
+    """對每個符合 call_re 的呼叫，若尚無 kw 的鍵，就在右括號前補上 ', kw'。"""
+    out, pos = [], 0
+    key = kw.split("=")[0].strip()
+    for m in re.finditer(call_re, t):
+        if m.start() < pos:
+            continue
+        close = _close_paren(t, m.end())
+        body = t[m.end():close]
+        out.append(t[pos:close])
+        if not re.search(r"\b" + key + r"\s*=", body):
+            out.append(", " + kw)
+        pos = close
+    out.append(t[pos:])
+    return "".join(out)
+
+
+def slim_status_line(t):
+    t = add_kw(t, r"\binput\.\w+\(", "display = display.none")                       # 參數不上狀態列
+    t = add_kw(t, r"(?<![\w.])plot\(", "display = display.pane + display.data_window + display.price_scale")  # plot 數值不上狀態列
+    return t
+
+
+for k, (new, _) in NAMES.items():
+    f = P / new
+    f.write_text(slim_status_line(f.read_text(encoding="utf-8")), encoding="utf-8")
 
 # ═══════════════════════════════ 檢查 ═══════════════════════════════
 for k, (new, _) in NAMES.items():

@@ -1,13 +1,13 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:13_00:04)
+//  版本 r6(09:13_09:56)
 //  R6-A  主圖：EMA9 Band Width Strategy
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_00.04).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_00.04).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_00.04).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_00.04).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_09.56).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_09.56).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_09.56).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_09.56).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 2（EMA9 中線 ± 帶寬、擠壓突破 / 回踩進場、風控出場）。
@@ -15,7 +15,7 @@
 //  但它們的圖形改由 R6-B / R6-C / R6-D 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
 // ═══════════════════════════════════════════════════════════════════════════
 
-strategy("R6-A EMA9 BW (main) r6(09:13_00:04)", shorttitle = "R6-A EMA9-BW",
+strategy("R6-A EMA9 BW (main) r6(09:13_09:56)", shorttitle = "R6-A EMA9-BW",
      overlay = true, initial_capital = 10000,
      default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
      commission_type = strategy.commission.percent, commission_value = 0.05,
@@ -26,29 +26,29 @@ strategy("R6-A EMA9 BW (main) r6(09:13_00:04)", shorttitle = "R6-A EMA9-BW",
 // ── M1 週期引擎（僅供過濾與面板；圖形在 R6-B）──
 // ── M1 參數 ──
 grpM = "M1 ① MACD (日線)"
-m1src = input.source(close, "價格來源", group = grpM)
-fast  = input.int(12, "快線 EMA", minval = 2, group = grpM)
-slow  = input.int(26, "慢線 EMA", minval = 3, group = grpM)
-sigL  = input.int(9,  "訊號線", minval = 2, group = grpM)
-cycTF = input.timeframe("D", "週期計算時間框 (預設日線)", group = grpM)
+m1src = input.source(close, "價格來源", group = grpM, display = display.none)
+fast  = input.int(12, "快線 EMA", minval = 2, group = grpM, display = display.none)
+slow  = input.int(26, "慢線 EMA", minval = 3, group = grpM, display = display.none)
+sigL  = input.int(9,  "訊號線", minval = 2, group = grpM, display = display.none)
+cycTF = input.timeframe("D", "週期計算時間框 (預設日線)", group = grpM, display = display.none)
 
 grpC = "M1 ② 週期估算"
-lookN  = input.int(8,  "平均週期長度取最近幾段", minval = 2, maxval = 50, group = grpC)
-defLen = input.int(12, "尚無歷史時的預設週期長度 (日)", minval = 2, group = grpC)
-lateAt = input.float(75, "進入尾段門檻 % (警報用)", minval = 50, maxval = 95, group = grpC)
+lookN  = input.int(8,  "平均週期長度取最近幾段", minval = 2, maxval = 50, group = grpC, display = display.none)
+defLen = input.int(12, "尚無歷史時的預設週期長度 (日)", minval = 2, group = grpC, display = display.none)
+lateAt = input.float(75, "進入尾段門檻 % (警報用)", minval = 50, maxval = 95, group = grpC, display = display.none)
 
 grpK = "M1 ③ 時鐘外觀"
-showClock = input.bool(true, "顯示時鐘", group = grpK)
-posOpt = input.string("右下", "位置", options = ["左上", "右上", "左下", "右下"], group = grpK)
-grid   = input.int(13, "解析度 (格數, 建議奇數 11–17)", minval = 9, maxval = 21, group = grpK)
-cellW  = input.float(0.9, "格寬 (% 圖表寬)", minval = 0.3, step = 0.1, group = grpK)
-cellH  = input.float(1.7, "格高 (% 圖表高)", minval = 0.5, step = 0.1, group = grpK)
-tz     = input.string("America/New_York", "日期時區", group = grpK)
-cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK)
-cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK)
-cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK)
-showBg  = input.bool(true, "主圖週期背景著色", group = grpK)
-showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK)
+showClock = input.bool(true, "顯示時鐘", group = grpK, display = display.none)
+posOpt = input.string("右下", "位置", options = ["左上", "右上", "左下", "右下"], group = grpK, display = display.none)
+grid   = input.int(13, "解析度 (格數, 建議奇數 11–17)", minval = 9, maxval = 21, group = grpK, display = display.none)
+cellW  = input.float(0.9, "格寬 (% 圖表寬)", minval = 0.3, step = 0.1, group = grpK, display = display.none)
+cellH  = input.float(1.7, "格高 (% 圖表高)", minval = 0.5, step = 0.1, group = grpK, display = display.none)
+tz     = input.string("America/New_York", "日期時區", group = grpK, display = display.none)
+cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK, display = display.none)
+cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK, display = display.none)
+cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK, display = display.none)
+showBg  = input.bool(true, "主圖週期背景著色", group = grpK, display = display.none)
+showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK, display = display.none)
 
 // ── M1 日線週期引擎 (在 security 的日線環境中執行) ──
 f_cycle() =>
@@ -97,11 +97,11 @@ bgcolor(showBg ? (up ? color.new(cUp, 94) : color.new(cDn, 94)) : na, title = "�
 
 // ── M3 計算（僅供過濾與面板；曲線在 R6-C / R6-D）──
 grpV = "M3 ① 資料來源"
-m3TF  = input.timeframe("D", "計算時間框 (預設日線)", group = grpV)
-bench = input.symbol("SPY", "相對強度 (RS) 基準", group = grpV)
+m3TF  = input.timeframe("D", "計算時間框 (預設日線)", group = grpV, display = display.none)
+bench = input.symbol("SPY", "相對強度 (RS) 基準", group = grpV, display = display.none)
 
 grpW = "M3 ② 門檻"
-certAlert = input.float(70, "確定性警報門檻 (≥)", minval = 0, maxval = 100, group = grpW)
+certAlert = input.float(70, "確定性警報門檻 (≥)", minval = 0, maxval = 100, group = grpW, display = display.none)
 
 f_clamp01(x) => math.max(0.0, math.min(1.0, x))
 
@@ -298,49 +298,49 @@ plot(vcpGrade,  "M3-B VCP 等級 (0=A…4=E)", color = color.gray, display = dis
 
 // ── MODULE 2：策略本體 ──
 grpB = "M2 ① 帶狀通道"
-src      = input.source(close, "價格來源", group = grpB)
-len      = input.int(9, "EMA 週期 (中線)", minval = 2, group = grpB)
-bandMode = input.string("StdDev", "帶寬計算方式", options = ["StdDev", "ATR"], group = grpB)
-mult     = input.float(2.0, "StdDev 倍數", step = 0.1, minval = 0.5, group = grpB)
-atrMult  = input.float(1.5, "ATR 倍數", step = 0.1, minval = 0.5, group = grpB)
+src      = input.source(close, "價格來源", group = grpB, display = display.none)
+len      = input.int(9, "EMA 週期 (中線)", minval = 2, group = grpB, display = display.none)
+bandMode = input.string("StdDev", "帶寬計算方式", options = ["StdDev", "ATR"], group = grpB, display = display.none)
+mult     = input.float(2.0, "StdDev 倍數", step = 0.1, minval = 0.5, group = grpB, display = display.none)
+atrMult  = input.float(1.5, "ATR 倍數", step = 0.1, minval = 0.5, group = grpB, display = display.none)
 
 grpS = "M2 ② 擠壓 (Squeeze) 偵測"
-bwLook = input.int(60, "Band Width 回看期 (找 N 期最低)", minval = 10, group = grpS)
-sqzTol = input.float(15, "擠壓容忍度 % (BW ≤ 最低 × (1+tol))", step = 1, minval = 0, group = grpS)
-sqzWin = input.int(8, "擠壓後幾根 K 內突破才有效", minval = 1, group = grpS)
+bwLook = input.int(60, "Band Width 回看期 (找 N 期最低)", minval = 10, group = grpS, display = display.none)
+sqzTol = input.float(15, "擠壓容忍度 % (BW ≤ 最低 × (1+tol))", step = 1, minval = 0, group = grpS, display = display.none)
+sqzWin = input.int(8, "擠壓後幾根 K 內突破才有效", minval = 1, group = grpS, display = display.none)
 
 grpE = "M2 ③ 進場"
-useBreak   = input.bool(true, "A) 擠壓後突破上軌", group = grpE)
-usePull    = input.bool(true, "B) 順勢回踩 EMA9 站回", group = grpE)
-allowShort = input.bool(false, "允許做空 (鏡像規則)", group = grpE)
-useVol     = input.bool(true, "量能過濾：量 > 20日均量 ×", inline = "v", group = grpE)
-volX       = input.float(1.5, "", step = 0.1, minval = 0.5, inline = "v", group = grpE)
-useMacd    = input.bool(true, "MACD 過濾 (多: MACD>0 / 空: MACD<0)", group = grpE)
-useTrend   = input.bool(true, "大趨勢過濾 (多: 價>EMA21 / 空: 價<EMA21)", group = grpE)
+useBreak   = input.bool(true, "A) 擠壓後突破上軌", group = grpE, display = display.none)
+usePull    = input.bool(true, "B) 順勢回踩 EMA9 站回", group = grpE, display = display.none)
+allowShort = input.bool(false, "允許做空 (鏡像規則)", group = grpE, display = display.none)
+useVol     = input.bool(true, "量能過濾：量 > 20日均量 ×", inline = "v", group = grpE, display = display.none)
+volX       = input.float(1.5, "", step = 0.1, minval = 0.5, inline = "v", group = grpE, display = display.none)
+useMacd    = input.bool(true, "MACD 過濾 (多: MACD>0 / 空: MACD<0)", group = grpE, display = display.none)
+useTrend   = input.bool(true, "大趨勢過濾 (多: 價>EMA21 / 空: 價<EMA21)", group = grpE, display = display.none)
 
 grpX = "M2 ④ 出場 / 風控"
-rr          = input.float(2.0, "止盈 R 倍數 (0 = 不設止盈)", step = 0.5, minval = 0, group = grpX)
-midExit     = input.bool(true, "收盤跌破/站回中線即出場 (移動出場)", group = grpX)
-midBars     = input.int(1, "需連續幾根 K 收在中線另一側", minval = 1, group = grpX)
-useRiskSize = input.bool(true, "依風險 % 計算股數 (關閉 = 用預設 % 權益)", group = grpX)
-riskPct     = input.float(1.0, "每筆風險 % 帳戶", step = 0.25, minval = 0.1, group = grpX)
+rr          = input.float(2.0, "止盈 R 倍數 (0 = 不設止盈)", step = 0.5, minval = 0, group = grpX, display = display.none)
+midExit     = input.bool(true, "收盤跌破/站回中線即出場 (移動出場)", group = grpX, display = display.none)
+midBars     = input.int(1, "需連續幾根 K 收在中線另一側", minval = 1, group = grpX, display = display.none)
+useRiskSize = input.bool(true, "依風險 % 計算股數 (關閉 = 用預設 % 權益)", group = grpX, display = display.none)
+riskPct     = input.float(1.0, "每筆風險 % 帳戶", step = 0.25, minval = 0.1, group = grpX, display = display.none)
 
 grpD = "M2 ⑤ 回測區間"
-startT  = input.time(timestamp("2023-01-01T00:00:00"), "開始", group = grpD)
-endT    = input.time(timestamp("2030-12-31T00:00:00"), "結束", group = grpD)
+startT  = input.time(timestamp("2023-01-01T00:00:00"), "開始", group = grpD, display = display.none)
+endT    = input.time(timestamp("2030-12-31T00:00:00"), "結束", group = grpD, display = display.none)
 inRange = time >= startT and time <= endT
 
 grpI = "⑥ 模組整合 (M1 → M2)"
-useDailyCycle = input.bool(false, "依日線週期過濾：多單只在日線上昇周期 / 空單只在下跌周期", group = grpI)
-avoidLate     = input.bool(false, "日線週期已進入尾段 (>門檻%) 時不再新開倉", group = grpI)
-useVcpGrade   = input.bool(false, "M3：只在 VCP 等級 A/B 時做多", group = grpI)
-minCert       = input.float(0, "M3：確定性總分 ≥ 此值才做多 (0 = 不過濾)", minval = 0, maxval = 100, step = 5, group = grpI)
+useDailyCycle = input.bool(false, "依日線週期過濾：多單只在日線上昇周期 / 空單只在下跌周期", group = grpI, display = display.none)
+avoidLate     = input.bool(false, "日線週期已進入尾段 (>門檻%) 時不再新開倉", group = grpI, display = display.none)
+useVcpGrade   = input.bool(false, "M3：只在 VCP 等級 A/B 時做多", group = grpI, display = display.none)
+minCert       = input.float(0, "M3：確定性總分 ≥ 此值才做多 (0 = 不過濾)", minval = 0, maxval = 100, step = 5, group = grpI, display = display.none)
 
 // ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
 grpL   = "⑦ 版面 (四個 pane 統一)"
-boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL)
-boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL)
-boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL)
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
+boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
+boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL, display = display.none)
 f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
 
 // ── M2 指標 ──
@@ -444,28 +444,28 @@ if midExit and strategy.position_size < 0 and aboveCnt >= midBars
     alert("EMA9-BW 平空 " + syminfo.ticker + " 收盤站回 EMA9", alert.freq_once_per_bar_close)
 
 // ── M2 繪圖 ──
-pB = plot(basis, "EMA9 中線", color = color.new(color.orange, 0), linewidth = 2)
-pU = plot(upper, "上軌", color = color.new(color.teal, 55), linewidth = 1)
-pL = plot(lower, "下軌", color = color.new(color.teal, 55), linewidth = 1)
+pB = plot(basis, "EMA9 中線", color = color.new(color.orange, 0), linewidth = 2, display = display.pane + display.data_window + display.price_scale)
+pU = plot(upper, "上軌", color = color.new(color.teal, 55), linewidth = 1, display = display.pane + display.data_window + display.price_scale)
+pL = plot(lower, "下軌", color = color.new(color.teal, 55), linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 fill(pU, pL, color = squeeze ? color.new(color.yellow, 88) : color.new(color.teal, 96), title = "通道 (黃 = 擠壓)")
-plot(ema21, "EMA21 (趨勢過濾)", color = color.new(color.gray, 20), linewidth = 3)
+plot(ema21, "EMA21 (趨勢過濾)", color = color.new(color.gray, 20), linewidth = 3, display = display.pane + display.data_window + display.price_scale)
 plot(bw, "Band Width %", color = color.purple, display = display.data_window)
 plot(bwLow, "Band Width N 期最低", color = color.gray, display = display.data_window)
 
 plotshape(longSig,  "做多訊號", shape.triangleup,   location.belowbar, color.green, size = size.small, text = "多")
 plotshape(shortSig, "做空訊號", shape.triangledown, location.abovebar, color.red,   size = size.small, text = "空")
-plot(strategy.position_size != 0 ? stopPx : na, "止損線", color = color.red,   style = plot.style_linebr, linewidth = 1)
-plot(strategy.position_size != 0 ? tpPx   : na, "止盈線", color = color.green, style = plot.style_linebr, linewidth = 1)
+plot(strategy.position_size != 0 ? stopPx : na, "止損線", color = color.red,   style = plot.style_linebr, linewidth = 1, display = display.pane + display.data_window + display.price_scale)
+plot(strategy.position_size != 0 ? tpPx   : na, "止盈線", color = color.green, style = plot.style_linebr, linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 
 // ── ⑧ 主力大單日（成交量柱本身畫在 R6-C pane，主圖只留 ◆ 標記 / 狀態列 / 警報）──
 // 主力大單 = 量 ≥ bigX × 均量，且收在當日區間上緣 (買入) / 下緣 (賣出)。
 grpVol  = "⑧ 主力大單 (成交量柱在 R6-C)"
-volLen  = input.int(50, "均量期數 (與 R6-C 設同值)", minval = 5, group = grpVol)
-bigX    = input.float(2.0, "主力大單門檻 (× 均量)", minval = 1.2, step = 0.1, group = grpVol)
-bigPos  = input.float(0.6, "主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之", minval = 0.5, maxval = 1, step = 0.05, group = grpVol)
-markBig = input.bool(true, "K 線旁加 ◆ 標記 (藍 = 主買、橙 = 主賣)", group = grpVol)
-cBuy    = input.color(#2563eb, "主力買入色", group = grpVol)
-cSell   = input.color(#f97316, "主力賣出色", group = grpVol)
+volLen  = input.int(50, "均量期數 (與 R6-C 設同值)", minval = 5, group = grpVol, display = display.none)
+bigX    = input.float(2.0, "主力大單門檻 (× 均量)", minval = 1.2, step = 0.1, group = grpVol, display = display.none)
+bigPos  = input.float(0.6, "主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之", minval = 0.5, maxval = 1, step = 0.05, group = grpVol, display = display.none)
+markBig = input.bool(true, "K 線旁加 ◆ 標記 (藍 = 主買、橙 = 主賣)", group = grpVol, display = display.none)
+cBuy    = input.color(#2563eb, "主力買入色", group = grpVol, display = display.none)
+cSell   = input.color(#f97316, "主力賣出色", group = grpVol, display = display.none)
 
 vAvg    = ta.sma(volume, volLen)
 rngPos  = high != low ? (close - low) / (high - low) : 0.5

@@ -1,13 +1,13 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:13_00:04)
+//  版本 r6(09:13_09:56)
 //  R6-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_00.04).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_00.04).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_00.04).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_00.04).pine
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_09.56).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_09.56).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_09.56).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_09.56).pine
 //  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -19,46 +19,46 @@
 //  R6：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R6-B MACD + Cycle Clock r6(09:13_00:04)", shorttitle = "R6-B MACD Clock",
+indicator("R6-B MACD + Cycle Clock r6(09:13_09:56)", shorttitle = "R6-B MACD Clock",
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
 grpM = "M1 ① MACD (日線)"
-m1src = input.source(close, "價格來源", group = grpM)
-fast  = input.int(12, "快線 EMA", minval = 2, group = grpM)
-slow  = input.int(26, "慢線 EMA", minval = 3, group = grpM)
-sigL  = input.int(9,  "訊號線", minval = 2, group = grpM)
-cycTF = input.timeframe("D", "週期計算時間框 (預設日線)", group = grpM)
+m1src = input.source(close, "價格來源", group = grpM, display = display.none)
+fast  = input.int(12, "快線 EMA", minval = 2, group = grpM, display = display.none)
+slow  = input.int(26, "慢線 EMA", minval = 3, group = grpM, display = display.none)
+sigL  = input.int(9,  "訊號線", minval = 2, group = grpM, display = display.none)
+cycTF = input.timeframe("D", "週期計算時間框 (預設日線)", group = grpM, display = display.none)
 
 grpC = "M1 ② 週期估算"
-lookN  = input.int(8,  "平均週期長度取最近幾段", minval = 2, maxval = 50, group = grpC)
-defLen = input.int(12, "尚無歷史時的預設週期長度 (日)", minval = 2, group = grpC)
-lateAt = input.float(75, "進入尾段門檻 % (警報用)", minval = 50, maxval = 95, group = grpC)
+lookN  = input.int(8,  "平均週期長度取最近幾段", minval = 2, maxval = 50, group = grpC, display = display.none)
+defLen = input.int(12, "尚無歷史時的預設週期長度 (日)", minval = 2, group = grpC, display = display.none)
+lateAt = input.float(75, "進入尾段門檻 % (警報用)", minval = 50, maxval = 95, group = grpC, display = display.none)
 
 grpK = "M1 ③ 時鐘外觀"
-showClock = input.bool(true, "顯示時鐘", group = grpK)
-grid   = input.int(21, "解析度 (格數, 奇數；21 = 高解析，pane 較矮用 13–15)", minval = 9, maxval = 41, step = 2, group = grpK)
-tz     = input.string("America/New_York", "日期時區", group = grpK)
-cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK)
-cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK)
-cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK)
-showBg  = input.bool(true, "週期背景著色", group = grpK)
-showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK)
+showClock = input.bool(true, "顯示時鐘", group = grpK, display = display.none)
+grid   = input.int(21, "解析度 (格數, 奇數；21 = 高解析，pane 較矮用 13–15)", minval = 9, maxval = 41, step = 2, group = grpK, display = display.none)
+tz     = input.string("America/New_York", "日期時區", group = grpK, display = display.none)
+cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK, display = display.none)
+cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK, display = display.none)
+cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK, display = display.none)
+showBg  = input.bool(true, "週期背景著色", group = grpK, display = display.none)
+showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK, display = display.none)
 
 grpDv = "M1 ④ 背馳 (頂 / 底)"
-showDiv = input.bool(true, "顯示頂背馳 / 底背馳", group = grpDv)
-divSrc  = input.string("柱狀圖", "背馳依據", options = ["柱狀圖", "MACD 線"], group = grpDv)
-lbL     = input.int(5, "轉折左側確認根數", minval = 1, maxval = 20, group = grpDv)
-lbR     = input.int(3, "轉折右側確認根數 (越小越早、越易誤判)", minval = 1, maxval = 10, group = grpDv)
-divMin  = input.int(5,  "兩個轉折最少相隔 (日)", minval = 1, group = grpDv)
-divMax  = input.int(60, "兩個轉折最多相隔 (日)", minval = 5, group = grpDv)
-divLine = input.bool(true, "日線圖上畫背馳連線", group = grpDv)
+showDiv = input.bool(true, "顯示頂背馳 / 底背馳", group = grpDv, display = display.none)
+divSrc  = input.string("柱狀圖", "背馳依據", options = ["柱狀圖", "MACD 線"], group = grpDv, display = display.none)
+lbL     = input.int(5, "轉折左側確認根數", minval = 1, maxval = 20, group = grpDv, display = display.none)
+lbR     = input.int(3, "轉折右側確認根數 (越小越早、越易誤判)", minval = 1, maxval = 10, group = grpDv, display = display.none)
+divMin  = input.int(5,  "兩個轉折最少相隔 (日)", minval = 1, group = grpDv, display = display.none)
+divMax  = input.int(60, "兩個轉折最多相隔 (日)", minval = 5, group = grpDv, display = display.none)
+divLine = input.bool(true, "日線圖上畫背馳連線", group = grpDv, display = display.none)
 
 // ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
 grpL   = "⑦ 版面 (四個 pane 統一)"
-boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL)
-boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL)
-boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL)
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
+boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
+boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL, display = display.none)
 f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
 
 // ── M1 日線週期引擎 (在 security 的日線環境中執行) ──
@@ -123,22 +123,32 @@ theta := theta >= 360 ? theta - 360 : theta
 phaseTxt = up ? (rising ? "▲ 日線上昇周期 · 動能加速" : "▲ 日線上昇周期 · 動能減速")
               : (rising ? "▼ 日線下跌周期 · 跌勢減弱" : "▼ 日線下跌周期 · 跌勢加速")
 
+// ── M1 背馳訊號（在柱狀圖 / MACD 線之前呼叫 → 文字位於下一層，不擋曲線）──
+//    訊號在轉折確認後 lbR 根才出現，文字回貼到轉折那根；頂背馳字在 pane 頂端、底背馳字在 pane 底端，透明無底色
+onCycTF = timeframe.period == cycTF
+bullDiv = showDiv and bullRaw and newDay
+bearDiv = showDiv and bearRaw and newDay
+divOff  = onCycTF ? -lbR : 0
+plotchar(bullDiv, "底背馳", "▲", location.bottom, color.new(cUp, 0), text = "底背馳", textcolor = color.new(cUp, 0), size = size.tiny, offset = divOff)
+plotchar(bearDiv, "頂背馳", "▼", location.top,    color.new(cDn, 0), text = "頂背馳", textcolor = color.new(cDn, 0), size = size.tiny, offset = divOff)
+
 // ── 本 pane 繪圖：MACD 柱狀圖（四色）+ MACD/Signal 線 ──
 histRising = hist > hist[1]
 hcol = up ? (histRising ? color.new(cUp, 0) : color.new(cUp, 55))
           : (histRising ? color.new(cDn, 55) : color.new(cDn, 0))
-plot(hist,    "MACD Histogram", style = plot.style_columns, color = hcol)
-plot(macdL,   "MACD",   color = color.new(color.blue, 20),   linewidth = 2)
-plot(sigLine, "Signal", color = color.new(color.orange, 20), linewidth = 2)
+plot(hist,    "MACD Histogram", style = plot.style_columns, color = hcol, display = display.pane + display.data_window + display.price_scale)
+plot(macdL,   "MACD",   color = color.new(color.blue, 45),   linewidth = 1, display = display.pane + display.data_window + display.price_scale)
+plot(sigLine, "Signal", color = color.new(color.orange, 45), linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 hline(0, "零軸", color = color.new(color.gray, 30), linestyle = hline.style_solid)
 bgcolor(showBg ? (up ? color.new(cUp, 92) : color.new(cDn, 92)) : na, title = "週期背景")
 
 // 週期切換處標註上一段長度（畫在零軸上／下）
+oscHi = ta.highest(math.max(math.max(hist, macdL), sigLine), 60)
+oscLo = ta.lowest(math.min(math.min(hist, macdL), sigLine), 60)
 if showLbl and flipEvt
-    label.new(bar_index, 0, str.tostring(lastLen, "#") + "日",
-         style = up[1] ? label.style_label_down : label.style_label_up,
-         color = up[1] ? color.new(cUp, 20) : color.new(cDn, 20),
-         textcolor = color.white, size = size.tiny)
+    // 次要備註：透明無底色、字不反白；剛結束的是上昇週期 → 放在近期振幅上方，下跌週期 → 下方
+    label.new(bar_index, up[1] ? oscHi * 1.25 : oscLo * 1.25, str.tostring(lastLen, "#") + "日",
+         style = label.style_none, textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny)
 
 // 轉勢點（本周期柱狀圖極值）標記 —— 時鐘 6 點鐘所對應的那一根
 var float extVal = na
@@ -154,19 +164,11 @@ else
 plotshape(bar_index == extBar and not up ? hist : na, "本周期新低 (轉勢點候選)", shape.circle,
      location.absolute, color.new(#eab308, 15), size = size.tiny)
 
-// ── M1 背馳繪圖（訊號在轉折確認後 lbR 根才出現，標籤回貼到轉折那根）──
-onCycTF = timeframe.period == cycTF
-bullDiv = showDiv and bullRaw and newDay
-bearDiv = showDiv and bearRaw and newDay
-divOff  = onCycTF ? -lbR : 0
-plotshape(bullDiv ? divOL : na, "底背馳", shape.labelup,   location.absolute, color.new(cUp, 0),
-     text = "底背馳", textcolor = color.white, size = size.small, offset = divOff)
-plotshape(bearDiv ? divOH : na, "頂背馳", shape.labeldown, location.absolute, color.new(cDn, 0),
-     text = "頂背馳", textcolor = color.white, size = size.small, offset = divOff)
+// ── M1 背馳連線（drawing 物件永遠在最上層，不會被柱狀圖遮住）──
 if divLine and onCycTF and bullDiv
-    line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 2)
+    line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 3, style = line.style_arrow_right)
 if divLine and onCycTF and bearDiv
-    line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 2)
+    line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 3, style = line.style_arrow_right)
 
 // Pine 沒有 math.atan2，自行實作（回傳弧度，範圍 -π..π）
 f_atan2(y, x) =>
