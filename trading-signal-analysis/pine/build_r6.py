@@ -34,14 +34,14 @@ def common(src, key):
         src = src.replace(old, new)
     # 標題加版本
     src = re.sub(r'^(strategy|indicator)\("([^"]+)"', lambda m: f'{m.group(1)}("{m.group(2)} r6({TS_TITLE})"', src, count=1, flags=re.M)
-    # 備註框 helper（四支共用）：有底色 (淺) + 白字，離錨點一段距離，虛線指回錨點；回傳 [label, line]
+    # 備註框 helper（四支共用）：有底色 (淺) + 黑字，離錨點一段距離，虛線指回錨點；回傳 [label, line]
     src = src.replace(
         'f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right\n',
         'f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right\n'
-        '// 備註框：淺色底 + 白字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點\n'
+        '// 備註框：淺色底 + 黑字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點\n'
         'f_note(x, yAnchor, yBox, txt, col, above) =>\n'
         '    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,\n'
-        '         color = color.new(col, 40), textcolor = color.white, size = size.small)\n'
+        '         color = color.new(col, 40), textcolor = color.black, size = size.small)\n'
         '    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)\n'
         '    [lb, ln]\n', 1)
     # 檔頭加版本行
@@ -58,6 +58,8 @@ def must(src, old, new, what, count=1):
 # ═══════════════════════════════ R6-A ═══════════════════════════════
 a = (P / NAMES["a"][1]).read_text(encoding="utf-8")
 a = common(a, "a")
+a = must(a, 'showBg  = input.bool(true, "主圖週期背景著色", group = grpK)',
+            'showBg  = input.bool(false, "主圖週期背景著色 (紅/綠；R6 預設關閉)", group = grpK)', "A 背景預設關閉")
 
 VOL_BLOCK = '''
 // ── ⑧ 主力大單日（成交量柱本身畫在 R6-C pane，主圖只留 ◆ 標記 / 狀態列 / 警報）──
@@ -103,6 +105,8 @@ alertcondition(bigSell, "⑧ 主力大單賣出日", "{{ticker}} 成交量 ≥ �
 # ═══════════════════════════════ R6-B ═══════════════════════════════
 b = (P / NAMES["b"][1]).read_text(encoding="utf-8")
 b = common(b, "b")
+b = must(b, 'showBg  = input.bool(true, "週期背景著色", group = grpK)',
+            'showBg  = input.bool(false, "週期背景著色 (紅/綠；R6 預設關閉)", group = grpK)', "B 背景預設關閉")
 b = must(b, "overlay = false, max_labels_count = 300)", "overlay = false, max_labels_count = 300, max_lines_count = 200)", "B 宣告")
 b = must(b, 'grid   = input.int(11, "解析度 (格數, 建議奇數 9–13；pane 較矮用小值)", minval = 9, maxval = 21, group = grpK)',
             'grid   = input.int(21, "解析度 (格數, 奇數；21 = 高解析，pane 較矮用 13–15)", minval = 9, maxval = 41, step = 2, group = grpK)', "B grid")
@@ -119,7 +123,7 @@ lbR     = input.int(3, "轉折右側確認根數 (越小越早、越易誤判)",
 divMin  = input.int(5,  "兩個轉折最少相隔 (日)", minval = 1, group = grpDv)
 divMax  = input.int(60, "兩個轉折最多相隔 (日)", minval = 5, group = grpDv)
 divLine = input.bool(true, "日線圖上畫背馳連線", group = grpDv)
-noteGap = input.float(0.35, "備註框與轉折點距離 (近期振幅倍數)", minval = 0.1, maxval = 1.0, step = 0.05, group = grpDv)
+noteGap = input.float(0.12, "備註框與轉折點距離 (近期振幅倍數)", minval = 0.03, maxval = 1.0, step = 0.01, group = grpDv)
 
 '''
 b = must(b, "// ── ⑦ 版面（四支 R6 腳本", DIV_INPUTS + "// ── ⑦ 版面（四支 R6 腳本", "B 背馳輸入")
@@ -164,18 +168,18 @@ b = must(b, OLD_CYCLE_TAIL, NEW_CYCLE_TAIL, "B 週期引擎尾段")
 
 DIV_DRAW = '''
 // ── M1 背馳標註：▲/▼ 畫在轉折點；備註框離開柱狀圖 (近期振幅 × noteGap)，虛線指回轉折點；
-//    備註框與曲線同一座標系，縮放 / 捲動同步。底背馳框在 ▲ 下方，頂背馳框在 ▼ 上方。背馳連線加粗帶箭頭。
+//    備註框與曲線同一座標系，縮放 / 捲動同步。底背馳框在 ▲ 下方，頂背馳框在 ▼ 上方。背馳連線加粗、實線無箭頭。
 divGap = math.max((oscHi - oscLo) * noteGap, 1e-9)
 plotshape(bullDiv ? divOL : na, "底背馳 ▲", shape.triangleup,   location.absolute, color.new(cUp, 0), size = size.small, offset = divOff)
 plotshape(bearDiv ? divOH : na, "頂背馳 ▼", shape.triangledown, location.absolute, color.new(cDn, 0), size = size.small, offset = divOff)
 if bullDiv
     [lbB, lnB] = f_note(bar_index + divOff, divOL, divOL - divGap, "底背馳", cUp, false)
     if divLine and onCycTF
-        line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 3, style = line.style_arrow_right)
+        line.new(bar_index - lbR - int(divDistL), divPrevOL, bar_index - lbR, divOL, color = color.new(cUp, 0), width = 3, style = line.style_solid)
 if bearDiv
     [lbT, lnT] = f_note(bar_index + divOff, divOH, divOH + divGap, "頂背馳", cDn, true)
     if divLine and onCycTF
-        line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 3, style = line.style_arrow_right)
+        line.new(bar_index - lbR - int(divDistH), divPrevOH, bar_index - lbR, divOH, color = color.new(cDn, 0), width = 3, style = line.style_solid)
 
 // Pine 沒有 math.atan2，自行實作（回傳弧度，範圍 -π..π）
 f_atan2(y, x) =>
