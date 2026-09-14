@@ -38,6 +38,8 @@ trading-signal-analysis/
 │   ├── combo_c_vcp_r6(mm.dd_hh.mm).pine         ← R6-C：等級標籤字級加大一倍
 │   ├── combo_d_cert_r6(mm.dd_hh.mm).pine        ← R6-D：只有高確定性 (≥ 門檻) 區段著色
 │   ├── build_r6.py                     ← 由 R5 產生 R6 四件套（檔名尾綴 r6(mm.dd_hh.mm)）
+│   ├── r7_ema9_bw_gravity(mm.dd_hh.mm).pine     ← R7 主圖：R6-A + MODULE 4 價格重心（與 K 線同價格軸，縮放同步；可作進場過濾）
+│   ├── build_r7.py                     ← 由最新 R6-A 產生 R7
 ├── maojie/                             ← XTrader 猫姐「第二維度」推論：價格重心 / 買賣力度
 │   ├── README.md                       ← 公開線索整理、參數猜測、Pine 重建可行性、來源
 │   └── pine/
