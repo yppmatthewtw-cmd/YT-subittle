@@ -38,6 +38,11 @@ trading-signal-analysis/
 │   ├── combo_c_vcp_r6(mm.dd_hh.mm).pine         ← R6-C：等級標籤字級加大一倍
 │   ├── combo_d_cert_r6(mm.dd_hh.mm).pine        ← R6-D：只有高確定性 (≥ 門檻) 區段著色
 │   ├── build_r6.py                     ← 由 R5 產生 R6 四件套（檔名尾綴 r6(mm.dd_hh.mm)）
+├── maojie/                             ← XTrader 猫姐「第二維度」推論：價格重心 / 買賣力度
+│   ├── README.md                       ← 公開線索整理、參數猜測、Pine 重建可行性、來源
+│   └── pine/
+│       ├── maojie_price_gravity.pine   ← 主圖：當日/錨定/滾動 VWAP 或 POC 重心 + 成本帶 + 斜率/穩定度/距離 + 假跌破
+│       └── maojie_buy_sell_force.pine  ← 下方 pane：1 分鐘近似主動買賣 → 淨力度/累積力度 + 結構/無結構低點 + 防守位
 │   ├── cert7_indicator.pine            ← 指標 3-A 確定性 7 項（獨立版，副圖）
 │   └── vcp_score_indicator.pine        ← 指標 3-B VCP 分數/等級 A–E（獨立版，副圖）
 └── charts/
