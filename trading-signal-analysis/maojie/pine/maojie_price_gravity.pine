@@ -1,6 +1,6 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」的公開版 r0
+//  價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」的公開版 r1（r0 因 alertcondition 訊息非常數而無法編譯）
 //
 //  重心 = 主力成本線的代理：
 //     模式 A  當日 VWAP（每個交易日重置）                       → 日內
@@ -11,7 +11,7 @@
 //  訊號：重心上移 + 價在重心上 = 上升最低阻力；重心下移 + 價在重心下 = 下跌最低阻力；
 //        重心走平且穩定 = 定錨 (主力未走)；價格跌破重心後 M 根內收回 = 假跌破 (用股價打掩護)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator("價格重心 Price Gravity r0", shorttitle = "價格重心", overlay = true, max_labels_count = 100, max_lines_count = 100)
+indicator("價格重心 Price Gravity r1", shorttitle = "價格重心", overlay = true, max_labels_count = 100, max_lines_count = 100)
 
 // ── ① 重心定義 ──
 grpG = "① 重心定義"
@@ -45,33 +45,37 @@ f_note(x, yAnchor, yBox, txt, col, above) =>
 
 // ── 重心計算 ──
 atr = ta.atr(atrLen)
-// A / B：ta.vwap 會在 anchor 為 true 的那根重置
-vwapDay = ta.vwap(src, timeframe.change("D"))
-vwapAnc = ta.vwap(src, timeframe.change(anchTF))
+vol = nz(volume, 0.0)                       // 指數 (SPX 等) 沒有成交量 → 0，下面一律退回均價
+smaSrc = ta.sma(src, lenN)
+// A / B：ta.vwap 會在 anchor 為 true 的那根重置；沒有成交量時 ta.vwap 回傳 na → 退回均價
+vwapDay = nz(ta.vwap(src, timeframe.change("D")), smaSrc)
+vwapAnc = nz(ta.vwap(src, timeframe.change(anchTF)), smaSrc)
 // C：滾動 VWAP
-sumPV = math.sum(src * volume, lenN)
-sumV  = math.sum(volume, lenN)
-vwapRoll = sumV > 0 ? sumPV / sumV : src
-// D：POC — 最近 lenN 根，把每根的成交量放進 hlc3 所在的箱
+sumPV = math.sum(src * vol, lenN)
+sumV  = math.sum(vol, lenN)
+vwapRoll = sumV > 0 ? sumPV / sumV : smaSrc
+// D：POC — 最近 lenN 根，把每根的成交量放進 hlc3 所在的箱（歷史不足 lenN 根時退回均價）
+hiN = ta.highest(high, lenN)
+loN = ta.lowest(low, lenN)
 f_poc() =>
-    hi = ta.highest(high, lenN)
-    lo = ta.lowest(low, lenN)
-    step = (hi - lo) / bins
+    step = (hiN - loN) / bins
     var vols = array.new_float(bins, 0.0)
     array.fill(vols, 0.0)
-    if step > 0
+    ok = bar_index >= lenN and not na(step) and step > 0 and sumV > 0
+    if ok
         for i = 0 to lenN - 1
-            b = int(math.min(bins - 1, math.max(0, (src[i] - lo) / step)))
-            array.set(vols, b, array.get(vols, b) + volume[i])
-    idx = array.indexof(vols, array.max(vols))
-    step > 0 ? lo + (idx + 0.5) * step : src
+            b = int(math.min(bins - 1, math.max(0, (nz(src[i], loN) - loN) / step)))
+            array.set(vols, b, array.get(vols, b) + nz(volume[i], 0.0))
+    idx = ok ? array.indexof(vols, array.max(vols)) : 0
+    ok ? loN + (idx + 0.5) * step : smaSrc
 pocVal = f_poc()
 
 gravity = mode == "當日 VWAP" ? vwapDay : mode == "錨定 VWAP" ? vwapAnc : mode == "滾動 VWAP" ? vwapRoll : pocVal
 
 // 成交量加權 σ（以滾動 N 根計，四種模式共用同一帶寬定義）
-dev2  = math.sum(volume * math.pow(src - gravity, 2), lenN)
+dev2  = math.sum(vol * math.pow(src - gravity, 2), lenN)
 sigma = sumV > 0 ? math.sqrt(dev2 / sumV) : atr
+sigma := na(sigma) or sigma <= 0 ? atr : sigma
 upperB = gravity + kSig * sigma
 lowerB = gravity - kSig * sigma
 
@@ -140,5 +144,6 @@ if showBox and barstate.islast
 alertcondition(pathUp and not pathUp[1], "重心上移 · 上升最低阻力", "{{ticker}} 價格重心上移且價在重心上 — 上升最低阻力")
 alertcondition(pathDn and not pathDn[1], "重心下移 · 下跌最低阻力", "{{ticker}} 價格重心下移且價在重心下 — 下跌最低阻力")
 alertcondition(anchor and not anchor[1], "重心定錨", "{{ticker}} 價格重心走平且價在成本帶內 — 主力未走，可定錨")
-alertcondition(fakeBD, "假跌破收回重心", "{{ticker}} 跌破重心後 " + str.tostring(fakeM) + " 根內收回 — 洗盤嫌疑")
-alertcondition(fakeBU, "假突破跌回重心", "{{ticker}} 突破重心後 " + str.tostring(fakeM) + " 根內跌回 — 誘多嫌疑")
+// alertcondition 的訊息必須是常數字串（不能串接 input）——這是 r0 無法編譯、整支腳本不顯示的原因
+alertcondition(fakeBD, "假跌破收回重心", "{{ticker}} 跌破價格重心後數根內收回 — 洗盤嫌疑")
+alertcondition(fakeBU, "假突破跌回重心", "{{ticker}} 突破價格重心後數根內跌回 — 誘多嫌疑")
