@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-R7 六件套：由最新的 R6 四件套 + maojie 兩支原型重新整併、統一命名。
+R7 七件套：由最新的 R6 四件套 + maojie 兩支原型重新整併、統一命名。
 
     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板     ← R6-A 原樣（策略與價格重心分開）
     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底   ← R6-B 原樣
@@ -8,6 +8,7 @@ R7 六件套：由最新的 R6 四件套 + maojie 兩支原型重新整併、統
     R7-D  下方 pane ③      確定性指數 (高確定性著色)             ← R6-D 原樣
     R7-E  主圖 (overlay)   價格重心：VWAP / 錨定 / 滾動 / POC 重心 + 成本帶 + 訊號   ← maojie_price_gravity_r1
     R7-F  下方 pane ④      買賣力度：1 分鐘近似主動買賣 → 力度 / 累積力度 / 結構低點    ← maojie_buy_sell_force
+    R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key + 放量/跟進     ← livermore_least_resistance
 
 用法：python3 build_r7.py   → r7a_main(mm.dd_hh.mm).pine … r7f_force(mm.dd_hh.mm).pine
 """
@@ -35,16 +36,18 @@ SPEC = [
     ("d", f"r7d_cert({TS_FILE}).pine",       latest(str(P / "combo_d_cert_r6(*).pine")),       "R7-D Certainty 7",           "R7-D Cert7"),
     ("e", f"r7e_gravity({TS_FILE}).pine",    MJ / "maojie_price_gravity_r1.pine",              "R7-E Price Gravity",         "R7-E Gravity"),
     ("f", f"r7f_force({TS_FILE}).pine",      MJ / "maojie_buy_sell_force.pine",                "R7-F Buy/Sell Force",        "R7-F Force"),
+    ("g", f"r7g_livermore({TS_FILE}).pine",  P / "livermore_least_resistance.pine",            "R7-G Livermore Least-Resistance", "R7-G Livermore"),
 ]
 NEWNAMES = {k: out for k, out, *_ in SPEC}
 
-HEADER_TABLE = f'''//  R7 六件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+HEADER_TABLE = f'''//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
 //     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                {NEWNAMES["a"]}
 //     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  {NEWNAMES["b"]}
 //     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         {NEWNAMES["c"]}
 //     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         {NEWNAMES["d"]}
 //     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  {NEWNAMES["e"]}
 //     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   {NEWNAMES["f"]}
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  {NEWNAMES["g"]}
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 '''
 
@@ -74,10 +77,10 @@ def convert_r6(src, new_title, new_short):
     """R6-A/B/C/D → R7：換標題、版本、檔頭檔案表；計算與畫法不變。"""
     src = retitle(src, r"R6-[ABCD] ", new_title, new_short)
     src = re.sub(r"^//  版本 r6\([^)]*\)", f"//  版本 r7({TS_TITLE})", src, count=1, flags=re.M)
-    # 檔頭的四件套說明 → 六件套
+    # 檔頭的四件套說明 → 七件套
     src = re.sub(r"//  R6 套件 —— [^\n]*\n(?://     R6-[ABCD][^\n]*\n){4}//  四支的計算邏輯與 R4 逐字相同[^\n]*\n",
                  HEADER_TABLE, src, count=1)
-    assert "R7 六件套" in src, "檔頭未替換"
+    assert "R7 七件套" in src, "檔頭未替換"
     src = src.replace("R6-A", "R7-A").replace("R6-B", "R7-B").replace("R6-C", "R7-C").replace("R6-D", "R7-D")
     src = src.replace("四支 R6 腳本", "六支 R7 腳本").replace("R6 預設", "R7 預設").replace("R6：", "R7：").replace("（R6 預設關閉）", "（R7 預設關閉）")
     return src
@@ -97,6 +100,13 @@ def convert_e(src):
     return src
 
 
+def convert_g(src):
+    src = retitle(src, r"Livermore Least-Resistance r0", "R7-G Livermore Least-Resistance", "R7-G Livermore")
+    src = src.replace("//  Livermore 最低阻力線 (Line of Least Resistance) r0 —— 主圖 overlay",
+                      f"//  版本 r7({TS_TITLE})\n//  R7-G  主圖：Livermore 最低阻力線 (Line of Least Resistance)\n//\n" + HEADER_TABLE + "//")
+    return src
+
+
 def convert_f(src):
     src = retitle(src, r"買賣力度 Buy/Sell Force r0", "R7-F Buy/Sell Force", "R7-F Force")
     src = src.replace("//  買賣力度 (Buy / Sell Force) —— 推論重建猫姐「買賣力道」的公開版 r0（下方 pane）",
@@ -112,6 +122,8 @@ for key, out, srcfile, title, short in SPEC:
             s = fix_clock_width(s)
     elif key == "e":
         s = convert_e(s)
+    elif key == "g":
+        s = convert_g(s)
     else:
         s = convert_f(s)
     (P / out).write_text(s, encoding="utf-8")

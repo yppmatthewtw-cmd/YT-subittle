@@ -44,7 +44,9 @@ trading-signal-analysis/
 │   ├── r7d_cert(mm.dd_hh.mm).pine        ← R7-D：確定性指數（= R6-D）
 │   ├── r7e_gravity(mm.dd_hh.mm).pine     ← R7-E 主圖：價格重心（獨立指標；框預設左上）
 │   ├── r7f_force(mm.dd_hh.mm).pine       ← R7-F 下方 pane：買賣力度
-│   ├── build_r7.py                     ← 由最新 R6 四件套 + maojie 兩支產生 R7 六件套
+│   ├── r7g_livermore(mm.dd_hh.mm).pine   ← R7-G 主圖：Livermore 最低阻力線（樞紐點結構 + Market Key 六欄 + 放量/跟進濾網）
+│   ├── livermore_least_resistance.pine ← R7-G 的原始版 (r0)
+│   ├── build_r7.py                     ← 由最新 R6 四件套 + maojie 兩支 + Livermore 產生 R7 七件套
 ├── maojie/                             ← XTrader 猫姐「第二維度」推論：價格重心 / 買賣力度
 │   ├── README.md                       ← 公開線索整理、參數猜測、Pine 重建可行性、來源
 │   └── pine/
