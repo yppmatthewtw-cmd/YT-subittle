@@ -1,0 +1,50 @@
+//@version=5
+// Bull Flag 首次回踩突破警報 (入市② 訊號)
+// 對應規則: #13 首次回踩勝率最高 / #15 Mini Pullback 精確識別 / #16 Dump 識別
+// 邏輯: 偵測「放量急拉 -> 縮量淺回踩(未破前波20%) -> 首根創新高K線」
+indicator("Ross Bull Flag First Pullback", overlay = true)
+
+surgeLen   = input.int(5,    "急拉判定K線數")
+surgePct   = input.float(5,  "急拉最小漲幅 %", minval = 1)
+maxRetrace = input.float(30, "最大回踩比例 % (>30%=Dump)", minval = 5)
+pullVolPct = input.float(50, "回踩量須低於突破量的 %")
+
+[macdLine, _, _] = ta.macd(close, 12, 26, 9)
+
+// ---- 狀態機: 0=找急拉  1=回踩中  ----
+var int   st        = 0
+var float waveLo    = na   // 波段起點
+var float waveHi    = na   // 波段高點
+var float surgeVol  = na   // 急拉期間最大量
+var int   pullBars  = 0
+
+surge = (close - low[surgeLen]) / low[surgeLen] * 100 >= surgePct and
+        volume > ta.sma(volume, 20) * 3
+
+if st == 0 and surge
+    st       := 1
+    waveLo   := low[surgeLen]
+    waveHi   := high
+    surgeVol := volume
+    pullBars := 0
+
+flagBreak = false
+if st == 1
+    waveHi   := math.max(waveHi, high)
+    surgeVol := math.max(surgeVol, volume)
+    retrace   = (waveHi - low) / (waveHi - waveLo) * 100
+    pullBars += close < waveHi ? 1 : 0
+    // Dump 條件: 回踩過深 / 放量下殺 / MACD 轉負 (#16) -> 放棄
+    if retrace > maxRetrace or macdLine < 0
+        st := 0
+    // 首次回踩後第一根創新高 K 線 = 入場 (#13/#15)
+    else if pullBars >= 2 and close > waveHi[1] and
+            volume[1] < surgeVol * pullVolPct / 100
+        flagBreak := true
+        st := 0
+
+plotshape(flagBreak, "FlagBreak", shape.triangleup, location.belowbar,
+          color.teal, size = size.small, text = "FLAG")
+
+alertcondition(flagBreak, "Bull Flag 首次回踩突破",
+     "{{ticker}} 首次縮量回踩後創新高 {{close}} — Bull Flag 入場. 止損=旗形低點")

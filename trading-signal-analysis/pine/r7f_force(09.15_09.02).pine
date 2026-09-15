@@ -1,0 +1,166 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  版本 r7(09:15_09:02)
+//  R7-F  下方 pane：買賣力度 (Buy / Sell Force) —— 推論重建猫姐「買賣力道」
+//
+//  R7 六件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.15_09.02).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.15_09.02).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.15_09.02).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.15_09.02).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.15_09.02).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.15_09.02).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
+//
+//
+//  資料：用較低時間框 (預設 1 分鐘) 的每根 K 近似「主動買 / 主動賣」：
+//        收陽 → 該分鐘量記為買量，收陰 → 賣量，平盤 → 對半。
+//        (Pine 沒有逐筆 / 內外盤；request.security_lower_tf 上限 100,000 根分鐘 K，日線約 250 天)
+//        沒有分鐘資料的歷史 K，退回用「收盤在區間的位置」近似 (類似 MFI 的拆分)。
+//  力度   = (買量 − 賣量) / 總量  ∈ [−1, 1]，EMA 平滑
+//  累積力度 = Σ(買量 − 賣量)  自當日開盤 (日內圖) 或 滾動 N 根 (日線)
+//  結構低點   = 價格創 N 根新低，但累積力度沒有新低 (買方承接、主力防守)
+//  無結構低點 = 價格創 N 根新低，累積力度同步新低 (無承接、賣壓出清)
+//  主力防守位 = 同一價位 (± ATR × 容差) 被多次觸及且觸及時力度為正 → 計數
+// ═══════════════════════════════════════════════════════════════════════════
+indicator("R7-F Buy/Sell Force r7(09:15_09:02)", shorttitle = "R7-F Force", overlay = false, max_labels_count = 200, max_lines_count = 200)
+
+// ── ① 資料 ──
+grpD = "① 資料"
+ltf     = input.timeframe("1", "主動買賣近似用的低時間框 (日線圖建議 5)", group = grpD, display = display.none)
+smooth  = input.int(5, "力度平滑 EMA", minval = 1, maxval = 30, group = grpD, display = display.none)
+cumMode = input.string("自動", "累積力度歸零", options = ["自動", "每日", "滾動 N"], group = grpD, display = display.none)
+cumN    = input.int(20, "滾動 N (累積 / 新低比較窗口)", minval = 5, maxval = 200, group = grpD, display = display.none)
+bigX    = input.float(2.5, "大單：單根低時間框量 ≥ 均量 ×", minval = 1.5, maxval = 10, step = 0.5, group = grpD, display = display.none)
+
+// ── ② 結構判斷 ──
+grpS = "② 結構低點 / 防守位"
+lbR     = input.int(3, "新低確認：右側根數 (猫姐公開接受 5 根)", minval = 1, maxval = 10, group = grpS, display = display.none)
+defTol  = input.float(0.3, "防守位容差 (ATR 倍數)", minval = 0.1, maxval = 1.0, step = 0.1, group = grpS, display = display.none)
+defWin  = input.int(60, "防守位統計窗口 (根)", minval = 10, maxval = 400, group = grpS, display = display.none)
+
+// ── ⑦ 版面 ──
+grpL   = "⑦ 版面"
+showBox = input.bool(true, "顯示資訊框", group = grpL, display = display.none)
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬)", minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
+boxH   = input.float(100, "資訊框高度 (% pane 高)", minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
+boxPos = input.string("右中", "位置", options = ["右上", "右中", "右下"], group = grpL, display = display.none)
+f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
+f_note(x, yAnchor, yBox, txt, col, above) =>
+    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
+         color = color.new(col, 40), textcolor = color.black, size = size.small)
+    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
+    [lb, ln]
+
+// ── 低時間框近似主動買 / 賣 ──
+[bArr, sArr, vArr] = request.security_lower_tf(syminfo.tickerid, ltf,
+     [close > open ? volume : close < open ? 0.0 : volume / 2,
+      close < open ? volume : close > open ? 0.0 : volume / 2,
+      volume])
+hasLtf = array.size(vArr) > 0
+// 沒有分鐘資料的歷史 K：用收盤在區間的位置拆分
+rngPos = high != low ? (close - low) / (high - low) : 0.5
+buyV  = hasLtf ? array.sum(bArr) : volume * rngPos
+sellV = hasLtf ? array.sum(sArr) : volume * (1 - rngPos)
+totV  = buyV + sellV
+delta = buyV - sellV
+force = totV > 0 ? delta / totV : 0.0
+forceS = ta.ema(force, smooth)
+
+// 大單：低時間框單根量 ≥ 其本根平均 × bigX，分別累計買 / 賣
+bigBuy = 0.0
+bigSell = 0.0
+if hasLtf
+    n = array.size(vArr)
+    avgI = array.avg(vArr)
+    for i = 0 to n - 1
+        v = array.get(vArr, i)
+        if v >= avgI * bigX
+            bigBuy  += array.get(bArr, i)
+            bigSell += array.get(sArr, i)
+bigNet = bigBuy - bigSell
+
+// 累積力度
+isIntra = timeframe.isintraday
+useDay  = cumMode == "每日" or (cumMode == "自動" and isIntra)
+var float cumDay = 0.0
+if timeframe.change("D")
+    cumDay := 0.0
+cumDay += delta
+cumRoll = math.sum(delta, cumN)
+cumD = useDay ? cumDay : cumRoll
+
+// ── 結構低點 / 無結構低點 / 結構高點（右側 lbR 根確認）──
+atr = ta.atr(14)
+pl  = ta.pivotlow(low, cumN, lbR)
+ph  = ta.pivothigh(high, cumN, lbR)
+newLow  = not na(pl)
+newHigh = not na(ph)
+cumAtPiv  = cumD[lbR]
+cumLoWin  = ta.lowest(cumD, cumN)[lbR + 1]      // 轉折點之前 cumN 根的累積力度最低
+cumHiWin  = ta.highest(cumD, cumN)[lbR + 1]
+forceAtPiv = forceS[lbR]
+structLow   = newLow and (cumAtPiv > cumLoWin or forceAtPiv > 0)    // 價新低、力度沒新低 → 有承接
+noStructLow = newLow and not structLow                              // 價新低、力度同步新低 → 無承接
+structHigh  = newHigh and (cumAtPiv < cumHiWin or forceAtPiv < 0)   // 價新高、力度沒新高 → 派發
+
+// ── 主力防守位：最近 defWin 根內，觸及 (低點 ≤ 位 + 容差) 且當根力度 > 0 的次數 ──
+defLvl = ta.lowest(low, defWin)
+defCnt = 0
+for i = 0 to defWin - 1
+    if low[i] <= defLvl + atr * defTol and force[i] > 0
+        defCnt += 1
+
+// ── 繪圖 ──
+colD = delta >= 0 ? (delta >= delta[1] ? #26a69a : #b2dfdb) : (delta >= delta[1] ? #ffcdd2 : #ff5252)
+plot(delta, "淨力度 (買量−賣量)", style = plot.style_columns, color = colD, display = display.pane + display.data_window)
+// 平滑力度 / 累積力度用本 pane 的量級縮放後畫線 (避免另開 pane)
+scaleV = ta.highest(math.abs(delta), 100)
+plot(forceS * scaleV, "力度 (平滑，×量級)", color = color.new(#2962FF, 0), linewidth = 1, display = display.pane + display.data_window)
+cumScale = ta.highest(math.abs(cumD), 100)
+plot(cumScale > 0 ? cumD / cumScale * scaleV : na, "累積力度 (×量級)", color = color.new(#ff6d00, 0), linewidth = 2, display = display.pane + display.data_window)
+hline(0, "零軸", color = color.new(#787b86, 50))
+plot(force, "力度 (原始 −1…1)", display = display.data_window)
+plot(cumD,  "累積力度 (原始)", display = display.data_window)
+plot(bigNet, "大單淨額", display = display.data_window)
+
+plotshape(structLow   ? delta[lbR] : na, "結構低點 ▲",   shape.triangleup,   location.absolute, color.new(#26a69a, 0), size = size.small, offset = -lbR)
+plotshape(noStructLow ? delta[lbR] : na, "無結構低點 ◆", shape.diamond,      location.absolute, color.new(#ef5350, 0), size = size.small, offset = -lbR)
+plotshape(structHigh  ? delta[lbR] : na, "結構高點 ▼",   shape.triangledown, location.absolute, color.new(#ef5350, 0), size = size.small, offset = -lbR)
+gap = scaleV * 0.25
+if structLow
+    [a1, b1] = f_note(bar_index - lbR, delta[lbR], delta[lbR] + gap, "結構低點 · 有承接", #26a69a, true)
+if noStructLow
+    [a2, b2] = f_note(bar_index - lbR, delta[lbR], delta[lbR] + gap, "無結構低點 · 無承接", #ef5350, true)
+if structHigh
+    [a3, b3] = f_note(bar_index - lbR, delta[lbR], delta[lbR] - gap, "結構高點 · 派發", #ef5350, false)
+
+// ── 資訊框 ──
+var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),
+     frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
+if showBox and barstate.islast
+    rh = boxH / 8
+    fCol = forceS > 0.15 ? color.new(#26a69a, 60) : forceS < -0.15 ? color.new(#ef5350, 60) : na
+    table.cell(tb, 0, 0, "買賣力度 (" + (hasLtf ? ltf + " 分鐘近似" : "K 線近似") + ")", width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
+    table.cell(tb, 1, 0, str.tostring(forceS * 100, "+#") + "%", width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
+    table.cell(tb, 0, 1, "本根 買量 / 賣量", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 1, str.tostring(buyV, format.volume) + " / " + str.tostring(sellV, format.volume), width = boxW * 0.45, height = rh, text_size = size.small)
+    table.cell(tb, 0, 2, "本根 力度", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 2, str.tostring(force * 100, "+#") + "%", width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = fCol)
+    table.cell(tb, 0, 3, useDay ? "累積力度 (當日)" : "累積力度 (滾動 " + str.tostring(cumN) + ")", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 3, str.tostring(cumD, format.volume), width = boxW * 0.45, height = rh, text_size = size.small, text_color = cumD >= 0 ? #26a69a : #ef5350)
+    table.cell(tb, 0, 4, "大單淨額 (≥" + str.tostring(bigX, "#.#") + "× 均量)", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 4, str.tostring(bigNet, format.volume), width = boxW * 0.45, height = rh, text_size = size.small, text_color = bigNet >= 0 ? #26a69a : #ef5350)
+    table.cell(tb, 0, 5, "主力防守位 (" + str.tostring(defWin) + " 根最低)", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 5, str.tostring(defLvl, format.mintick) + " · 防守 " + str.tostring(defCnt) + " 次", width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = defCnt >= 3 ? color.new(#f59e0b, 60) : na)
+    lastLow = structLow ? "結構低點 (有承接)" : noStructLow ? "無結構低點 (無承接)" : "—"
+    table.cell(tb, 0, 6, "最近訊號", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 6, lastLow, width = boxW * 0.45, height = rh, text_size = size.small)
+    table.cell(tb, 0, 7, "說明", width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 1, 7, "▲承接 ◆無承接 ▼派發", width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+
+// ── 警報 ──
+alertcondition(structLow,   "結構低點 (有承接)",  "{{ticker}} 價格新低但買賣力度未新低 — 主力承接 / 防守")
+alertcondition(noStructLow, "無結構低點 (無承接)", "{{ticker}} 價格新低且力度同步新低 — 賣壓出清，留意最後一跌")
+alertcondition(structHigh,  "結構高點 (派發)",    "{{ticker}} 價格新高但買賣力度未新高 — 派發嫌疑")
+alertcondition(defCnt >= 3 and defCnt[1] < 3, "主力防守位 3 次", "{{ticker}} 同一低位被防守 3 次以上")
