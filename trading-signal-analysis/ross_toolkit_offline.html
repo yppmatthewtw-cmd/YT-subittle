@@ -6742,28 +6742,28 @@ alertcondition(flipEvt and not up, &quot;日線轉入下跌周期&quot;, &quot;{
 alertcondition(lateEvt and up,     &quot;日線上昇周期進入尾段&quot;, &quot;{{ticker}} 日線上昇周期已走 &gt;75%，留意轉折 (接近 3 點鐘)&quot;)
 alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &quot;{{ticker}} 日線下跌周期已走 &gt;75%，留意反轉 (接近 9 點鐘)&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7a_main(09.14_21.58).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.14_21.58).pine')">複製</button></summary>
-      <pre id="pine-r7a_main(09.14_21.58).pine">//@version=5
+<details class="pinebox"><summary><b>r7a_main(09.15_09.02).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.15_09.02).pine')">複製</button></summary>
+      <pre id="pine-r7a_main(09.15_09.02).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:14_21:58)
+//  版本 r7(09:15_09:02)
 //  R7-A  主圖：EMA9 Band Width Strategy
 //
 //  R7 六件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.14_21.58).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.14_21.58).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.14_21.58).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.14_21.58).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.14_21.58).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.14_21.58).pine
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右；R7-E 的框預設在左上，不與 R7-A 的右側狀態框重疊。
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.15_09.02).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.15_09.02).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.15_09.02).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.15_09.02).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.15_09.02).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.15_09.02).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 2（EMA9 中線 ± 帶寬、擠壓突破 / 回踩進場、風控出場）。
 //  M1 的日線週期與 M3 的 VCP／確定性仍在此計算，供「⑥ 模組整合」過濾與右上狀態面板使用，
 //  但它們的圖形改由 R7-B / R7-C / R7-D 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
 // ═══════════════════════════════════════════════════════════════════════════
 
-strategy(&quot;R7-A EMA9 BW (main) r7(09:14_21:58)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
+strategy(&quot;R7-A EMA9 BW (main) r7(09:15_09:02)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
      overlay = true, initial_capital = 10000,
      default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
      commission_type = strategy.commission.percent, commission_value = 0.05,
@@ -7269,21 +7269,21 @@ alertcondition(squeeze and not squeeze[1], &quot;M2 EMA9-BW 擠壓開始&quot;, 
 alertcondition(bigBuy,  &quot;⑧ 主力大單買入日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間上緣 — 主力大單買入&quot;)
 alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間下緣 — 主力大單賣出&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7b_macd_clock(09.14_21.58).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.14_21.58).pine')">複製</button></summary>
-      <pre id="pine-r7b_macd_clock(09.14_21.58).pine">//@version=5
+<details class="pinebox"><summary><b>r7b_macd_clock(09.15_09.02).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.15_09.02).pine')">複製</button></summary>
+      <pre id="pine-r7b_macd_clock(09.15_09.02).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:14_21:58)
+//  版本 r7(09:15_09:02)
 //  R7-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R7 六件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.14_21.58).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.14_21.58).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.14_21.58).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.14_21.58).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.14_21.58).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.14_21.58).pine
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右；R7-E 的框預設在左上，不與 R7-A 的右側狀態框重疊。
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.15_09.02).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.15_09.02).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.15_09.02).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.15_09.02).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.15_09.02).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.15_09.02).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
 //  MACD 線與訊號線疊在同一 pane，週期背景與「上一段周期長度」標籤同時顯示，
@@ -7294,7 +7294,7 @@ alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 
 //  R7：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-B MACD + Cycle Clock r7(09:14_21:58)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
+indicator(&quot;R7-B MACD + Cycle Clock r7(09:15_09:02)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -7339,6 +7339,8 @@ grpL   = &quot;⑦ 版面 (四個 pane 統一)&quot;
 boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬；四支腳本設同值)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
 boxH   = input.float(100, &quot;資訊框高度 (% 本 pane 高；100 = 撐滿)&quot;, minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
 boxPos = input.string(&quot;右中&quot;, &quot;垂直位置 (高度 &lt;100 時才有差別)&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;], group = grpL, display = display.none)
+clkWfix = input.float(1.2, &quot;時鐘寬度補正 (% 圖表寬；時鐘比其他框寬就調大、窄就調小)&quot;, minval = 0, maxval = 6, step = 0.1, group = grpL, display = display.none)
+clkHfix = input.float(3.0, &quot;時鐘高度補正 (% pane 高；時鐘超出 pane 就調大)&quot;, minval = 0, maxval = 20, step = 0.5, group = grpL, display = display.none)
 f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
 // 備註框：淺色底 + 黑字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
@@ -7511,8 +7513,8 @@ f_atan2(y, x) =&gt;
 // ── M1 時鐘 (table) ──
 // 時鐘尺寸由 ⑦ 版面 的 boxW / boxH 推導：上下各一列文字 (hdrH%)，中間 grid 列平均分配
 hdrH  = 6.0
-cellW = boxW / grid
-cellH = (boxH - 2 * hdrH) / grid
+cellW = (boxW - clkWfix) / grid            // 扣除格子內距累積的寬度，使時鐘與其他框等寬、左右緣對齊
+cellH = (boxH - 2 * hdrH - clkHfix) / grid
 tpos  = f_boxPos(boxPos)
 
 var table clk = table.new(tpos, grid, grid + 2, bgcolor = color.new(color.black, 100),
@@ -7606,28 +7608,28 @@ alertcondition(bearDiv, &quot;M1 頂背馳&quot;, &quot;{{ticker}} 日線 MACD �
 alertcondition(brkUpEvt, &quot;M1 MACD 升破前頂&quot;, &quot;{{ticker}} 日線 MACD 快線升破前一個轉折高點 — 動能創新高&quot;)
 alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日線 MACD 快線跌破前一個轉折低點 — 動能創新低&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7c_vcp(09.14_21.58).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.14_21.58).pine')">複製</button></summary>
-      <pre id="pine-r7c_vcp(09.14_21.58).pine">//@version=5
+<details class="pinebox"><summary><b>r7c_vcp(09.15_09.02).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.15_09.02).pine')">複製</button></summary>
+      <pre id="pine-r7c_vcp(09.15_09.02).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:14_21:58)
+//  版本 r7(09:15_09:02)
 //  R7-C  下方 pane：VCP 指數曲線
 //
 //  R7 六件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.14_21.58).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.14_21.58).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.14_21.58).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.14_21.58).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.14_21.58).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.14_21.58).pine
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右；R7-E 的框預設在左上，不與 R7-A 的右側狀態框重疊。
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.15_09.02).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.15_09.02).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.15_09.02).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.15_09.02).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.15_09.02).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.15_09.02).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
 //  背景依 A/B/C/D/E 等級著色，60 / 40 兩條參考線，右側面板列出構成分數的明細。
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-C VCP Score r7(09:14_21:58)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-C VCP Score r7(09:15_09:02)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -7928,21 +7930,21 @@ if showVcp and barstate.islast
 alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, &quot;VCP 轉 A 級 (待突破)&quot;, &quot;{{ticker}} VCP 等級轉為 A · VCP 待突破&quot;)
 alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&quot;, &quot;{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7d_cert(09.14_21.58).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.14_21.58).pine')">複製</button></summary>
-      <pre id="pine-r7d_cert(09.14_21.58).pine">//@version=5
+<details class="pinebox"><summary><b>r7d_cert(09.15_09.02).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.15_09.02).pine')">複製</button></summary>
+      <pre id="pine-r7d_cert(09.15_09.02).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:14_21:58)
+//  版本 r7(09:15_09:02)
 //  R7-D  下方 pane：確定性指數曲線
 //
 //  R7 六件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.14_21.58).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.14_21.58).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.14_21.58).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.14_21.58).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.14_21.58).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.14_21.58).pine
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右；R7-E 的框預設在左上，不與 R7-A 的右側狀態框重疊。
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.15_09.02).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.15_09.02).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.15_09.02).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.15_09.02).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.15_09.02).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.15_09.02).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-A。把 7 項加權後的 0–100 確定性總分畫成一條曲線，
 //  7 個分項各自可選顯示為細線，有「一底高於一底」結構時背景轉綠，
@@ -7950,7 +7952,7 @@ alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo build_r17_data.py）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-D Certainty 7 r7(09:14_21:58)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-D Certainty 7 r7(09:15_09:02)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8223,21 +8225,21 @@ if showCert and barstate.islast
 alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;確定性達門檻&quot;,
      &quot;{{ticker}} 確定性總分升至門檻以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7e_gravity(09.14_21.58).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.14_21.58).pine')">複製</button></summary>
-      <pre id="pine-r7e_gravity(09.14_21.58).pine">//@version=5
+<details class="pinebox"><summary><b>r7e_gravity(09.15_09.02).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.15_09.02).pine')">複製</button></summary>
+      <pre id="pine-r7e_gravity(09.15_09.02).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:14_21:58)
+//  版本 r7(09:15_09:02)
 //  R7-E  主圖：價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」
 //
 //  R7 六件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.14_21.58).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.14_21.58).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.14_21.58).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.14_21.58).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.14_21.58).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.14_21.58).pine
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右；R7-E 的框預設在左上，不與 R7-A 的右側狀態框重疊。
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.15_09.02).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.15_09.02).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.15_09.02).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.15_09.02).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.15_09.02).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.15_09.02).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
 //  重心 = 主力成本線的代理：
@@ -8249,7 +8251,7 @@ alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;
 //  訊號：重心上移 + 價在重心上 = 上升最低阻力；重心下移 + 價在重心下 = 下跌最低阻力；
 //        重心走平且穩定 = 定錨 (主力未走)；價格跌破重心後 M 根內收回 = 假跌破 (用股價打掩護)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-E Price Gravity r7(09:14_21:58)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-E Price Gravity r7(09:15_09:02)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
 
 // ── ① 重心定義 ──
 grpG = &quot;① 重心定義&quot;
@@ -8273,7 +8275,7 @@ grpL   = &quot;⑦ 版面&quot;
 showBox = input.bool(true, &quot;顯示資訊框&quot;, group = grpL, display = display.none)
 boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
 boxH   = input.float(40, &quot;資訊框高度 (% pane 高)&quot;, minval = 20, maxval = 100, step = 5, group = grpL, display = display.none)
-boxPos = input.string(&quot;左上&quot;, &quot;位置 (預設左上，避開 R7-A 右側狀態框)&quot;, options = [&quot;左上&quot;, &quot;左中&quot;, &quot;左下&quot;, &quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;], group = grpL, display = display.none)
+boxPos = input.string(&quot;右上&quot;, &quot;位置 (與其他 R7 框同貼右；若與 R7-A 狀態框重疊，把 R7-A 改 右下 / 高度 60)&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;, &quot;左上&quot;, &quot;左中&quot;, &quot;左下&quot;], group = grpL, display = display.none)
 f_boxPos(s) =&gt; s == &quot;左上&quot; ? position.top_left : s == &quot;左中&quot; ? position.middle_left : s == &quot;左下&quot; ? position.bottom_left :
      s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
@@ -8387,21 +8389,21 @@ alertcondition(anchor and not anchor[1], &quot;重心定錨&quot;, &quot;{{ticke
 alertcondition(fakeBD, &quot;假跌破收回重心&quot;, &quot;{{ticker}} 跌破價格重心後數根內收回 — 洗盤嫌疑&quot;)
 alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突破價格重心後數根內跌回 — 誘多嫌疑&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7f_force(09.14_21.58).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.14_21.58).pine')">複製</button></summary>
-      <pre id="pine-r7f_force(09.14_21.58).pine">//@version=5
+<details class="pinebox"><summary><b>r7f_force(09.15_09.02).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.15_09.02).pine')">複製</button></summary>
+      <pre id="pine-r7f_force(09.15_09.02).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:14_21:58)
+//  版本 r7(09:15_09:02)
 //  R7-F  下方 pane：買賣力度 (Buy / Sell Force) —— 推論重建猫姐「買賣力道」
 //
 //  R7 六件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.14_21.58).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.14_21.58).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.14_21.58).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.14_21.58).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.14_21.58).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.14_21.58).pine
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右；R7-E 的框預設在左上，不與 R7-A 的右側狀態框重疊。
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.15_09.02).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.15_09.02).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.15_09.02).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.15_09.02).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.15_09.02).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.15_09.02).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
 //  資料：用較低時間框 (預設 1 分鐘) 的每根 K 近似「主動買 / 主動賣」：
@@ -8414,7 +8416,7 @@ alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突�
 //  無結構低點 = 價格創 N 根新低，累積力度同步新低 (無承接、賣壓出清)
 //  主力防守位 = 同一價位 (± ATR × 容差) 被多次觸及且觸及時力度為正 → 計數
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-F Buy/Sell Force r7(09:14_21:58)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;R7-F Buy/Sell Force r7(09:15_09:02)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
 
 // ── ① 資料 ──
 grpD = &quot;① 資料&quot;

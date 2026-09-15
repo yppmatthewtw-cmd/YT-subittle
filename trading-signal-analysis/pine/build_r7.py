@@ -45,7 +45,7 @@ HEADER_TABLE = f'''//  R7 六件套 —— 每支各佔一個 pane；策略 (A) 
 //     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         {NEWNAMES["d"]}
 //     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  {NEWNAMES["e"]}
 //     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   {NEWNAMES["f"]}
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右；R7-E 的框預設在左上，不與 R7-A 的右側狀態框重疊。
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 '''
 
 
@@ -53,6 +53,20 @@ def retitle(src, old_title_re, new_title, new_short):
     src, n = re.subn(r'^(strategy|indicator)\("' + old_title_re + r'[^"]*", shorttitle = "[^"]*"',
                      lambda m: f'{m.group(1)}("{new_title} r7({TS_TITLE})", shorttitle = "{new_short}"', src, count=1, flags=re.M)
     assert n == 1, f"標題未替換: {old_title_re}"
+    return src
+
+
+def fix_clock_width(src):
+    """R7-B：table 每格有固定內距，時鐘 21 欄累積後比其他框寬 (右緣對齊、左緣突出)。
+    以 clkWfix / clkHfix (% 圖表寬 / % pane 高) 從 boxW / boxH 扣除後再平分給格子。"""
+    src = src.replace('boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL, display = display.none)\n',
+                      'boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL, display = display.none)\n'
+                      'clkWfix = input.float(1.2, "時鐘寬度補正 (% 圖表寬；時鐘比其他框寬就調大、窄就調小)", minval = 0, maxval = 6, step = 0.1, group = grpL, display = display.none)\n'
+                      'clkHfix = input.float(3.0, "時鐘高度補正 (% pane 高；時鐘超出 pane 就調大)", minval = 0, maxval = 20, step = 0.5, group = grpL, display = display.none)\n', 1)
+    src = src.replace("cellW = boxW / grid\ncellH = (boxH - 2 * hdrH) / grid",
+                      "cellW = (boxW - clkWfix) / grid            // 扣除格子內距累積的寬度，使時鐘與其他框等寬、左右緣對齊\n"
+                      "cellH = (boxH - 2 * hdrH - clkHfix) / grid", 1)
+    assert "clkWfix" in src and "(boxW - clkWfix) / grid" in src, "B 時鐘寬度補正未套用"
     return src
 
 
@@ -75,7 +89,7 @@ def convert_e(src):
                       f"//  版本 r7({TS_TITLE})\n//  R7-E  主圖：價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」\n//\n" + HEADER_TABLE + "//")
     # 資訊框：預設左上，避免與 R7-A 右側狀態框重疊；位置選項加入左側
     src = src.replace('boxPos = input.string("右上", "位置", options = ["右上", "右中", "右下"], group = grpL, display = display.none)',
-                      'boxPos = input.string("左上", "位置 (預設左上，避開 R7-A 右側狀態框)", options = ["左上", "左中", "左下", "右上", "右中", "右下"], group = grpL, display = display.none)')
+                      'boxPos = input.string("右上", "位置 (與其他 R7 框同貼右；若與 R7-A 狀態框重疊，把 R7-A 改 右下 / 高度 60)", options = ["右上", "右中", "右下", "左上", "左中", "左下"], group = grpL, display = display.none)')
     src = src.replace('f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right',
                       'f_boxPos(s) => s == "左上" ? position.top_left : s == "左中" ? position.middle_left : s == "左下" ? position.bottom_left :\n'
                       '     s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right')
@@ -94,6 +108,8 @@ for key, out, srcfile, title, short in SPEC:
     s = srcfile.read_text(encoding="utf-8")
     if key in "abcd":
         s = convert_r6(s, title, short)
+        if key == "b":
+            s = fix_clock_width(s)
     elif key == "e":
         s = convert_e(s)
     else:
