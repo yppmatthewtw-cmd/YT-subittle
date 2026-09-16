@@ -6425,6 +6425,10 @@ alertcondition(gapGo, &quot;Gap&amp;Go 突破盤前高&quot;,
 //    ④ 盤整箱視窗 20 → 10 根。
 //  仍保留：收盤越過樞紐 = 線定義自己（立即翻轉）、突破放量、突破後跟進（否則危險訊號）。
 //  不再畫 EMA21 / SMA50 / AVWAP / 樞紐高低參考線；圖上只有這一條線 + 突破記號。
+//  r2：加入 Livermore 買賣決策點（④），每個標籤的文字就是觸發原因：
+//      買① 升破樞紐·放量、買② MK 回升勢欄、買③ 首穿整數關卡、加碼 首筆有利潤、
+//      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
+//      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
 // ═══════════════════════════════════════════════════════════════════════════
 indicator(&quot;Livermore Least-Resistance r1&quot;, shorttitle = &quot;Livermore LR&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
 
@@ -6627,6 +6631,86 @@ loF = ta.lowest(low, followBars)
 danger = not na(brkBar) and bar_index == brkBar + followBars and
      ((brkDir == 1 and (close &lt;= brkClose or hiF &lt;= brkHigh)) or (brkDir == -1 and (close &gt;= brkClose or loF &gt;= brkLow)))
 
+// ── ④ Livermore 買賣決策點（每個記號都標明觸發原因）──
+//    買①  升破樞紐高 + 放量            ← &quot;buy when it crosses the Pivotal Point ... unusually large volume&quot;
+//    買②  Market Key 回到上升趨勢欄    ← 自然回檔結束、越過前高 (+確認門檻)：續勢樞紐點
+//    買③  首次穿越整數關卡 + 放量       ← &quot;when a stock crosses 100, 200 or 300 for the first time&quot;
+//    加碼  首筆有利潤且再漲一個確認門檻 ← &quot;don&#x27;t make a second unless the first shows you a profit&quot; (pyramiding)
+//    賣①  跌破最低阻力線 (趨勢必守樞紐) ← 線失效；放量則同時是放空點
+//    賣②  突破後無跟進                 ← &quot;a danger signal that must be heeded&quot;
+//    賣③  次級反彈失敗轉回檔            ← Market Key 次級欄：反彈不過前高即回落 = 派發警訊
+//    賣④  放量異常反轉 (高潮)           ← &quot;abnormal break ... with great activity&quot; 於創 20 日新高當天
+//    賣⑤  一日反轉                     ← 創新高、收低於昨收、量增 (Livermore 的 one-day reversal)
+//    放空② Market Key 回到下降趨勢欄；回補 = 跌破後無跟進 / 升破樞紐
+grpS = &quot;④ 買賣決策點&quot;
+showSig  = input.bool(true, &quot;顯示買賣決策點與原因&quot;, group = grpS, display = display.none)
+showAdd  = input.bool(true, &quot;顯示加碼點 (pyramiding)&quot;, group = grpS, display = display.none)
+maxAdds  = input.int(2, &quot;最多加碼次數&quot;, minval = 0, maxval = 5, group = grpS, display = display.none)
+climaxX  = input.float(2.0, &quot;高潮反轉：量 ≥ 均量 ×&quot;, minval = 1.2, maxval = 5, step = 0.1, group = grpS, display = display.none)
+
+// 整數關卡 (依價位分級)
+rn  = close &gt;= 200 ? 100 : close &gt;= 50 ? 50 : close &gt;= 20 ? 10 : 5
+lvl = math.ceil(close[1] / rn) * rn
+hi250 = ta.highest(high, 250)
+crossRound = close[1] &lt; lvl and close &gt;= lvl and hi250[1] &lt; lvl
+
+buyBreak   = brkUp and volOK
+watchBreak = brkUp and not volOK
+buyResume  = mk == 1 and mk[1] != 1 and structDir == 1 and not brkUp
+buyRound   = crossRound and volOK and structDir == 1 and not brkUp
+sellBreak  = brkDn
+sellDanger = danger and brkDir == 1
+coverDanger= danger and brkDir == -1
+sellRallyFail = mk[1] == 3 and (mk == -2 or mk == -3)
+rngPosC = high != low ? (close - low) / (high - low) : 0.5
+hi20 = ta.highest(high, 20)
+sellClimax = structDir == 1 and high &gt;= hi20 and volume &gt;= vAvg * climaxX and close &lt; open and rngPosC &lt; 0.3 and not brkDn
+sellODR    = structDir == 1 and high &gt; high[1] and close &lt; close[1] and volume &gt; volume[1] and not sellClimax and not brkDn
+shortResume= mk == -1 and mk[1] != -1 and structDir == -1 and not brkDn
+
+// 部位狀態 (只為加碼點與資訊框；本指標不下單)
+var bool  inLong  = false
+var float lastPx  = na
+var int   adds    = 0
+var string lastSig = &quot;—&quot;
+buyAdd = false
+if buyBreak or buyResume or buyRound
+    if not inLong
+        inLong := true
+        adds := 0
+    lastPx := close
+if inLong and showAdd and adds &lt; maxAdds and not (buyBreak or buyResume or buyRound) and lrDir == 1 and close &gt;= lastPx + confAmt and close &gt; lastPx
+    buyAdd := true
+    adds += 1
+    lastPx := close
+if sellBreak or sellDanger
+    inLong := false
+    adds := 0
+if buyBreak
+    lastSig := &quot;買① 升破樞紐高·放量&quot;
+else if buyResume
+    lastSig := &quot;買② MK 回到上升趨勢欄&quot;
+else if buyRound
+    lastSig := &quot;買③ 首次穿越整數關卡&quot;
+else if buyAdd
+    lastSig := &quot;加碼 #&quot; + str.tostring(adds) + &quot; 首筆有利潤&quot;
+else if sellBreak
+    lastSig := volOK ? &quot;賣①/放空 跌破樞紐·放量&quot; : &quot;賣① 跌破必守樞紐&quot;
+else if sellDanger
+    lastSig := &quot;賣② 突破後無跟進&quot;
+else if sellRallyFail
+    lastSig := &quot;賣③ 次級反彈失敗&quot;
+else if sellClimax
+    lastSig := &quot;賣④ 放量異常反轉&quot;
+else if sellODR
+    lastSig := &quot;賣⑤ 一日反轉&quot;
+else if shortResume
+    lastSig := &quot;放空② MK 回到下降趨勢欄&quot;
+else if coverDanger
+    lastSig := &quot;回補 跌破後無跟進&quot;
+else if watchBreak
+    lastSig := &quot;觀察 升破未放量·不買&quot;
+
 // ── 繪圖：只有一條線 ──
 lrCol = lrDir == 1 ? color.new(#26a69a, 0) : lrDir == -1 ? color.new(#ef5350, 0) : color.new(#9ca3af, 0)
 plot(lrLine, &quot;Livermore 最低阻力線&quot;, color = lrCol, linewidth = 3, style = plot.style_stepline, display = display.pane + display.data_window + display.price_scale)
@@ -6635,21 +6719,29 @@ plot(mk, &quot;Market Key 欄&quot;, display = display.data_window)
 plot(ph1, &quot;最後樞紐高 (數值)&quot;, display = display.data_window)
 plot(pl1, &quot;最後樞紐低 (數值)&quot;, display = display.data_window)
 
+// 突破記號 (▲▼) — 只標線的定義點；文字說明由 ④ 的決策點標籤負責
 plotshape(showMarks and brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
 plotshape(showMarks and brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
-if showMarks and brkUp
-    [l1, n1] = f_note(bar_index, low, low - atr * 0.9, volOK ? &quot;線向上定義 · 放量 ✓&quot; : &quot;升破樞紐 · 未放量 ⚠&quot;, #26a69a, false)
-if showMarks and brkDn
-    [l2, n2] = f_note(bar_index, high, high + atr * 0.9, volOK ? &quot;線向下定義 · 放量 ✓&quot; : &quot;跌破樞紐 · 未放量 ⚠&quot;, #ef5350, true)
-if showMarks and danger
-    [l3, n3] = f_note(bar_index, brkDir == 1 ? high : low, brkDir == 1 ? high + atr * 0.9 : low - atr * 0.9,
-         &quot;突破後無跟進 · 危險訊號&quot;, #f59e0b, brkDir == 1)
+
+// ④ 買賣決策點：綠 = 買 / 加碼、紅 = 賣 / 放空、橙 = 危險訊號、灰 = 觀察不買；文字即觸發原因
+plotshape(showSig and buyBreak,   &quot;買① 升破樞紐高·放量&quot;,        shape.labelup,   location.belowbar, color.new(#16a34a, 0), text = &quot;買①\n升破樞紐·放量&quot;,     textcolor = color.white, size = size.small)
+plotshape(showSig and buyResume,  &quot;買② MK 回到上升趨勢欄&quot;,      shape.labelup,   location.belowbar, color.new(#16a34a, 20), text = &quot;買②\nMK回升勢欄&quot;,       textcolor = color.white, size = size.small)
+plotshape(showSig and buyRound,   &quot;買③ 首次穿越整數關卡&quot;,       shape.labelup,   location.belowbar, color.new(#0ea5e9, 0), text = &quot;買③\n首穿整數關卡&quot;,       textcolor = color.white, size = size.small)
+plotshape(showSig and buyAdd,     &quot;加碼：首筆有利潤&quot;,           shape.labelup,   location.belowbar, color.new(#65a30d, 0), text = &quot;加碼\n首筆有利潤&quot;,         textcolor = color.white, size = size.tiny)
+plotshape(showSig and watchBreak, &quot;觀察：升破未放量&quot;,           shape.labelup,   location.belowbar, color.new(#9ca3af, 0), text = &quot;觀察\n未放量不買&quot;,         textcolor = color.white, size = size.tiny)
+plotshape(showSig and sellBreak,  &quot;賣①/放空 跌破必守樞紐&quot;,      shape.labeldown, location.abovebar, color.new(#dc2626, 0), text = &quot;賣①\n跌破必守樞紐&quot;,       textcolor = color.white, size = size.small)
+plotshape(showSig and sellDanger, &quot;賣② 突破後無跟進&quot;,           shape.labeldown, location.abovebar, color.new(#f59e0b, 0), text = &quot;賣②\n突破無跟進&quot;,         textcolor = color.white, size = size.small)
+plotshape(showSig and sellRallyFail, &quot;賣③ 次級反彈失敗&quot;,        shape.labeldown, location.abovebar, color.new(#dc2626, 20), text = &quot;賣③\n次級反彈失敗&quot;,     textcolor = color.white, size = size.small)
+plotshape(showSig and sellClimax, &quot;賣④ 放量異常反轉&quot;,           shape.labeldown, location.abovebar, color.new(#b91c1c, 0), text = &quot;賣④\n放量異常反轉&quot;,       textcolor = color.white, size = size.small)
+plotshape(showSig and sellODR,    &quot;賣⑤ 一日反轉&quot;,               shape.labeldown, location.abovebar, color.new(#dc2626, 35), text = &quot;賣⑤\n一日反轉&quot;,           textcolor = color.white, size = size.tiny)
+plotshape(showSig and shortResume,&quot;放空② MK 回到下降趨勢欄&quot;,    shape.labeldown, location.abovebar, color.new(#7f1d1d, 0), text = &quot;放空②\nMK回跌勢欄&quot;,     textcolor = color.white, size = size.small)
+plotshape(showSig and coverDanger,&quot;回補：跌破後無跟進&quot;,         shape.labelup,   location.belowbar, color.new(#f59e0b, 0), text = &quot;回補\n跌破無跟進&quot;,         textcolor = color.white, size = size.small)
 
 // ── 資訊框 ──
-var table tb = table.new(f_boxPos(boxPos), 2, 7, bgcolor = color.new(#ffffff, 5),
+var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 if showBox and barstate.islast
-    rh = boxH / 7
+    rh = boxH / 8
     stTxt = lrDir == 1 ? &quot;上升最低阻力 ✓&quot; : lrDir == -1 ? &quot;下降最低阻力 ✓&quot; : inBox ? &quot;盤整箱 · 不表態&quot; : &quot;未定義&quot;
     stCol = lrDir == 1 ? color.new(#26a69a, 60) : lrDir == -1 ? color.new(#ef5350, 60) : color.new(#9ca3af, 70)
     table.cell(tb, 0, 0, &quot;Livermore 最低阻力線 (中短線)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
@@ -6666,8 +6758,12 @@ if showBox and barstate.islast
     table.cell(tb, 1, 4, str.tostring(ph1, format.mintick) + &quot; / &quot; + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
     table.cell(tb, 0, 5, &quot;本根量比 (突破需 ≥&quot; + str.tostring(volX, &quot;#.#&quot;) + &quot;×)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
     table.cell(tb, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + &quot;×&quot; + (volOK ? &quot; 放量&quot; : &quot;&quot;), width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = volOK ? color.new(#f59e0b, 60) : na)
-    table.cell(tb, 0, 6, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
-    table.cell(tb, 1, 6, &quot;線 = 趨勢必守樞紐，只沿趨勢棘輪&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+    sigCol = str.startswith(lastSig, &quot;買&quot;) or str.startswith(lastSig, &quot;加碼&quot;) or str.startswith(lastSig, &quot;回補&quot;) ? color.new(#16a34a, 60) :
+         str.startswith(lastSig, &quot;賣&quot;) or str.startswith(lastSig, &quot;放空&quot;) ? color.new(#dc2626, 60) : na
+    table.cell(tb, 0, 6, &quot;最近決策點 (原因)&quot; + (inLong ? &quot; · 持多 加碼&quot; + str.tostring(adds) : &quot;&quot;), width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 6, lastSig, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = sigCol)
+    table.cell(tb, 0, 7, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 1, 7, &quot;線 = 趨勢必守樞紐 · 標籤文字 = 觸發原因&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
 
 // ── 警報 ──
 alertcondition(brkUp, &quot;Livermore 線向上定義 (升破樞紐高)&quot;, &quot;{{ticker}} 收盤升破最後樞紐高 — 最低阻力線向上定義，檢查是否放量&quot;)
@@ -6675,6 +6771,18 @@ alertcondition(brkDn, &quot;Livermore 線向下定義 (跌破樞紐低)&quot;, &
 alertcondition(danger, &quot;Livermore 危險訊號 (突破後無跟進)&quot;, &quot;{{ticker}} 突破樞紐點後數根內沒有跟進 — Livermore 危險訊號&quot;)
 alertcondition(mkTrend == 1 and mkTrend[1] != 1,   &quot;Market Key 轉入上升趨勢欄&quot;, &quot;{{ticker}} Market Key 進入上升趨勢欄&quot;)
 alertcondition(mkTrend == -1 and mkTrend[1] != -1, &quot;Market Key 轉入下降趨勢欄&quot;, &quot;{{ticker}} Market Key 進入下降趨勢欄&quot;)
+// ④ 買賣決策點
+alertcondition(buyBreak,   &quot;買① 升破樞紐高·放量&quot;,      &quot;{{ticker}} 買①：收盤升破最後樞紐高且放量 — Livermore 樞紐點突破買入&quot;)
+alertcondition(buyResume,  &quot;買② MK 回到上升趨勢欄&quot;,    &quot;{{ticker}} 買②：自然回檔結束，Market Key 回到上升趨勢欄 — 續勢樞紐點&quot;)
+alertcondition(buyRound,   &quot;買③ 首次穿越整數關卡&quot;,     &quot;{{ticker}} 買③：首次放量穿越整數關卡&quot;)
+alertcondition(buyAdd,     &quot;加碼：首筆有利潤&quot;,         &quot;{{ticker}} 加碼：首筆已有利潤且再漲一個確認門檻 (pyramiding)&quot;)
+alertcondition(sellBreak,  &quot;賣①/放空 跌破必守樞紐&quot;,    &quot;{{ticker}} 賣①：收盤跌破最低阻力線 (趨勢必守樞紐) — 趨勢失效；放量則為放空點&quot;)
+alertcondition(sellDanger, &quot;賣② 突破後無跟進&quot;,         &quot;{{ticker}} 賣②：突破樞紐後數根內無跟進 — Livermore 危險訊號&quot;)
+alertcondition(sellRallyFail, &quot;賣③ 次級反彈失敗&quot;,      &quot;{{ticker}} 賣③：次級反彈不過前高即回落 — 派發警訊&quot;)
+alertcondition(sellClimax, &quot;賣④ 放量異常反轉&quot;,         &quot;{{ticker}} 賣④：創 20 日新高當天放量收黑於區間下緣 — 高潮反轉&quot;)
+alertcondition(sellODR,    &quot;賣⑤ 一日反轉&quot;,             &quot;{{ticker}} 賣⑤：創新高但收低於昨收且量增 — 一日反轉&quot;)
+alertcondition(shortResume,&quot;放空② MK 回到下降趨勢欄&quot;,  &quot;{{ticker}} 放空②：自然反彈結束，Market Key 回到下降趨勢欄&quot;)
+alertcondition(coverDanger,&quot;回補：跌破後無跟進&quot;,       &quot;{{ticker}} 回補：跌破樞紐後數根內無跟進&quot;)
 </pre></details>
 <details class="pinebox"><summary><b>macd_cycle_clock.pine</b>
       <button class="copybtn" onclick="copyPine(event,'macd_cycle_clock.pine')">複製</button></summary>
@@ -7017,21 +7125,21 @@ alertcondition(flipEvt and not up, &quot;日線轉入下跌周期&quot;, &quot;{
 alertcondition(lateEvt and up,     &quot;日線上昇周期進入尾段&quot;, &quot;{{ticker}} 日線上昇周期已走 &gt;75%，留意轉折 (接近 3 點鐘)&quot;)
 alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &quot;{{ticker}} 日線下跌周期已走 &gt;75%，留意反轉 (接近 9 點鐘)&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7a_main(09.16_13.27).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.16_13.27).pine')">複製</button></summary>
-      <pre id="pine-r7a_main(09.16_13.27).pine">//@version=5
+<details class="pinebox"><summary><b>r7a_main(09.16_13.59).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.16_13.59).pine')">複製</button></summary>
+      <pre id="pine-r7a_main(09.16_13.59).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:27)
+//  版本 r7(09:16_13:59)
 //  R7-A  主圖：EMA9 Band Width Strategy
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 2（EMA9 中線 ± 帶寬、擠壓突破 / 回踩進場、風控出場）。
@@ -7039,7 +7147,7 @@ alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &
 //  但它們的圖形改由 R7-B / R7-C / R7-D 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
 // ═══════════════════════════════════════════════════════════════════════════
 
-strategy(&quot;R7-A EMA9 BW (main) r7(09:16_13:27)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
+strategy(&quot;R7-A EMA9 BW (main) r7(09:16_13:59)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
      overlay = true, initial_capital = 10000,
      default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
      commission_type = strategy.commission.percent, commission_value = 0.05,
@@ -7546,21 +7654,21 @@ alertcondition(squeeze and not squeeze[1], &quot;M2 EMA9-BW 擠壓開始&quot;, 
 alertcondition(bigBuy,  &quot;⑧ 主力大單買入日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間上緣 — 主力大單買入&quot;)
 alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間下緣 — 主力大單賣出&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7b_macd_clock(09.16_13.27).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.16_13.27).pine')">複製</button></summary>
-      <pre id="pine-r7b_macd_clock(09.16_13.27).pine">//@version=5
+<details class="pinebox"><summary><b>r7b_macd_clock(09.16_13.59).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.16_13.59).pine')">複製</button></summary>
+      <pre id="pine-r7b_macd_clock(09.16_13.59).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:27)
+//  版本 r7(09:16_13:59)
 //  R7-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -7572,7 +7680,7 @@ alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 
 //  R7：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-B MACD + Cycle Clock r7(09:16_13:27)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
+indicator(&quot;R7-B MACD + Cycle Clock r7(09:16_13:59)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -7886,21 +7994,21 @@ alertcondition(bearDiv, &quot;M1 頂背馳&quot;, &quot;{{ticker}} 日線 MACD �
 alertcondition(brkUpEvt, &quot;M1 MACD 升破前頂&quot;, &quot;{{ticker}} 日線 MACD 快線升破前一個轉折高點 — 動能創新高&quot;)
 alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日線 MACD 快線跌破前一個轉折低點 — 動能創新低&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7c_vcp(09.16_13.27).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.16_13.27).pine')">複製</button></summary>
-      <pre id="pine-r7c_vcp(09.16_13.27).pine">//@version=5
+<details class="pinebox"><summary><b>r7c_vcp(09.16_13.59).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.16_13.59).pine')">複製</button></summary>
+      <pre id="pine-r7c_vcp(09.16_13.59).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:27)
+//  版本 r7(09:16_13:59)
 //  R7-C  下方 pane：VCP 指數曲線
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
@@ -7908,7 +8016,7 @@ alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日�
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-C VCP Score r7(09:16_13:27)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-C VCP Score r7(09:16_13:59)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8210,21 +8318,21 @@ if showVcp and barstate.islast
 alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, &quot;VCP 轉 A 級 (待突破)&quot;, &quot;{{ticker}} VCP 等級轉為 A · VCP 待突破&quot;)
 alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&quot;, &quot;{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7d_cert(09.16_13.27).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.16_13.27).pine')">複製</button></summary>
-      <pre id="pine-r7d_cert(09.16_13.27).pine">//@version=5
+<details class="pinebox"><summary><b>r7d_cert(09.16_13.59).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.16_13.59).pine')">複製</button></summary>
+      <pre id="pine-r7d_cert(09.16_13.59).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:27)
+//  版本 r7(09:16_13:59)
 //  R7-D  下方 pane：確定性指數曲線
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-A。把 7 項加權後的 0–100 確定性總分畫成一條曲線，
@@ -8233,7 +8341,7 @@ alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo build_r17_data.py）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-D Certainty 7 r7(09:16_13:27)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-D Certainty 7 r7(09:16_13:59)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8507,21 +8615,21 @@ if showCert and barstate.islast
 alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;確定性達門檻&quot;,
      &quot;{{ticker}} 確定性總分升至門檻以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7e_gravity(09.16_13.27).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.16_13.27).pine')">複製</button></summary>
-      <pre id="pine-r7e_gravity(09.16_13.27).pine">//@version=5
+<details class="pinebox"><summary><b>r7e_gravity(09.16_13.59).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.16_13.59).pine')">複製</button></summary>
+      <pre id="pine-r7e_gravity(09.16_13.59).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:27)
+//  版本 r7(09:16_13:59)
 //  R7-E  主圖：價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8534,7 +8642,7 @@ alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;
 //  訊號：重心上移 + 價在重心上 = 上升最低阻力；重心下移 + 價在重心下 = 下跌最低阻力；
 //        重心走平且穩定 = 定錨 (主力未走)；價格跌破重心後 M 根內收回 = 假跌破 (用股價打掩護)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-E Price Gravity r7(09:16_13:27)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-E Price Gravity r7(09:16_13:59)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
 
 // ── ① 重心定義 ──
 grpG = &quot;① 重心定義&quot;
@@ -8672,21 +8780,21 @@ alertcondition(anchor and not anchor[1], &quot;重心定錨&quot;, &quot;{{ticke
 alertcondition(fakeBD, &quot;假跌破收回重心&quot;, &quot;{{ticker}} 跌破價格重心後數根內收回 — 洗盤嫌疑&quot;)
 alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突破價格重心後數根內跌回 — 誘多嫌疑&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7f_force(09.16_13.27).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.16_13.27).pine')">複製</button></summary>
-      <pre id="pine-r7f_force(09.16_13.27).pine">//@version=5
+<details class="pinebox"><summary><b>r7f_force(09.16_13.59).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.16_13.59).pine')">複製</button></summary>
+      <pre id="pine-r7f_force(09.16_13.59).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:27)
+//  版本 r7(09:16_13:59)
 //  R7-F  下方 pane：買賣力度 (Buy / Sell Force) —— 推論重建猫姐「買賣力道」
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8700,7 +8808,7 @@ alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突�
 //  無結構低點 = 價格創 N 根新低，累積力度同步新低 (無承接、賣壓出清)
 //  主力防守位 = 同一價位 (± ATR × 容差) 被多次觸及且觸及時力度為正 → 計數
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-F Buy/Sell Force r7(09:16_13:27)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;R7-F Buy/Sell Force r7(09:16_13:59)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
 
 // ── ① 資料 ──
 grpD = &quot;① 資料&quot;
@@ -8842,21 +8950,21 @@ alertcondition(noStructLow, &quot;無結構低點 (無承接)&quot;, &quot;{{tic
 alertcondition(structHigh,  &quot;結構高點 (派發)&quot;,    &quot;{{ticker}} 價格新高但買賣力度未新高 — 派發嫌疑&quot;)
 alertcondition(defCnt &gt;= 3 and defCnt[1] &lt; 3, &quot;主力防守位 3 次&quot;, &quot;{{ticker}} 同一低位被防守 3 次以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7g_livermore(09.16_13.27).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7g_livermore(09.16_13.27).pine')">複製</button></summary>
-      <pre id="pine-r7g_livermore(09.16_13.27).pine">//@version=5
+<details class="pinebox"><summary><b>r7g_livermore(09.16_13.59).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7g_livermore(09.16_13.59).pine')">複製</button></summary>
+      <pre id="pine-r7g_livermore(09.16_13.59).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:27)
+//  版本 r7(09:16_13:59)
 //  R7-G  主圖：Livermore 最低阻力線 (Line of Least Resistance)
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8872,8 +8980,12 @@ alertcondition(defCnt &gt;= 3 and defCnt[1] &lt; 3, &quot;主力防守位 3 次&
 //    ④ 盤整箱視窗 20 → 10 根。
 //  仍保留：收盤越過樞紐 = 線定義自己（立即翻轉）、突破放量、突破後跟進（否則危險訊號）。
 //  不再畫 EMA21 / SMA50 / AVWAP / 樞紐高低參考線；圖上只有這一條線 + 突破記號。
+//  r2：加入 Livermore 買賣決策點（④），每個標籤的文字就是觸發原因：
+//      買① 升破樞紐·放量、買② MK 回升勢欄、買③ 首穿整數關卡、加碼 首筆有利潤、
+//      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
+//      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-G Livermore Least-Resistance r7(09:16_13:27)&quot;, shorttitle = &quot;R7-G Livermore&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;R7-G Livermore Least-Resistance r7(09:16_13:59)&quot;, shorttitle = &quot;R7-G Livermore&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
 
 // ── ① 樞紐點 ──
 grpP = &quot;① 樞紐點 (Pivotal Points) — 中短線&quot;
@@ -9074,6 +9186,86 @@ loF = ta.lowest(low, followBars)
 danger = not na(brkBar) and bar_index == brkBar + followBars and
      ((brkDir == 1 and (close &lt;= brkClose or hiF &lt;= brkHigh)) or (brkDir == -1 and (close &gt;= brkClose or loF &gt;= brkLow)))
 
+// ── ④ Livermore 買賣決策點（每個記號都標明觸發原因）──
+//    買①  升破樞紐高 + 放量            ← &quot;buy when it crosses the Pivotal Point ... unusually large volume&quot;
+//    買②  Market Key 回到上升趨勢欄    ← 自然回檔結束、越過前高 (+確認門檻)：續勢樞紐點
+//    買③  首次穿越整數關卡 + 放量       ← &quot;when a stock crosses 100, 200 or 300 for the first time&quot;
+//    加碼  首筆有利潤且再漲一個確認門檻 ← &quot;don&#x27;t make a second unless the first shows you a profit&quot; (pyramiding)
+//    賣①  跌破最低阻力線 (趨勢必守樞紐) ← 線失效；放量則同時是放空點
+//    賣②  突破後無跟進                 ← &quot;a danger signal that must be heeded&quot;
+//    賣③  次級反彈失敗轉回檔            ← Market Key 次級欄：反彈不過前高即回落 = 派發警訊
+//    賣④  放量異常反轉 (高潮)           ← &quot;abnormal break ... with great activity&quot; 於創 20 日新高當天
+//    賣⑤  一日反轉                     ← 創新高、收低於昨收、量增 (Livermore 的 one-day reversal)
+//    放空② Market Key 回到下降趨勢欄；回補 = 跌破後無跟進 / 升破樞紐
+grpS = &quot;④ 買賣決策點&quot;
+showSig  = input.bool(true, &quot;顯示買賣決策點與原因&quot;, group = grpS, display = display.none)
+showAdd  = input.bool(true, &quot;顯示加碼點 (pyramiding)&quot;, group = grpS, display = display.none)
+maxAdds  = input.int(2, &quot;最多加碼次數&quot;, minval = 0, maxval = 5, group = grpS, display = display.none)
+climaxX  = input.float(2.0, &quot;高潮反轉：量 ≥ 均量 ×&quot;, minval = 1.2, maxval = 5, step = 0.1, group = grpS, display = display.none)
+
+// 整數關卡 (依價位分級)
+rn  = close &gt;= 200 ? 100 : close &gt;= 50 ? 50 : close &gt;= 20 ? 10 : 5
+lvl = math.ceil(close[1] / rn) * rn
+hi250 = ta.highest(high, 250)
+crossRound = close[1] &lt; lvl and close &gt;= lvl and hi250[1] &lt; lvl
+
+buyBreak   = brkUp and volOK
+watchBreak = brkUp and not volOK
+buyResume  = mk == 1 and mk[1] != 1 and structDir == 1 and not brkUp
+buyRound   = crossRound and volOK and structDir == 1 and not brkUp
+sellBreak  = brkDn
+sellDanger = danger and brkDir == 1
+coverDanger= danger and brkDir == -1
+sellRallyFail = mk[1] == 3 and (mk == -2 or mk == -3)
+rngPosC = high != low ? (close - low) / (high - low) : 0.5
+hi20 = ta.highest(high, 20)
+sellClimax = structDir == 1 and high &gt;= hi20 and volume &gt;= vAvg * climaxX and close &lt; open and rngPosC &lt; 0.3 and not brkDn
+sellODR    = structDir == 1 and high &gt; high[1] and close &lt; close[1] and volume &gt; volume[1] and not sellClimax and not brkDn
+shortResume= mk == -1 and mk[1] != -1 and structDir == -1 and not brkDn
+
+// 部位狀態 (只為加碼點與資訊框；本指標不下單)
+var bool  inLong  = false
+var float lastPx  = na
+var int   adds    = 0
+var string lastSig = &quot;—&quot;
+buyAdd = false
+if buyBreak or buyResume or buyRound
+    if not inLong
+        inLong := true
+        adds := 0
+    lastPx := close
+if inLong and showAdd and adds &lt; maxAdds and not (buyBreak or buyResume or buyRound) and lrDir == 1 and close &gt;= lastPx + confAmt and close &gt; lastPx
+    buyAdd := true
+    adds += 1
+    lastPx := close
+if sellBreak or sellDanger
+    inLong := false
+    adds := 0
+if buyBreak
+    lastSig := &quot;買① 升破樞紐高·放量&quot;
+else if buyResume
+    lastSig := &quot;買② MK 回到上升趨勢欄&quot;
+else if buyRound
+    lastSig := &quot;買③ 首次穿越整數關卡&quot;
+else if buyAdd
+    lastSig := &quot;加碼 #&quot; + str.tostring(adds) + &quot; 首筆有利潤&quot;
+else if sellBreak
+    lastSig := volOK ? &quot;賣①/放空 跌破樞紐·放量&quot; : &quot;賣① 跌破必守樞紐&quot;
+else if sellDanger
+    lastSig := &quot;賣② 突破後無跟進&quot;
+else if sellRallyFail
+    lastSig := &quot;賣③ 次級反彈失敗&quot;
+else if sellClimax
+    lastSig := &quot;賣④ 放量異常反轉&quot;
+else if sellODR
+    lastSig := &quot;賣⑤ 一日反轉&quot;
+else if shortResume
+    lastSig := &quot;放空② MK 回到下降趨勢欄&quot;
+else if coverDanger
+    lastSig := &quot;回補 跌破後無跟進&quot;
+else if watchBreak
+    lastSig := &quot;觀察 升破未放量·不買&quot;
+
 // ── 繪圖：只有一條線 ──
 lrCol = lrDir == 1 ? color.new(#26a69a, 0) : lrDir == -1 ? color.new(#ef5350, 0) : color.new(#9ca3af, 0)
 plot(lrLine, &quot;Livermore 最低阻力線&quot;, color = lrCol, linewidth = 3, style = plot.style_stepline, display = display.pane + display.data_window + display.price_scale)
@@ -9082,21 +9274,29 @@ plot(mk, &quot;Market Key 欄&quot;, display = display.data_window)
 plot(ph1, &quot;最後樞紐高 (數值)&quot;, display = display.data_window)
 plot(pl1, &quot;最後樞紐低 (數值)&quot;, display = display.data_window)
 
+// 突破記號 (▲▼) — 只標線的定義點；文字說明由 ④ 的決策點標籤負責
 plotshape(showMarks and brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
 plotshape(showMarks and brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
-if showMarks and brkUp
-    [l1, n1] = f_note(bar_index, low, low - atr * 0.9, volOK ? &quot;線向上定義 · 放量 ✓&quot; : &quot;升破樞紐 · 未放量 ⚠&quot;, #26a69a, false)
-if showMarks and brkDn
-    [l2, n2] = f_note(bar_index, high, high + atr * 0.9, volOK ? &quot;線向下定義 · 放量 ✓&quot; : &quot;跌破樞紐 · 未放量 ⚠&quot;, #ef5350, true)
-if showMarks and danger
-    [l3, n3] = f_note(bar_index, brkDir == 1 ? high : low, brkDir == 1 ? high + atr * 0.9 : low - atr * 0.9,
-         &quot;突破後無跟進 · 危險訊號&quot;, #f59e0b, brkDir == 1)
+
+// ④ 買賣決策點：綠 = 買 / 加碼、紅 = 賣 / 放空、橙 = 危險訊號、灰 = 觀察不買；文字即觸發原因
+plotshape(showSig and buyBreak,   &quot;買① 升破樞紐高·放量&quot;,        shape.labelup,   location.belowbar, color.new(#16a34a, 0), text = &quot;買①\n升破樞紐·放量&quot;,     textcolor = color.white, size = size.small)
+plotshape(showSig and buyResume,  &quot;買② MK 回到上升趨勢欄&quot;,      shape.labelup,   location.belowbar, color.new(#16a34a, 20), text = &quot;買②\nMK回升勢欄&quot;,       textcolor = color.white, size = size.small)
+plotshape(showSig and buyRound,   &quot;買③ 首次穿越整數關卡&quot;,       shape.labelup,   location.belowbar, color.new(#0ea5e9, 0), text = &quot;買③\n首穿整數關卡&quot;,       textcolor = color.white, size = size.small)
+plotshape(showSig and buyAdd,     &quot;加碼：首筆有利潤&quot;,           shape.labelup,   location.belowbar, color.new(#65a30d, 0), text = &quot;加碼\n首筆有利潤&quot;,         textcolor = color.white, size = size.tiny)
+plotshape(showSig and watchBreak, &quot;觀察：升破未放量&quot;,           shape.labelup,   location.belowbar, color.new(#9ca3af, 0), text = &quot;觀察\n未放量不買&quot;,         textcolor = color.white, size = size.tiny)
+plotshape(showSig and sellBreak,  &quot;賣①/放空 跌破必守樞紐&quot;,      shape.labeldown, location.abovebar, color.new(#dc2626, 0), text = &quot;賣①\n跌破必守樞紐&quot;,       textcolor = color.white, size = size.small)
+plotshape(showSig and sellDanger, &quot;賣② 突破後無跟進&quot;,           shape.labeldown, location.abovebar, color.new(#f59e0b, 0), text = &quot;賣②\n突破無跟進&quot;,         textcolor = color.white, size = size.small)
+plotshape(showSig and sellRallyFail, &quot;賣③ 次級反彈失敗&quot;,        shape.labeldown, location.abovebar, color.new(#dc2626, 20), text = &quot;賣③\n次級反彈失敗&quot;,     textcolor = color.white, size = size.small)
+plotshape(showSig and sellClimax, &quot;賣④ 放量異常反轉&quot;,           shape.labeldown, location.abovebar, color.new(#b91c1c, 0), text = &quot;賣④\n放量異常反轉&quot;,       textcolor = color.white, size = size.small)
+plotshape(showSig and sellODR,    &quot;賣⑤ 一日反轉&quot;,               shape.labeldown, location.abovebar, color.new(#dc2626, 35), text = &quot;賣⑤\n一日反轉&quot;,           textcolor = color.white, size = size.tiny)
+plotshape(showSig and shortResume,&quot;放空② MK 回到下降趨勢欄&quot;,    shape.labeldown, location.abovebar, color.new(#7f1d1d, 0), text = &quot;放空②\nMK回跌勢欄&quot;,     textcolor = color.white, size = size.small)
+plotshape(showSig and coverDanger,&quot;回補：跌破後無跟進&quot;,         shape.labelup,   location.belowbar, color.new(#f59e0b, 0), text = &quot;回補\n跌破無跟進&quot;,         textcolor = color.white, size = size.small)
 
 // ── 資訊框 ──
-var table tb = table.new(f_boxPos(boxPos), 2, 7, bgcolor = color.new(#ffffff, 5),
+var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 if showBox and barstate.islast
-    rh = boxH / 7
+    rh = boxH / 8
     stTxt = lrDir == 1 ? &quot;上升最低阻力 ✓&quot; : lrDir == -1 ? &quot;下降最低阻力 ✓&quot; : inBox ? &quot;盤整箱 · 不表態&quot; : &quot;未定義&quot;
     stCol = lrDir == 1 ? color.new(#26a69a, 60) : lrDir == -1 ? color.new(#ef5350, 60) : color.new(#9ca3af, 70)
     table.cell(tb, 0, 0, &quot;Livermore 最低阻力線 (中短線)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
@@ -9113,8 +9313,12 @@ if showBox and barstate.islast
     table.cell(tb, 1, 4, str.tostring(ph1, format.mintick) + &quot; / &quot; + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
     table.cell(tb, 0, 5, &quot;本根量比 (突破需 ≥&quot; + str.tostring(volX, &quot;#.#&quot;) + &quot;×)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
     table.cell(tb, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + &quot;×&quot; + (volOK ? &quot; 放量&quot; : &quot;&quot;), width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = volOK ? color.new(#f59e0b, 60) : na)
-    table.cell(tb, 0, 6, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
-    table.cell(tb, 1, 6, &quot;線 = 趨勢必守樞紐，只沿趨勢棘輪&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+    sigCol = str.startswith(lastSig, &quot;買&quot;) or str.startswith(lastSig, &quot;加碼&quot;) or str.startswith(lastSig, &quot;回補&quot;) ? color.new(#16a34a, 60) :
+         str.startswith(lastSig, &quot;賣&quot;) or str.startswith(lastSig, &quot;放空&quot;) ? color.new(#dc2626, 60) : na
+    table.cell(tb, 0, 6, &quot;最近決策點 (原因)&quot; + (inLong ? &quot; · 持多 加碼&quot; + str.tostring(adds) : &quot;&quot;), width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 6, lastSig, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = sigCol)
+    table.cell(tb, 0, 7, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 1, 7, &quot;線 = 趨勢必守樞紐 · 標籤文字 = 觸發原因&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
 
 // ── 警報 ──
 alertcondition(brkUp, &quot;Livermore 線向上定義 (升破樞紐高)&quot;, &quot;{{ticker}} 收盤升破最後樞紐高 — 最低阻力線向上定義，檢查是否放量&quot;)
@@ -9122,6 +9326,18 @@ alertcondition(brkDn, &quot;Livermore 線向下定義 (跌破樞紐低)&quot;, &
 alertcondition(danger, &quot;Livermore 危險訊號 (突破後無跟進)&quot;, &quot;{{ticker}} 突破樞紐點後數根內沒有跟進 — Livermore 危險訊號&quot;)
 alertcondition(mkTrend == 1 and mkTrend[1] != 1,   &quot;Market Key 轉入上升趨勢欄&quot;, &quot;{{ticker}} Market Key 進入上升趨勢欄&quot;)
 alertcondition(mkTrend == -1 and mkTrend[1] != -1, &quot;Market Key 轉入下降趨勢欄&quot;, &quot;{{ticker}} Market Key 進入下降趨勢欄&quot;)
+// ④ 買賣決策點
+alertcondition(buyBreak,   &quot;買① 升破樞紐高·放量&quot;,      &quot;{{ticker}} 買①：收盤升破最後樞紐高且放量 — Livermore 樞紐點突破買入&quot;)
+alertcondition(buyResume,  &quot;買② MK 回到上升趨勢欄&quot;,    &quot;{{ticker}} 買②：自然回檔結束，Market Key 回到上升趨勢欄 — 續勢樞紐點&quot;)
+alertcondition(buyRound,   &quot;買③ 首次穿越整數關卡&quot;,     &quot;{{ticker}} 買③：首次放量穿越整數關卡&quot;)
+alertcondition(buyAdd,     &quot;加碼：首筆有利潤&quot;,         &quot;{{ticker}} 加碼：首筆已有利潤且再漲一個確認門檻 (pyramiding)&quot;)
+alertcondition(sellBreak,  &quot;賣①/放空 跌破必守樞紐&quot;,    &quot;{{ticker}} 賣①：收盤跌破最低阻力線 (趨勢必守樞紐) — 趨勢失效；放量則為放空點&quot;)
+alertcondition(sellDanger, &quot;賣② 突破後無跟進&quot;,         &quot;{{ticker}} 賣②：突破樞紐後數根內無跟進 — Livermore 危險訊號&quot;)
+alertcondition(sellRallyFail, &quot;賣③ 次級反彈失敗&quot;,      &quot;{{ticker}} 賣③：次級反彈不過前高即回落 — 派發警訊&quot;)
+alertcondition(sellClimax, &quot;賣④ 放量異常反轉&quot;,         &quot;{{ticker}} 賣④：創 20 日新高當天放量收黑於區間下緣 — 高潮反轉&quot;)
+alertcondition(sellODR,    &quot;賣⑤ 一日反轉&quot;,             &quot;{{ticker}} 賣⑤：創新高但收低於昨收且量增 — 一日反轉&quot;)
+alertcondition(shortResume,&quot;放空② MK 回到下降趨勢欄&quot;,  &quot;{{ticker}} 放空②：自然反彈結束，Market Key 回到下降趨勢欄&quot;)
+alertcondition(coverDanger,&quot;回補：跌破後無跟進&quot;,       &quot;{{ticker}} 回補：跌破樞紐後數根內無跟進&quot;)
 </pre></details>
 <details class="pinebox"><summary><b>ross_momentum_dashboard.pine</b>
       <button class="copybtn" onclick="copyPine(event,'ross_momentum_dashboard.pine')">複製</button></summary>
