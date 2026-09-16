@@ -1,17 +1,14 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_07:11)
-//  R7-B  下方 pane：MACD 柱狀圖 + 週期時鐘
+//  版本 r6(09:16_09:05)
+//  R6-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
-//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_07.11).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_07.11).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_07.11).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_07.11).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_07.11).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_07.11).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_07.11).pine
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
+//  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
+//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.16_09.05).pine
+//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.16_09.05).pine
+//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.16_09.05).pine
+//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.16_09.05).pine
+//  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
 //  MACD 線與訊號線疊在同一 pane，週期背景與「上一段周期長度」標籤同時顯示，
@@ -19,10 +16,10 @@
 //
 //  ⚠ 時鐘是格子陣列，pane 太矮會被壓扁 —— 請把本 pane 往下拖高（約 300px 以上）
 //     才會呈現正圓；或把「解析度」調小（13–15 格）。
-//  R7：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
+//  R6：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R7-B MACD + Cycle Clock r7(09:16_07:11)", shorttitle = "R7-B MACD Clock",
+indicator("R6-B MACD + Cycle Clock r6(09:16_09:05)", shorttitle = "R6-B MACD Clock",
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -45,7 +42,7 @@ tz     = input.string("America/New_York", "日期時區", group = grpK, display 
 cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK, display = display.none)
 cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK, display = display.none)
 cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK, display = display.none)
-showBg  = input.bool(false, "週期背景著色 (紅/綠；R7 預設關閉)", group = grpK, display = display.none)
+showBg  = input.bool(false, "週期背景著色 (紅/綠；R6 預設關閉)", group = grpK, display = display.none)
 showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK, display = display.none)
 
 grpDv = "M1 ④ 背馳 (頂 / 底)"
@@ -62,13 +59,11 @@ grpBk = "M1 ⑤ MACD 快線 升破前頂 / 跌破前底"
 showBrk = input.bool(true, "顯示 升破前頂 / 跌破前底 訊號", group = grpBk, display = display.none)
 showLvl = input.bool(true, "畫前頂 / 前底 水平虛線 (日線圖)", group = grpBk, display = display.none)
 
-// ── ⑦ 版面（六支 R7 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+// ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
 grpL   = "⑦ 版面 (四個 pane 統一)"
 boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
 boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
 boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL, display = display.none)
-clkWfix = input.float(1.2, "時鐘寬度補正 (% 圖表寬；時鐘比其他框寬就調大、窄就調小)", minval = 0, maxval = 6, step = 0.1, group = grpL, display = display.none)
-clkHfix = input.float(3.0, "時鐘高度補正 (% pane 高；時鐘超出 pane 就調大)", minval = 0, maxval = 20, step = 0.5, group = grpL, display = display.none)
 f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
 // 備註框：淺色底 + 黑字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
 f_note(x, yAnchor, yBox, txt, col, above) =>
@@ -241,8 +236,8 @@ f_atan2(y, x) =>
 // ── M1 時鐘 (table) ──
 // 時鐘尺寸由 ⑦ 版面 的 boxW / boxH 推導：上下各一列文字 (hdrH%)，中間 grid 列平均分配
 hdrH  = 6.0
-cellW = (boxW - clkWfix) / grid            // 扣除格子內距累積的寬度，使時鐘與其他框等寬、左右緣對齊
-cellH = (boxH - 2 * hdrH - clkHfix) / grid
+cellW = boxW / grid
+cellH = (boxH - 2 * hdrH) / grid
 tpos  = f_boxPos(boxPos)
 
 var table clk = table.new(tpos, grid, grid + 2, bgcolor = color.new(color.black, 100),

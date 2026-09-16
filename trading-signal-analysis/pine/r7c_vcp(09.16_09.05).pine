@@ -1,21 +1,24 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r6(09:13_18:17)
-//  R6-C  下方 pane：VCP 指數曲線
+//  版本 r7(09:16_09:05)
+//  R7-C  下方 pane：VCP 指數曲線
 //
-//  R6 套件 —— Pine 一個腳本只能佔一個 pane，故 R4 的單檔拆成四支，各佔一個 pane：
-//     R6-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板        combo_a_main_r6(09.13_18.17).pine
-//     R6-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 (時鐘在最右邊)     combo_b_macd_clock_r6(09.13_18.17).pine
-//     R6-C  下方 pane ②      VCP 指數曲線 0–100 + 等級                combo_c_vcp_r6(09.13_18.17).pine
-//     R6-D  下方 pane ③      確定性指數曲線 0–100 + 7 分項            combo_d_cert_r6(09.13_18.17).pine
-//  四支的計算邏輯與 R4 逐字相同，只改「畫在哪個 pane」與各自的呈現方式。
+//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_09.05).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_09.05).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_09.05).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_09.05).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_09.05).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_09.05).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_09.05).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
 //  背景依 A/B/C/D/E 等級著色，60 / 40 兩條參考線，右側面板列出構成分數的明細。
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R6-C VCP Score r6(09:13_18:17)", shorttitle = "R6-C VCP", overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator("R7-C VCP Score r7(09:16_09:05)", shorttitle = "R7-C VCP", overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = "M3 ① 資料來源"
 m3TF  = input.timeframe("D", "計算時間框 (預設日線)", group = grpV, display = display.none)
@@ -26,9 +29,9 @@ showVcp = input.bool(true, "顯示明細面板 (本 pane 右側)", group = grpW,
 lblHold = input.int(3, "等級備註：新等級需持續幾根才標註 (去雜訊)", minval = 1, maxval = 20, group = grpW, display = display.none)
 lblMax  = input.int(8, "等級備註：最多保留最近幾個", minval = 1, maxval = 40, group = grpW, display = display.none)
 lblGap  = input.float(18, "備註框與曲線距離 (0–100 刻度)", minval = 5, maxval = 40, group = grpW, display = display.none)
-showGBg = input.bool(false, "等級背景著色 (R6 預設關閉)", group = grpW, display = display.none)
+showGBg = input.bool(false, "等級背景著色 (R7 預設關閉)", group = grpW, display = display.none)
 
-// ── ⑦ 版面（四支 R6 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
+// ── ⑦ 版面（六支 R7 腳本請設同一 boxW，四個資訊框即等寬、右緣對齊）──
 grpL   = "⑦ 版面 (四個 pane 統一)"
 boxW   = input.float(18, "資訊框寬度 (% 圖表寬；四支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
 boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
@@ -196,7 +199,8 @@ f_vcp() =>
     tight    = math.abs(c1) <= 7 and rng <= 12
     extended = c1 > 15
     v50 = ta.sma(volume, 50)
-    vr  = v50 > 0 ? ta.sma(volume, 10) / v50 : 1.0
+    v10 = ta.sma(volume, 10)
+    vr  = v50 > 0 ? v10 / v50 : 1.0
     s = 10.0 * (a200 ? 1 : 0) + 10.0 * (a50 ? 1 : 0) + 5.0 * (cross ? 1 : 0) + 5.0 * (aboveLow >= 30 ? 1 : 0)
     s += math.max(0.0, 15.0 * (1 - math.min(offHigh, 25) / 25)) + math.max(0.0, 15.0 * (1 - math.min(math.abs(c1), 15) / 15))
     s += math.min(10.0, math.max(0.0, c6) / 5) + math.min(10.0, math.max(0.0, c1y) / 10)
@@ -222,12 +226,12 @@ f_gradeCol(g) => g == 0 ? #3FB68B : g == 1 ? #5CA3D6 : g == 2 ? #6B7885 : g == 3
 [vcpScore, vcpGrade, offHigh, aboveLow, chg1m, chg3m, rng21, volRatio, trendOK, tightB, extendedB, a50B, a200B, crossB] =
      request.security(syminfo.tickerid, m3TF, f_vcp(), lookahead = barmerge.lookahead_off)
 
-// ── ⑧ 成交量柱（自 R6-A 移入本 pane）：以 volLen 日均量 = 25 標準化，柱高直接就是「量比 × 25」──
+// ── ⑧ 成交量柱（自 R7-A 移入本 pane）：以 volLen 日均量 = 25 標準化，柱高直接就是「量比 × 25」──
 //    50 日均量 = 25 (灰虛線)；10 日均量線 / 25 = VCP 明細裡的「量比 10d/50d」；2 倍均量 = 50；超過 4 倍 (100) 截頂。
 grpVol  = "⑧ 成交量 (本 pane，均量 = 25)"
 showVolC = input.bool(true, "顯示成交量柱", group = grpVol, display = display.none)
 volLen  = input.int(50, "均量期數 (基準 = 25)", minval = 5, group = grpVol, display = display.none)
-bigX    = input.float(2.0, "主力大單門檻 (× 均量；與 R6-A 設同值)", minval = 1.2, step = 0.1, group = grpVol, display = display.none)
+bigX    = input.float(2.0, "主力大單門檻 (× 均量；與 R7-A 設同值)", minval = 1.2, step = 0.1, group = grpVol, display = display.none)
 bigPos  = input.float(0.6, "主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之", minval = 0.5, maxval = 1, step = 0.05, group = grpVol, display = display.none)
 cBuy    = input.color(#2563eb, "主力買入色", group = grpVol, display = display.none)
 cSell   = input.color(#f97316, "主力賣出色", group = grpVol, display = display.none)
@@ -272,7 +276,7 @@ if gradeEvt
     if array.size(gL) > lblMax
         label.delete(array.shift(gL))
         line.delete(array.shift(gN))
-// （R6：不在曲線上加圓點——白點會蓋住曲線，看起來像斷線；虛線直接接到曲線）
+// （R7：不在曲線上加圓點——白點會蓋住曲線，看起來像斷線；虛線直接接到曲線）
 
 // ── 明細面板（本 pane 右側）──
 var table tV = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
