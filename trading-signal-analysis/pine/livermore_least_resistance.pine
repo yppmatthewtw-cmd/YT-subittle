@@ -19,7 +19,7 @@
 //      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
 //      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator("Livermore Least-Resistance r2", shorttitle = "Livermore LR", overlay = true, max_labels_count = 500, max_lines_count = 200)
+indicator("Livermore Least-Resistance r2", shorttitle = "Livermore LR", overlay = true, max_labels_count = 500, max_lines_count = 500)
 
 // ── ① 樞紐點 ──
 grpP = "① 樞紐點 (Pivotal Points) — 中短線"
@@ -236,7 +236,8 @@ showSig  = input.bool(true, "顯示買賣決策點與原因", group = grpS, disp
 showAdd  = input.bool(true, "顯示加碼點 (pyramiding)", group = grpS, display = display.none)
 maxAdds  = input.int(2, "最多加碼次數", minval = 0, maxval = 5, group = grpS, display = display.none)
 climaxX  = input.float(2.0, "高潮反轉：量 ≥ 均量 ×", minval = 1.2, maxval = 5, step = 0.1, group = grpS, display = display.none)
-sigTrans = input.int(82, "決策點底色透明度 (0 = 實色, 100 = 全透明)", minval = 0, maxval = 100, step = 2, group = grpS, display = display.none)
+sigTrans = input.int(88, "決策點底色透明度 (0 = 實色, 100 = 全透明)", minval = 0, maxval = 100, step = 2, group = grpS, display = display.none)
+sigGap   = input.float(1.5, "決策點框與 K 線的距離 (ATR 倍數；框不壓 K 線)", minval = 0.3, maxval = 6, step = 0.1, group = grpS, display = display.none)
 
 // 整數關卡 (依價位分級)
 rn  = close >= 200 ? 100 : close >= 50 ? 50 : close >= 20 ? 10 : 5
@@ -313,14 +314,16 @@ plot(pl1, "最後樞紐低 (數值)", display = display.data_window)
 plotshape(showMarks and brkUp, "升破樞紐高", shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
 plotshape(showMarks and brkDn, "跌破樞紐低", shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
 
-// ④ 買賣決策點：淺色透明底 + 黑色粗體字；文字即觸發原因（用 label 而非 plotshape，故不佔狀態列）
-f_sig(cond, txt, col, above) =>
+// ④ 買賣決策點：框放在 K 線外側 sigGap × ATR 處（不壓 K 線），虛線指回 K 線端點；透明底 + 粗體黑字；文字即觸發原因
+//    below = true → 框在 K 線下方 (買 / 加碼 / 回補)；false → 框在 K 線上方 (賣 / 放空)
+f_sig(cond, txt, col, below) =>
     if cond
-        label.new(bar_index, above ? low : high, txt,
-             yloc = above ? yloc.belowbar : yloc.abovebar,
-             style = above ? label.style_label_up : label.style_label_down,
+        yA = below ? low : high
+        yB = below ? low - atr * sigGap : high + atr * sigGap
+        label.new(bar_index, yB, txt, style = below ? label.style_label_up : label.style_label_down,
              color = color.new(col, sigTrans), textcolor = color.black, size = size.small,
-             text_formatting = text.format_bold, text_font_family = font.family_monospace)
+             text_formatting = text.format_bold)
+        line.new(bar_index, yA, bar_index, yB, color = color.new(col, 25), style = line.style_dotted, width = 1)
 f_sig(showSig and buyBreak,      "買① 升破樞紐·放量",   #16a34a, true)
 f_sig(showSig and buyResume,     "買② MK回升勢欄",      #16a34a, true)
 f_sig(showSig and buyRound,      "買③ 首穿整數關卡",    #0ea5e9, true)

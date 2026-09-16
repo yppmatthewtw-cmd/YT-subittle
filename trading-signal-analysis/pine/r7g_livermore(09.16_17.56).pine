@@ -1,16 +1,17 @@
-//@version=5
+//@version=6
+// R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_17:41)
+//  版本 r7(09:16_17:56)
 //  R7-G  主圖：Livermore 最低阻力線 (Line of Least Resistance)
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.56).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.56).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.56).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.56).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.56).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.56).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.56).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -31,7 +32,7 @@
 //      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
 //      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator("R7-G Livermore Least-Resistance r7(09:16_17:41)", shorttitle = "R7-G Livermore", overlay = true, max_labels_count = 500, max_lines_count = 200)
+indicator("R7-G Livermore Least-Resistance r7(09:16_17:56)", shorttitle = "R7-G Livermore", overlay = true, max_labels_count = 500, max_lines_count = 500)
 
 // ── ① 樞紐點 ──
 grpP = "① 樞紐點 (Pivotal Points) — 中短線"
@@ -248,7 +249,8 @@ showSig  = input.bool(true, "顯示買賣決策點與原因", group = grpS, disp
 showAdd  = input.bool(true, "顯示加碼點 (pyramiding)", group = grpS, display = display.none)
 maxAdds  = input.int(2, "最多加碼次數", minval = 0, maxval = 5, group = grpS, display = display.none)
 climaxX  = input.float(2.0, "高潮反轉：量 ≥ 均量 ×", minval = 1.2, maxval = 5, step = 0.1, group = grpS, display = display.none)
-sigTrans = input.int(82, "決策點底色透明度 (0 = 實色, 100 = 全透明)", minval = 0, maxval = 100, step = 2, group = grpS, display = display.none)
+sigTrans = input.int(88, "決策點底色透明度 (0 = 實色, 100 = 全透明)", minval = 0, maxval = 100, step = 2, group = grpS, display = display.none)
+sigGap   = input.float(1.5, "決策點框與 K 線的距離 (ATR 倍數；框不壓 K 線)", minval = 0.3, maxval = 6, step = 0.1, group = grpS, display = display.none)
 
 // 整數關卡 (依價位分級)
 rn  = close >= 200 ? 100 : close >= 50 ? 50 : close >= 20 ? 10 : 5
@@ -325,14 +327,16 @@ plot(pl1, "最後樞紐低 (數值)", display = display.data_window)
 plotshape(showMarks and brkUp, "升破樞紐高", shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny, display = display.pane)
 plotshape(showMarks and brkDn, "跌破樞紐低", shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny, display = display.pane)
 
-// ④ 買賣決策點：淺色透明底 + 黑色粗體字；文字即觸發原因（用 label 而非 plotshape，故不佔狀態列）
-f_sig(cond, txt, col, above) =>
+// ④ 買賣決策點：框放在 K 線外側 sigGap × ATR 處（不壓 K 線），虛線指回 K 線端點；透明底 + 粗體黑字；文字即觸發原因
+//    below = true → 框在 K 線下方 (買 / 加碼 / 回補)；false → 框在 K 線上方 (賣 / 放空)
+f_sig(cond, txt, col, below) =>
     if cond
-        label.new(bar_index, above ? low : high, txt,
-             yloc = above ? yloc.belowbar : yloc.abovebar,
-             style = above ? label.style_label_up : label.style_label_down,
+        yA = below ? low : high
+        yB = below ? low - atr * sigGap : high + atr * sigGap
+        label.new(bar_index, yB, txt, style = below ? label.style_label_up : label.style_label_down,
              color = color.new(col, sigTrans), textcolor = color.black, size = size.small,
-             text_formatting = text.format_bold, text_font_family = font.family_monospace)
+             text_formatting = text.format_bold)
+        line.new(bar_index, yA, bar_index, yB, color = color.new(col, 25), style = line.style_dotted, width = 1)
 f_sig(showSig and buyBreak,      "買① 升破樞紐·放量",   #16a34a, true)
 f_sig(showSig and buyResume,     "買② MK回升勢欄",      #16a34a, true)
 f_sig(showSig and buyRound,      "買③ 首穿整數關卡",    #0ea5e9, true)

@@ -159,6 +159,8 @@ BOLD = "text_formatting = text.format_bold"
 
 
 def soften_boxes(src):
+    # ⓪ 全套升到 Pine v6：粗體 (text_formatting = text.format_bold) 只有 v6 才有；v5 會報「no argument text_formatting」
+    src = src.replace("//@version=5", "//@version=6\n// R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）", 1)
     # ① plotshape / plotchar 不上狀態列（否則每個訊號都在標題列印一串 0.0000）
     src = add_kw(src, r"(?<![\w.])plotshape\(", "display = display.pane")
     src = add_kw(src, r"(?<![\w.])plotchar\(", "display = display.pane")
