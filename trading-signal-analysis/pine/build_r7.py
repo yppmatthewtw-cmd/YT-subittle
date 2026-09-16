@@ -101,8 +101,8 @@ def convert_e(src):
 
 
 def convert_g(src):
-    src = retitle(src, r"Livermore Least-Resistance r0", "R7-G Livermore Least-Resistance", "R7-G Livermore")
-    src = src.replace("//  Livermore 最低阻力線 (Line of Least Resistance) r0 —— 主圖 overlay",
+    src = retitle(src, r"Livermore Least-Resistance r\d", "R7-G Livermore Least-Resistance", "R7-G Livermore")
+    src = src.replace("//  Livermore 最低阻力線 (Line of Least Resistance) r1 —— 主圖 overlay，中短線版：只畫「一條線」",
                       f"//  版本 r7({TS_TITLE})\n//  R7-G  主圖：Livermore 最低阻力線 (Line of Least Resistance)\n//\n" + HEADER_TABLE + "//")
     return src
 

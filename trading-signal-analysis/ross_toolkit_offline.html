@@ -6411,56 +6411,52 @@ alertcondition(gapGo, &quot;Gap&amp;Go 突破盤前高&quot;,
       <button class="copybtn" onclick="copyPine(event,'livermore_least_resistance.pine')">複製</button></summary>
       <pre id="pine-livermore_least_resistance.pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  Livermore 最低阻力線 (Line of Least Resistance) r0 —— 主圖 overlay
+//  Livermore 最低阻力線 (Line of Least Resistance) r1 —— 主圖 overlay，中短線版：只畫「一條線」
 //
-//  Livermore 的最低阻力線不是任何平滑曲線，而是「市場自己在樞紐點上證明出來的方向」：
+//  Livermore 的最低阻力線不是平滑曲線，而是「市場在樞紐點上自己證明的方向」：
 //    &quot;Prices ... move along the line of least resistance ... wait for the moment when that line defines itself.&quot;
-//  本腳本把他 1940 年《How to Trade in Stocks》的做法機械化，並用實測 (2025-09~2026-09 美股日線) 選出的設定：
-//    ① 樞紐點 (Pivotal Points)：左 5 / 右 3 確認的轉折高低點；一頂高於一頂 + 一底高於一底 = 上升結構，反之下降結構。
-//       收盤越過最後一個確認樞紐高 / 低 = 「線定義了自己」，直接翻轉結構（實測：沒有這條突破規則，純結構線的命中率只有 64 分）。
-//    ② Market Key 六欄 (上升趨勢 / 自然反彈 / 次級反彈 / 下降趨勢 / 自然回檔 / 次級回檔)：
-//       反轉門檻 3%（原著 $30 以上股票約 6 點）、確認門檻 1.5%（原著約 3 點）；實測 3%/1.5% 讀「趨勢欄」是 Livermore 原生方法中最佳。
-//    ③ 兩道濾網：突破要放量 (≥1.5× 均量)；突破後 N 根內沒有跟進 = &quot;a danger signal that must be heeded&quot;。
-//    ④ 參考雙線（實測結論）：EMA21 抓轉折最快 (反轉命中 82–93%)、SMA50 / Supertrend 判「趨勢仍在、回檔不出場」假訊號最少。
-//  畫出的「最低阻力線」= 目前趨勢必守的樞紐價位：上升結構畫最後樞紐低（跌破即失效），下降結構畫最後樞紐高。
+//  這條線 = 目前趨勢「必守的樞紐價位」（他 Market Key 帳上的紅線 / 黑線）：
+//    上升趨勢 → 最近一個回檔低點（跌破即趨勢失效）；下降趨勢 → 最近一個反彈高點。
+//  r1 中短線化（不改邏輯，只縮短「線與 K 線的距離」）：
+//    ① 樞紐點改用 左 3 / 右 2 確認（原 5/3），抓的是中短線的擺動而不是大波段；
+//    ② 線取「最近確認樞紐低」與「Market Key 最近自然回檔低」兩者中較貼近價格者，並且只會向趨勢方向棘輪
+//       （上升趨勢中只升不降，這正是 Livermore 隨趨勢上移停損的做法）；
+//    ③ Market Key 反轉 / 確認門檻 3%/1.5% → 2%/1%（原著 6/3 點是給 $30 以上大波段用的）；
+//    ④ 盤整箱視窗 20 → 10 根。
+//  仍保留：收盤越過樞紐 = 線定義自己（立即翻轉）、突破放量、突破後跟進（否則危險訊號）。
+//  不再畫 EMA21 / SMA50 / AVWAP / 樞紐高低參考線；圖上只有這一條線 + 突破記號。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;Livermore Least-Resistance r0&quot;, shorttitle = &quot;Livermore LR&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;Livermore Least-Resistance r1&quot;, shorttitle = &quot;Livermore LR&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
 
 // ── ① 樞紐點 ──
-grpP = &quot;① 樞紐點 (Pivotal Points)&quot;
-lbL    = input.int(5, &quot;轉折左側確認根數&quot;, minval = 1, maxval = 20, group = grpP, display = display.none)
-lbR    = input.int(3, &quot;轉折右側確認根數 (Livermore 接受滯後 3–5 根)&quot;, minval = 1, maxval = 10, group = grpP, display = display.none)
+grpP = &quot;① 樞紐點 (Pivotal Points) — 中短線&quot;
+lbL    = input.int(3, &quot;轉折左側確認根數&quot;, minval = 1, maxval = 20, group = grpP, display = display.none)
+lbR    = input.int(2, &quot;轉折右側確認根數&quot;, minval = 1, maxval = 10, group = grpP, display = display.none)
 brkPct = input.float(0.0, &quot;突破樞紐點需超過 % (0 = 收盤越過即算)&quot;, minval = 0, maxval = 5, step = 0.25, group = grpP, display = display.none)
+boxLen = input.int(10, &quot;盤整箱視窗 (根)&quot;, minval = 5, maxval = 60, group = grpP, display = display.none)
+rangeMult = input.float(2.5, &quot;盤整箱：視窗高低差 &lt; ATR × 此值 → 不表態&quot;, minval = 1, maxval = 8, step = 0.5, group = grpP, display = display.none)
 
 // ── ② Market Key ──
-grpM = &quot;② Market Key 六欄 (Livermore 1940)&quot;
+grpM = &quot;② Market Key 六欄 (Livermore 1940) — 中短線門檻&quot;
 mkMode    = input.string(&quot;百分比&quot;, &quot;門檻單位&quot;, options = [&quot;百分比&quot;, &quot;ATR 倍數&quot;], group = grpM, display = display.none)
-mkRev     = input.float(3.0, &quot;反轉門檻 %：承認 自然反彈 / 回檔 (原著約 6 點)&quot;, minval = 0.5, maxval = 15, step = 0.5, group = grpM, display = display.none)
-mkConf    = input.float(1.5, &quot;確認門檻 %：越過樞紐價位 (原著約 3 點)&quot;, minval = 0.25, maxval = 10, step = 0.25, group = grpM, display = display.none)
-mkRevAtr  = input.float(2.0, &quot;反轉門檻 (ATR 倍數)&quot;, minval = 0.5, maxval = 6, step = 0.25, group = grpM, display = display.none)
-mkConfAtr = input.float(1.0, &quot;確認門檻 (ATR 倍數)&quot;, minval = 0.25, maxval = 4, step = 0.25, group = grpM, display = display.none)
-atrLen    = input.int(20, &quot;ATR 長度&quot;, minval = 5, group = grpM, display = display.none)
+mkRev     = input.float(2.0, &quot;反轉門檻 %：承認 自然反彈 / 回檔&quot;, minval = 0.5, maxval = 15, step = 0.5, group = grpM, display = display.none)
+mkConf    = input.float(1.0, &quot;確認門檻 %：越過樞紐價位&quot;, minval = 0.25, maxval = 10, step = 0.25, group = grpM, display = display.none)
+mkRevAtr  = input.float(1.5, &quot;反轉門檻 (ATR 倍數)&quot;, minval = 0.5, maxval = 6, step = 0.25, group = grpM, display = display.none)
+mkConfAtr = input.float(0.75, &quot;確認門檻 (ATR 倍數)&quot;, minval = 0.25, maxval = 4, step = 0.25, group = grpM, display = display.none)
+atrLen    = input.int(14, &quot;ATR 長度&quot;, minval = 5, group = grpM, display = display.none)
 
 // ── ③ 成交量與跟進 ──
-grpV = &quot;③ 成交量確認與跟進 (Livermore 的兩道濾網)&quot;
+grpV = &quot;③ 成交量確認與跟進&quot;
 volLen     = input.int(50, &quot;均量期數&quot;, minval = 5, group = grpV, display = display.none)
 volX       = input.float(1.5, &quot;突破放量門檻 (× 均量)&quot;, minval = 1, maxval = 5, step = 0.1, group = grpV, display = display.none)
 followBars = input.int(3, &quot;突破後幾根內必須跟進，否則危險訊號&quot;, minval = 1, maxval = 10, group = grpV, display = display.none)
-
-// ── ④ 參考均線 ──
-grpR = &quot;④ 參考均線 (實測：EMA21 抓轉折、SMA50 判趨勢仍在)&quot;
-showFast = input.bool(true, &quot;顯示 EMA21&quot;, group = grpR, display = display.none)
-showSlow = input.bool(true, &quot;顯示 SMA50&quot;, group = grpR, display = display.none)
-showRng  = input.bool(true, &quot;顯示最後樞紐高 / 低 (get-nowhere 區間邊緣)&quot;, group = grpR, display = display.none)
-showAvw  = input.bool(true, &quot;顯示事件錨定 AVWAP (自最近一次結構反轉起算的平均成本)&quot;, group = grpR, display = display.none)
-rangeMult = input.float(3.0, &quot;盤整箱：20 日高低差 &lt; ATR × 此值 → 視為 get-nowhere (不表態)&quot;, minval = 1, maxval = 8, step = 0.5, group = grpR, display = display.none)
-showBg   = input.bool(false, &quot;狀態背景著色 (預設關閉)&quot;, group = grpR, display = display.none)
+showMarks  = input.bool(true, &quot;顯示突破 ▲▼ 與備註框&quot;, group = grpV, display = display.none)
 
 // ── ⑦ 版面 ──
 grpL   = &quot;⑦ 版面&quot;
 showBox = input.bool(true, &quot;顯示資訊框&quot;, group = grpL, display = display.none)
 boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
-boxH   = input.float(40, &quot;資訊框高度 (% pane 高)&quot;, minval = 20, maxval = 100, step = 5, group = grpL, display = display.none)
+boxH   = input.float(35, &quot;資訊框高度 (% pane 高)&quot;, minval = 20, maxval = 100, step = 5, group = grpL, display = display.none)
 boxPos = input.string(&quot;右下&quot;, &quot;位置&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;, &quot;左上&quot;, &quot;左中&quot;, &quot;左下&quot;], group = grpL, display = display.none)
 f_boxPos(s) =&gt; s == &quot;左上&quot; ? position.top_left : s == &quot;左中&quot; ? position.middle_left : s == &quot;左下&quot; ? position.bottom_left :
      s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
@@ -6473,9 +6469,8 @@ f_note(x, yAnchor, yBox, txt, col, above) =&gt;
 // ── 基礎序列 ──
 atr   = ta.atr(atrLen)
 vAvg  = ta.sma(volume, volLen)
-ema21 = ta.ema(close, 21)
-sma50 = ta.sma(close, 50)
 volOK = volume &gt;= vAvg * volX
+volRatio = vAvg &gt; 0 ? volume / vAvg : na
 
 // ── ① 樞紐點：最後兩個已確認的轉折高 / 低 ──
 ph = ta.pivothigh(high, lbL, lbR)
@@ -6511,12 +6506,12 @@ if brkDn
 // ── ② Market Key 六欄狀態機（只用收盤）──
 //    mk：1 上升趨勢 UT、2 自然反彈、3 次級反彈、-1 下降趨勢 DT、-2 自然回檔、-3 次級回檔
 var int   mk       = 0
-var int   mkTrend  = 0          // 最後進入的趨勢欄 (UT = 1 / DT = -1) = Livermore 的黑線 / 紅線
-var float colExt   = na         // 目前欄位的極值
-var float lastUT   = na         // 各欄最後記錄的樞紐價位
+var int   mkTrend  = 0
+var float colExt   = na
+var float lastUT   = na
 var float lastDT   = na
-var float lastNR   = na
-var float lastNRe  = na
+var float lastNR   = na          // 最近自然反彈高
+var float lastNRe  = na          // 最近自然回檔低
 c = close
 revAmt  = mkMode == &quot;百分比&quot; ? nz(colExt, c) * mkRev / 100 : atr * mkRevAtr
 confAmt = mkMode == &quot;百分比&quot; ? c * mkConf / 100 : atr * mkConfAtr
@@ -6524,21 +6519,21 @@ if na(colExt)
     colExt := c
     mk := 1
     mkTrend := 1
-else if mk == 1                                  // 上升趨勢欄
+else if mk == 1
     if c &gt; colExt
         colExt := c
     else if c &lt;= colExt - revAmt
         lastUT := colExt
         mk := -2
         colExt := c
-else if mk == -1                                 // 下降趨勢欄
+else if mk == -1
     if c &lt; colExt
         colExt := c
     else if c &gt;= colExt + revAmt
         lastDT := colExt
         mk := 2
         colExt := c
-else if mk == -2                                 // 自然回檔
+else if mk == -2
     if c &lt; colExt
         colExt := c
         if (not na(lastDT) and c &lt; lastDT) or (not na(lastNRe) and c &lt; lastNRe - confAmt)
@@ -6554,7 +6549,7 @@ else if mk == -2                                 // 自然回檔
             mk := 3
         else
             mk := 2
-else if mk == 2                                  // 自然反彈
+else if mk == 2
     if c &gt; colExt
         colExt := c
         if (not na(lastUT) and c &gt; lastUT) or (not na(lastNR) and c &gt; lastNR + confAmt)
@@ -6570,7 +6565,7 @@ else if mk == 2                                  // 自然反彈
             mk := -3
         else
             mk := -2
-else if mk == 3                                  // 次級反彈
+else if mk == 3
     if c &gt; colExt
         colExt := c
         if not na(lastUT) and c &gt; lastUT
@@ -6581,7 +6576,7 @@ else if mk == 3                                  // 次級反彈
     else if c &lt;= colExt - revAmt
         colExt := c
         mk := not na(lastNRe) and c &lt; lastNRe ? -2 : -3
-else if mk == -3                                 // 次級回檔
+else if mk == -3
     if c &lt; colExt
         colExt := c
         if not na(lastDT) and c &lt; lastDT
@@ -6594,27 +6589,26 @@ else if mk == -3                                 // 次級回檔
         mk := not na(lastNR) and c &gt; lastNR ? 2 : 3
 f_mkTxt(m) =&gt; m == 1 ? &quot;上升趨勢 UT&quot; : m == 2 ? &quot;自然反彈&quot; : m == 3 ? &quot;次級反彈&quot; : m == -1 ? &quot;下降趨勢 DT&quot; : m == -2 ? &quot;自然回檔&quot; : &quot;次級回檔&quot;
 
-// ── 盤整箱 (get-nowhere prices)：20 日高低差太窄且尚未突破 → 不表態 ──
-dcHi = ta.highest(high, 20)
-dcLo = ta.lowest(low, 20)
-inBox = (dcHi - dcLo) &lt; atr * rangeMult and not brkUp and not brkDn
+// ── 盤整箱 (get-nowhere prices) ──
+inBox = (ta.highest(high, boxLen) - ta.lowest(low, boxLen)) &lt; atr * rangeMult and not brkUp and not brkDn
 
-// ── 事件錨定 AVWAP：自最近一次結構反轉 (structDir 改變) 起算的成交量加權平均成本 ──
-//    對應「越過關鍵點後，多方 / 空方誰被套」；取代滾動視窗的價格重心
-var float aPV = 0.0
-var float aV  = 0.0
-if structDir != structDir[1]
-    aPV := 0.0
-    aV  := 0.0
-aPV += hlc3 * nz(volume, 0)
-aV  += nz(volume, 0)
-avwap = aV &gt; 0 ? aPV / aV : na
-
-// ── 綜合：最低阻力方向 = 結構 (含突破) 與 Market Key 趨勢欄一致、且不在盤整箱內才算定義；否則「未定義 (get-nowhere)」──
+// ── 這一條線：趨勢必守的樞紐價位，取較貼近價格者，並沿趨勢方向棘輪 ──
+//    上升：max(最近確認樞紐低, Market Key 最近自然回檔低)，兩者都必須在價格之下；只升不降
+//    下降：min(最近確認樞紐高, Market Key 最近自然反彈高)，兩者都必須在價格之上；只降不升
+//    趨勢翻轉時重新定位到新趨勢的第一個樞紐
+var float lrLine = na
+upC1 = not na(pl1) and pl1 &lt; close ? pl1 : na
+upC2 = not na(lastNRe) and lastNRe &lt; close ? lastNRe : na
+upCand = na(upC1) ? upC2 : na(upC2) ? upC1 : math.max(upC1, upC2)
+dnC1 = not na(ph1) and ph1 &gt; close ? ph1 : na
+dnC2 = not na(lastNR) and lastNR &gt; close ? lastNR : na
+dnCand = na(dnC1) ? dnC2 : na(dnC2) ? dnC1 : math.min(dnC1, dnC2)
+if structDir == 1
+    lrLine := structDir[1] != 1 or na(lrLine) ? upCand : na(upCand) ? lrLine : math.max(lrLine, upCand)
+else if structDir == -1
+    lrLine := structDir[1] != -1 or na(lrLine) ? dnCand : na(dnCand) ? lrLine : math.min(lrLine, dnCand)
 lrDir  = inBox ? 0 : structDir == 1 and mkTrend == 1 ? 1 : structDir == -1 and mkTrend == -1 ? -1 : 0
-lrLine = structDir == 1 ? pl1 : structDir == -1 ? ph1 : na        // 必守的樞紐價位
 lrDist = not na(lrLine) ? (close - lrLine) / close * 100 : na
-sma50Up = sma50 &gt; sma50[5]
 
 // ── ③ 突破放量與跟進（危險訊號）──
 var int   brkBar   = na
@@ -6628,63 +6622,52 @@ if brkUp or brkDn
     brkHigh  := high
     brkLow   := low
     brkDir   := brkUp ? 1 : -1
-// 跟進 = 突破後 followBars 根內至少創出突破根之上的新高 (向下反之)，且收盤沒有退回突破價
 hiF = ta.highest(high, followBars)
 loF = ta.lowest(low, followBars)
 danger = not na(brkBar) and bar_index == brkBar + followBars and
      ((brkDir == 1 and (close &lt;= brkClose or hiF &lt;= brkHigh)) or (brkDir == -1 and (close &gt;= brkClose or loF &gt;= brkLow)))
-volRatio = vAvg &gt; 0 ? volume / vAvg : na
 
-// ── 繪圖 ──
+// ── 繪圖：只有一條線 ──
 lrCol = lrDir == 1 ? color.new(#26a69a, 0) : lrDir == -1 ? color.new(#ef5350, 0) : color.new(#9ca3af, 0)
-plot(lrLine, &quot;最低阻力線 (趨勢必守樞紐)&quot;, color = lrCol, linewidth = 3, style = plot.style_stepline, display = display.pane + display.data_window + display.price_scale)
-plot(showRng ? ph1 : na, &quot;最後樞紐高&quot;, color = color.new(#ef5350, 65), linewidth = 1, style = plot.style_stepline, display = display.pane + display.data_window)
-plot(showRng ? pl1 : na, &quot;最後樞紐低&quot;, color = color.new(#26a69a, 65), linewidth = 1, style = plot.style_stepline, display = display.pane + display.data_window)
-plot(showFast ? ema21 : na, &quot;EMA21 (轉折參考)&quot;, color = color.new(#f59e0b, 30), linewidth = 1, display = display.pane + display.data_window)
-plot(showSlow ? sma50 : na, &quot;SMA50 (趨勢仍在參考)&quot;, color = color.new(#6b7280, 30), linewidth = 2, display = display.pane + display.data_window)
-plot(showAvw ? avwap : na, &quot;錨定 AVWAP (自最近反轉)&quot;, color = color.new(#8b5cf6, 20), linewidth = 2, style = plot.style_linebr, display = display.pane + display.data_window)
+plot(lrLine, &quot;Livermore 最低阻力線&quot;, color = lrCol, linewidth = 3, style = plot.style_stepline, display = display.pane + display.data_window + display.price_scale)
 plot(structDir, &quot;結構方向 (1/0/-1)&quot;, display = display.data_window)
-plot(mk, &quot;Market Key 欄 (1 UT 2 自然反彈 3 次級反彈 -1 DT -2 自然回檔 -3 次級回檔)&quot;, display = display.data_window)
-bgcolor(showBg ? (lrDir == 1 ? color.new(#26a69a, 92) : lrDir == -1 ? color.new(#ef5350, 92) : na) : na, title = &quot;最低阻力方向背景&quot;)
+plot(mk, &quot;Market Key 欄&quot;, display = display.data_window)
+plot(ph1, &quot;最後樞紐高 (數值)&quot;, display = display.data_window)
+plot(pl1, &quot;最後樞紐低 (數值)&quot;, display = display.data_window)
 
-plotshape(brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.small)
-plotshape(brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.small)
-plotshape(mkTrend == 1 and mkTrend[1] != 1,   &quot;Market Key 轉入上升趨勢欄&quot;, shape.circle, location.belowbar, color.new(#26a69a, 0), size = size.tiny)
-plotshape(mkTrend == -1 and mkTrend[1] != -1, &quot;Market Key 轉入下降趨勢欄&quot;, shape.circle, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
-if brkUp
+plotshape(showMarks and brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
+plotshape(showMarks and brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
+if showMarks and brkUp
     [l1, n1] = f_note(bar_index, low, low - atr * 0.9, volOK ? &quot;線向上定義 · 放量 ✓&quot; : &quot;升破樞紐 · 未放量 ⚠&quot;, #26a69a, false)
-if brkDn
+if showMarks and brkDn
     [l2, n2] = f_note(bar_index, high, high + atr * 0.9, volOK ? &quot;線向下定義 · 放量 ✓&quot; : &quot;跌破樞紐 · 未放量 ⚠&quot;, #ef5350, true)
-if danger
+if showMarks and danger
     [l3, n3] = f_note(bar_index, brkDir == 1 ? high : low, brkDir == 1 ? high + atr * 0.9 : low - atr * 0.9,
          &quot;突破後無跟進 · 危險訊號&quot;, #f59e0b, brkDir == 1)
 
 // ── 資訊框 ──
-var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),
+var table tb = table.new(f_boxPos(boxPos), 2, 7, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 if showBox and barstate.islast
-    rh = boxH / 8
-    stTxt = lrDir == 1 ? &quot;上升最低阻力 ✓&quot; : lrDir == -1 ? &quot;下降最低阻力 ✓&quot; : inBox ? &quot;盤整箱 · 不表態&quot; : &quot;未定義 (結構與 Market Key 不一致)&quot;
+    rh = boxH / 7
+    stTxt = lrDir == 1 ? &quot;上升最低阻力 ✓&quot; : lrDir == -1 ? &quot;下降最低阻力 ✓&quot; : inBox ? &quot;盤整箱 · 不表態&quot; : &quot;未定義&quot;
     stCol = lrDir == 1 ? color.new(#26a69a, 60) : lrDir == -1 ? color.new(#ef5350, 60) : color.new(#9ca3af, 70)
-    table.cell(tb, 0, 0, &quot;Livermore 最低阻力線&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
+    table.cell(tb, 0, 0, &quot;Livermore 最低阻力線 (中短線)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
     table.cell(tb, 1, 0, stTxt, width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 0, 1, &quot;結構 (樞紐 &quot; + str.tostring(lbL) + &quot;/&quot; + str.tostring(lbR) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 1, structDir == 1 ? &quot;HH+HL 上升&quot; : structDir == -1 ? &quot;LH+LL 下降&quot; : &quot;混合&quot;, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = stCol)
-    table.cell(tb, 0, 2, &quot;Market Key 欄 / 趨勢欄&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 2, f_mkTxt(mk) + &quot; / &quot; + (mkTrend == 1 ? &quot;UT&quot; : &quot;DT&quot;), width = boxW * 0.45, height = rh, text_size = size.small,
+    table.cell(tb, 0, 1, &quot;線位 · 價格距線&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 1, na(lrLine) ? &quot;—&quot; : str.tostring(lrLine, format.mintick) + &quot; (&quot; + str.tostring(lrDist, &quot;+#.#&quot;) + &quot;%)&quot;, width = boxW * 0.45, height = rh, text_size = size.small,
+         text_color = lrDir == 1 ? #26a69a : lrDir == -1 ? #ef5350 : color.gray, bgcolor = stCol)
+    table.cell(tb, 0, 2, &quot;結構 (樞紐 &quot; + str.tostring(lbL) + &quot;/&quot; + str.tostring(lbR) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 2, structDir == 1 ? &quot;HH+HL 上升&quot; : structDir == -1 ? &quot;LH+LL 下降&quot; : &quot;混合&quot;, width = boxW * 0.45, height = rh, text_size = size.small)
+    table.cell(tb, 0, 3, &quot;Market Key 欄 / 趨勢欄&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 3, f_mkTxt(mk) + &quot; / &quot; + (mkTrend == 1 ? &quot;UT&quot; : &quot;DT&quot;), width = boxW * 0.45, height = rh, text_size = size.small,
          text_color = mkTrend == 1 ? #26a69a : #ef5350)
-    table.cell(tb, 0, 3, &quot;最後樞紐 高 / 低&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 3, str.tostring(ph1, format.mintick) + &quot; / &quot; + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 4, &quot;必守樞紐 · 距離&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 4, na(lrLine) ? &quot;—&quot; : str.tostring(lrLine, format.mintick) + &quot; (&quot; + str.tostring(lrDist, &quot;+#.#&quot;) + &quot;%)&quot;, width = boxW * 0.45, height = rh, text_size = size.small,
-         text_color = lrDir == 1 ? #26a69a : lrDir == -1 ? #ef5350 : color.gray)
+    table.cell(tb, 0, 4, &quot;最後樞紐 高 / 低&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 4, str.tostring(ph1, format.mintick) + &quot; / &quot; + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
     table.cell(tb, 0, 5, &quot;本根量比 (突破需 ≥&quot; + str.tostring(volX, &quot;#.#&quot;) + &quot;×)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
     table.cell(tb, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + &quot;×&quot; + (volOK ? &quot; 放量&quot; : &quot;&quot;), width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = volOK ? color.new(#f59e0b, 60) : na)
-    table.cell(tb, 0, 6, &quot;EMA21 / SMA50(升降) / 錨定AVWAP&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 6, (close &gt; ema21 ? &quot;上&quot; : &quot;下&quot;) + &quot; / &quot; + (close &gt; sma50 ? &quot;上&quot; : &quot;下&quot;) + (sma50Up ? &quot;↑&quot; : &quot;↓&quot;) + &quot; / &quot; + (na(avwap) ? &quot;—&quot; : close &gt; avwap ? &quot;上&quot; : &quot;下&quot;),
-         width = boxW * 0.45, height = rh, text_size = size.small, text_color = close &gt; sma50 ? #26a69a : #ef5350)
-    table.cell(tb, 0, 7, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
-    table.cell(tb, 1, 7, &quot;▲▼ 樞紐突破 ● Market Key 趨勢欄&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 6, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 1, 6, &quot;線 = 趨勢必守樞紐，只沿趨勢棘輪&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
 
 // ── 警報 ──
 alertcondition(brkUp, &quot;Livermore 線向上定義 (升破樞紐高)&quot;, &quot;{{ticker}} 收盤升破最後樞紐高 — 最低阻力線向上定義，檢查是否放量&quot;)
@@ -7034,21 +7017,21 @@ alertcondition(flipEvt and not up, &quot;日線轉入下跌周期&quot;, &quot;{
 alertcondition(lateEvt and up,     &quot;日線上昇周期進入尾段&quot;, &quot;{{ticker}} 日線上昇周期已走 &gt;75%，留意轉折 (接近 3 點鐘)&quot;)
 alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &quot;{{ticker}} 日線下跌周期已走 &gt;75%，留意反轉 (接近 9 點鐘)&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7a_main(09.16_09.05).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.16_09.05).pine')">複製</button></summary>
-      <pre id="pine-r7a_main(09.16_09.05).pine">//@version=5
+<details class="pinebox"><summary><b>r7a_main(09.16_13.27).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.16_13.27).pine')">複製</button></summary>
+      <pre id="pine-r7a_main(09.16_13.27).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_09:05)
+//  版本 r7(09:16_13:27)
 //  R7-A  主圖：EMA9 Band Width Strategy
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_09.05).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_09.05).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_09.05).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_09.05).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_09.05).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_09.05).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_09.05).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 2（EMA9 中線 ± 帶寬、擠壓突破 / 回踩進場、風控出場）。
@@ -7056,7 +7039,7 @@ alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &
 //  但它們的圖形改由 R7-B / R7-C / R7-D 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
 // ═══════════════════════════════════════════════════════════════════════════
 
-strategy(&quot;R7-A EMA9 BW (main) r7(09:16_09:05)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
+strategy(&quot;R7-A EMA9 BW (main) r7(09:16_13:27)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
      overlay = true, initial_capital = 10000,
      default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
      commission_type = strategy.commission.percent, commission_value = 0.05,
@@ -7563,21 +7546,21 @@ alertcondition(squeeze and not squeeze[1], &quot;M2 EMA9-BW 擠壓開始&quot;, 
 alertcondition(bigBuy,  &quot;⑧ 主力大單買入日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間上緣 — 主力大單買入&quot;)
 alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間下緣 — 主力大單賣出&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7b_macd_clock(09.16_09.05).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.16_09.05).pine')">複製</button></summary>
-      <pre id="pine-r7b_macd_clock(09.16_09.05).pine">//@version=5
+<details class="pinebox"><summary><b>r7b_macd_clock(09.16_13.27).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.16_13.27).pine')">複製</button></summary>
+      <pre id="pine-r7b_macd_clock(09.16_13.27).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_09:05)
+//  版本 r7(09:16_13:27)
 //  R7-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_09.05).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_09.05).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_09.05).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_09.05).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_09.05).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_09.05).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_09.05).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -7589,7 +7572,7 @@ alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 
 //  R7：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-B MACD + Cycle Clock r7(09:16_09:05)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
+indicator(&quot;R7-B MACD + Cycle Clock r7(09:16_13:27)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -7903,21 +7886,21 @@ alertcondition(bearDiv, &quot;M1 頂背馳&quot;, &quot;{{ticker}} 日線 MACD �
 alertcondition(brkUpEvt, &quot;M1 MACD 升破前頂&quot;, &quot;{{ticker}} 日線 MACD 快線升破前一個轉折高點 — 動能創新高&quot;)
 alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日線 MACD 快線跌破前一個轉折低點 — 動能創新低&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7c_vcp(09.16_09.05).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.16_09.05).pine')">複製</button></summary>
-      <pre id="pine-r7c_vcp(09.16_09.05).pine">//@version=5
+<details class="pinebox"><summary><b>r7c_vcp(09.16_13.27).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.16_13.27).pine')">複製</button></summary>
+      <pre id="pine-r7c_vcp(09.16_13.27).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_09:05)
+//  版本 r7(09:16_13:27)
 //  R7-C  下方 pane：VCP 指數曲線
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_09.05).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_09.05).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_09.05).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_09.05).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_09.05).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_09.05).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_09.05).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
@@ -7925,7 +7908,7 @@ alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日�
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-C VCP Score r7(09:16_09:05)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-C VCP Score r7(09:16_13:27)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8227,21 +8210,21 @@ if showVcp and barstate.islast
 alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, &quot;VCP 轉 A 級 (待突破)&quot;, &quot;{{ticker}} VCP 等級轉為 A · VCP 待突破&quot;)
 alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&quot;, &quot;{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7d_cert(09.16_09.05).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.16_09.05).pine')">複製</button></summary>
-      <pre id="pine-r7d_cert(09.16_09.05).pine">//@version=5
+<details class="pinebox"><summary><b>r7d_cert(09.16_13.27).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.16_13.27).pine')">複製</button></summary>
+      <pre id="pine-r7d_cert(09.16_13.27).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_09:05)
+//  版本 r7(09:16_13:27)
 //  R7-D  下方 pane：確定性指數曲線
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_09.05).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_09.05).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_09.05).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_09.05).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_09.05).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_09.05).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_09.05).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-A。把 7 項加權後的 0–100 確定性總分畫成一條曲線，
@@ -8250,7 +8233,7 @@ alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo build_r17_data.py）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-D Certainty 7 r7(09:16_09:05)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-D Certainty 7 r7(09:16_13:27)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8524,21 +8507,21 @@ if showCert and barstate.islast
 alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;確定性達門檻&quot;,
      &quot;{{ticker}} 確定性總分升至門檻以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7e_gravity(09.16_09.05).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.16_09.05).pine')">複製</button></summary>
-      <pre id="pine-r7e_gravity(09.16_09.05).pine">//@version=5
+<details class="pinebox"><summary><b>r7e_gravity(09.16_13.27).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.16_13.27).pine')">複製</button></summary>
+      <pre id="pine-r7e_gravity(09.16_13.27).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_09:05)
+//  版本 r7(09:16_13:27)
 //  R7-E  主圖：價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_09.05).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_09.05).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_09.05).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_09.05).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_09.05).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_09.05).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_09.05).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8551,7 +8534,7 @@ alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;
 //  訊號：重心上移 + 價在重心上 = 上升最低阻力；重心下移 + 價在重心下 = 下跌最低阻力；
 //        重心走平且穩定 = 定錨 (主力未走)；價格跌破重心後 M 根內收回 = 假跌破 (用股價打掩護)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-E Price Gravity r7(09:16_09:05)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-E Price Gravity r7(09:16_13:27)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
 
 // ── ① 重心定義 ──
 grpG = &quot;① 重心定義&quot;
@@ -8689,21 +8672,21 @@ alertcondition(anchor and not anchor[1], &quot;重心定錨&quot;, &quot;{{ticke
 alertcondition(fakeBD, &quot;假跌破收回重心&quot;, &quot;{{ticker}} 跌破價格重心後數根內收回 — 洗盤嫌疑&quot;)
 alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突破價格重心後數根內跌回 — 誘多嫌疑&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7f_force(09.16_09.05).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.16_09.05).pine')">複製</button></summary>
-      <pre id="pine-r7f_force(09.16_09.05).pine">//@version=5
+<details class="pinebox"><summary><b>r7f_force(09.16_13.27).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.16_13.27).pine')">複製</button></summary>
+      <pre id="pine-r7f_force(09.16_13.27).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_09:05)
+//  版本 r7(09:16_13:27)
 //  R7-F  下方 pane：買賣力度 (Buy / Sell Force) —— 推論重建猫姐「買賣力道」
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_09.05).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_09.05).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_09.05).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_09.05).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_09.05).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_09.05).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_09.05).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8717,7 +8700,7 @@ alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突�
 //  無結構低點 = 價格創 N 根新低，累積力度同步新低 (無承接、賣壓出清)
 //  主力防守位 = 同一價位 (± ATR × 容差) 被多次觸及且觸及時力度為正 → 計數
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-F Buy/Sell Force r7(09:16_09:05)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;R7-F Buy/Sell Force r7(09:16_13:27)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
 
 // ── ① 資料 ──
 grpD = &quot;① 資料&quot;
@@ -8859,72 +8842,68 @@ alertcondition(noStructLow, &quot;無結構低點 (無承接)&quot;, &quot;{{tic
 alertcondition(structHigh,  &quot;結構高點 (派發)&quot;,    &quot;{{ticker}} 價格新高但買賣力度未新高 — 派發嫌疑&quot;)
 alertcondition(defCnt &gt;= 3 and defCnt[1] &lt; 3, &quot;主力防守位 3 次&quot;, &quot;{{ticker}} 同一低位被防守 3 次以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7g_livermore(09.16_09.05).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7g_livermore(09.16_09.05).pine')">複製</button></summary>
-      <pre id="pine-r7g_livermore(09.16_09.05).pine">//@version=5
+<details class="pinebox"><summary><b>r7g_livermore(09.16_13.27).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7g_livermore(09.16_13.27).pine')">複製</button></summary>
+      <pre id="pine-r7g_livermore(09.16_13.27).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_09:05)
+//  版本 r7(09:16_13:27)
 //  R7-G  主圖：Livermore 最低阻力線 (Line of Least Resistance)
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_09.05).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_09.05).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_09.05).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_09.05).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_09.05).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_09.05).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_09.05).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.27).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.27).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.27).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.27).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.27).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.27).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.27).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
-//  Livermore 的最低阻力線不是任何平滑曲線，而是「市場自己在樞紐點上證明出來的方向」：
+//  Livermore 的最低阻力線不是平滑曲線，而是「市場在樞紐點上自己證明的方向」：
 //    &quot;Prices ... move along the line of least resistance ... wait for the moment when that line defines itself.&quot;
-//  本腳本把他 1940 年《How to Trade in Stocks》的做法機械化，並用實測 (2025-09~2026-09 美股日線) 選出的設定：
-//    ① 樞紐點 (Pivotal Points)：左 5 / 右 3 確認的轉折高低點；一頂高於一頂 + 一底高於一底 = 上升結構，反之下降結構。
-//       收盤越過最後一個確認樞紐高 / 低 = 「線定義了自己」，直接翻轉結構（實測：沒有這條突破規則，純結構線的命中率只有 64 分）。
-//    ② Market Key 六欄 (上升趨勢 / 自然反彈 / 次級反彈 / 下降趨勢 / 自然回檔 / 次級回檔)：
-//       反轉門檻 3%（原著 $30 以上股票約 6 點）、確認門檻 1.5%（原著約 3 點）；實測 3%/1.5% 讀「趨勢欄」是 Livermore 原生方法中最佳。
-//    ③ 兩道濾網：突破要放量 (≥1.5× 均量)；突破後 N 根內沒有跟進 = &quot;a danger signal that must be heeded&quot;。
-//    ④ 參考雙線（實測結論）：EMA21 抓轉折最快 (反轉命中 82–93%)、SMA50 / Supertrend 判「趨勢仍在、回檔不出場」假訊號最少。
-//  畫出的「最低阻力線」= 目前趨勢必守的樞紐價位：上升結構畫最後樞紐低（跌破即失效），下降結構畫最後樞紐高。
+//  這條線 = 目前趨勢「必守的樞紐價位」（他 Market Key 帳上的紅線 / 黑線）：
+//    上升趨勢 → 最近一個回檔低點（跌破即趨勢失效）；下降趨勢 → 最近一個反彈高點。
+//  r1 中短線化（不改邏輯，只縮短「線與 K 線的距離」）：
+//    ① 樞紐點改用 左 3 / 右 2 確認（原 5/3），抓的是中短線的擺動而不是大波段；
+//    ② 線取「最近確認樞紐低」與「Market Key 最近自然回檔低」兩者中較貼近價格者，並且只會向趨勢方向棘輪
+//       （上升趨勢中只升不降，這正是 Livermore 隨趨勢上移停損的做法）；
+//    ③ Market Key 反轉 / 確認門檻 3%/1.5% → 2%/1%（原著 6/3 點是給 $30 以上大波段用的）；
+//    ④ 盤整箱視窗 20 → 10 根。
+//  仍保留：收盤越過樞紐 = 線定義自己（立即翻轉）、突破放量、突破後跟進（否則危險訊號）。
+//  不再畫 EMA21 / SMA50 / AVWAP / 樞紐高低參考線；圖上只有這一條線 + 突破記號。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-G Livermore Least-Resistance r7(09:16_09:05)&quot;, shorttitle = &quot;R7-G Livermore&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;R7-G Livermore Least-Resistance r7(09:16_13:27)&quot;, shorttitle = &quot;R7-G Livermore&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
 
 // ── ① 樞紐點 ──
-grpP = &quot;① 樞紐點 (Pivotal Points)&quot;
-lbL    = input.int(5, &quot;轉折左側確認根數&quot;, minval = 1, maxval = 20, group = grpP, display = display.none)
-lbR    = input.int(3, &quot;轉折右側確認根數 (Livermore 接受滯後 3–5 根)&quot;, minval = 1, maxval = 10, group = grpP, display = display.none)
+grpP = &quot;① 樞紐點 (Pivotal Points) — 中短線&quot;
+lbL    = input.int(3, &quot;轉折左側確認根數&quot;, minval = 1, maxval = 20, group = grpP, display = display.none)
+lbR    = input.int(2, &quot;轉折右側確認根數&quot;, minval = 1, maxval = 10, group = grpP, display = display.none)
 brkPct = input.float(0.0, &quot;突破樞紐點需超過 % (0 = 收盤越過即算)&quot;, minval = 0, maxval = 5, step = 0.25, group = grpP, display = display.none)
+boxLen = input.int(10, &quot;盤整箱視窗 (根)&quot;, minval = 5, maxval = 60, group = grpP, display = display.none)
+rangeMult = input.float(2.5, &quot;盤整箱：視窗高低差 &lt; ATR × 此值 → 不表態&quot;, minval = 1, maxval = 8, step = 0.5, group = grpP, display = display.none)
 
 // ── ② Market Key ──
-grpM = &quot;② Market Key 六欄 (Livermore 1940)&quot;
+grpM = &quot;② Market Key 六欄 (Livermore 1940) — 中短線門檻&quot;
 mkMode    = input.string(&quot;百分比&quot;, &quot;門檻單位&quot;, options = [&quot;百分比&quot;, &quot;ATR 倍數&quot;], group = grpM, display = display.none)
-mkRev     = input.float(3.0, &quot;反轉門檻 %：承認 自然反彈 / 回檔 (原著約 6 點)&quot;, minval = 0.5, maxval = 15, step = 0.5, group = grpM, display = display.none)
-mkConf    = input.float(1.5, &quot;確認門檻 %：越過樞紐價位 (原著約 3 點)&quot;, minval = 0.25, maxval = 10, step = 0.25, group = grpM, display = display.none)
-mkRevAtr  = input.float(2.0, &quot;反轉門檻 (ATR 倍數)&quot;, minval = 0.5, maxval = 6, step = 0.25, group = grpM, display = display.none)
-mkConfAtr = input.float(1.0, &quot;確認門檻 (ATR 倍數)&quot;, minval = 0.25, maxval = 4, step = 0.25, group = grpM, display = display.none)
-atrLen    = input.int(20, &quot;ATR 長度&quot;, minval = 5, group = grpM, display = display.none)
+mkRev     = input.float(2.0, &quot;反轉門檻 %：承認 自然反彈 / 回檔&quot;, minval = 0.5, maxval = 15, step = 0.5, group = grpM, display = display.none)
+mkConf    = input.float(1.0, &quot;確認門檻 %：越過樞紐價位&quot;, minval = 0.25, maxval = 10, step = 0.25, group = grpM, display = display.none)
+mkRevAtr  = input.float(1.5, &quot;反轉門檻 (ATR 倍數)&quot;, minval = 0.5, maxval = 6, step = 0.25, group = grpM, display = display.none)
+mkConfAtr = input.float(0.75, &quot;確認門檻 (ATR 倍數)&quot;, minval = 0.25, maxval = 4, step = 0.25, group = grpM, display = display.none)
+atrLen    = input.int(14, &quot;ATR 長度&quot;, minval = 5, group = grpM, display = display.none)
 
 // ── ③ 成交量與跟進 ──
-grpV = &quot;③ 成交量確認與跟進 (Livermore 的兩道濾網)&quot;
+grpV = &quot;③ 成交量確認與跟進&quot;
 volLen     = input.int(50, &quot;均量期數&quot;, minval = 5, group = grpV, display = display.none)
 volX       = input.float(1.5, &quot;突破放量門檻 (× 均量)&quot;, minval = 1, maxval = 5, step = 0.1, group = grpV, display = display.none)
 followBars = input.int(3, &quot;突破後幾根內必須跟進，否則危險訊號&quot;, minval = 1, maxval = 10, group = grpV, display = display.none)
-
-// ── ④ 參考均線 ──
-grpR = &quot;④ 參考均線 (實測：EMA21 抓轉折、SMA50 判趨勢仍在)&quot;
-showFast = input.bool(true, &quot;顯示 EMA21&quot;, group = grpR, display = display.none)
-showSlow = input.bool(true, &quot;顯示 SMA50&quot;, group = grpR, display = display.none)
-showRng  = input.bool(true, &quot;顯示最後樞紐高 / 低 (get-nowhere 區間邊緣)&quot;, group = grpR, display = display.none)
-showAvw  = input.bool(true, &quot;顯示事件錨定 AVWAP (自最近一次結構反轉起算的平均成本)&quot;, group = grpR, display = display.none)
-rangeMult = input.float(3.0, &quot;盤整箱：20 日高低差 &lt; ATR × 此值 → 視為 get-nowhere (不表態)&quot;, minval = 1, maxval = 8, step = 0.5, group = grpR, display = display.none)
-showBg   = input.bool(false, &quot;狀態背景著色 (預設關閉)&quot;, group = grpR, display = display.none)
+showMarks  = input.bool(true, &quot;顯示突破 ▲▼ 與備註框&quot;, group = grpV, display = display.none)
 
 // ── ⑦ 版面 ──
 grpL   = &quot;⑦ 版面&quot;
 showBox = input.bool(true, &quot;顯示資訊框&quot;, group = grpL, display = display.none)
 boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
-boxH   = input.float(40, &quot;資訊框高度 (% pane 高)&quot;, minval = 20, maxval = 100, step = 5, group = grpL, display = display.none)
+boxH   = input.float(35, &quot;資訊框高度 (% pane 高)&quot;, minval = 20, maxval = 100, step = 5, group = grpL, display = display.none)
 boxPos = input.string(&quot;右下&quot;, &quot;位置&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;, &quot;左上&quot;, &quot;左中&quot;, &quot;左下&quot;], group = grpL, display = display.none)
 f_boxPos(s) =&gt; s == &quot;左上&quot; ? position.top_left : s == &quot;左中&quot; ? position.middle_left : s == &quot;左下&quot; ? position.bottom_left :
      s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
@@ -8937,9 +8916,8 @@ f_note(x, yAnchor, yBox, txt, col, above) =&gt;
 // ── 基礎序列 ──
 atr   = ta.atr(atrLen)
 vAvg  = ta.sma(volume, volLen)
-ema21 = ta.ema(close, 21)
-sma50 = ta.sma(close, 50)
 volOK = volume &gt;= vAvg * volX
+volRatio = vAvg &gt; 0 ? volume / vAvg : na
 
 // ── ① 樞紐點：最後兩個已確認的轉折高 / 低 ──
 ph = ta.pivothigh(high, lbL, lbR)
@@ -8975,12 +8953,12 @@ if brkDn
 // ── ② Market Key 六欄狀態機（只用收盤）──
 //    mk：1 上升趨勢 UT、2 自然反彈、3 次級反彈、-1 下降趨勢 DT、-2 自然回檔、-3 次級回檔
 var int   mk       = 0
-var int   mkTrend  = 0          // 最後進入的趨勢欄 (UT = 1 / DT = -1) = Livermore 的黑線 / 紅線
-var float colExt   = na         // 目前欄位的極值
-var float lastUT   = na         // 各欄最後記錄的樞紐價位
+var int   mkTrend  = 0
+var float colExt   = na
+var float lastUT   = na
 var float lastDT   = na
-var float lastNR   = na
-var float lastNRe  = na
+var float lastNR   = na          // 最近自然反彈高
+var float lastNRe  = na          // 最近自然回檔低
 c = close
 revAmt  = mkMode == &quot;百分比&quot; ? nz(colExt, c) * mkRev / 100 : atr * mkRevAtr
 confAmt = mkMode == &quot;百分比&quot; ? c * mkConf / 100 : atr * mkConfAtr
@@ -8988,21 +8966,21 @@ if na(colExt)
     colExt := c
     mk := 1
     mkTrend := 1
-else if mk == 1                                  // 上升趨勢欄
+else if mk == 1
     if c &gt; colExt
         colExt := c
     else if c &lt;= colExt - revAmt
         lastUT := colExt
         mk := -2
         colExt := c
-else if mk == -1                                 // 下降趨勢欄
+else if mk == -1
     if c &lt; colExt
         colExt := c
     else if c &gt;= colExt + revAmt
         lastDT := colExt
         mk := 2
         colExt := c
-else if mk == -2                                 // 自然回檔
+else if mk == -2
     if c &lt; colExt
         colExt := c
         if (not na(lastDT) and c &lt; lastDT) or (not na(lastNRe) and c &lt; lastNRe - confAmt)
@@ -9018,7 +8996,7 @@ else if mk == -2                                 // 自然回檔
             mk := 3
         else
             mk := 2
-else if mk == 2                                  // 自然反彈
+else if mk == 2
     if c &gt; colExt
         colExt := c
         if (not na(lastUT) and c &gt; lastUT) or (not na(lastNR) and c &gt; lastNR + confAmt)
@@ -9034,7 +9012,7 @@ else if mk == 2                                  // 自然反彈
             mk := -3
         else
             mk := -2
-else if mk == 3                                  // 次級反彈
+else if mk == 3
     if c &gt; colExt
         colExt := c
         if not na(lastUT) and c &gt; lastUT
@@ -9045,7 +9023,7 @@ else if mk == 3                                  // 次級反彈
     else if c &lt;= colExt - revAmt
         colExt := c
         mk := not na(lastNRe) and c &lt; lastNRe ? -2 : -3
-else if mk == -3                                 // 次級回檔
+else if mk == -3
     if c &lt; colExt
         colExt := c
         if not na(lastDT) and c &lt; lastDT
@@ -9058,27 +9036,26 @@ else if mk == -3                                 // 次級回檔
         mk := not na(lastNR) and c &gt; lastNR ? 2 : 3
 f_mkTxt(m) =&gt; m == 1 ? &quot;上升趨勢 UT&quot; : m == 2 ? &quot;自然反彈&quot; : m == 3 ? &quot;次級反彈&quot; : m == -1 ? &quot;下降趨勢 DT&quot; : m == -2 ? &quot;自然回檔&quot; : &quot;次級回檔&quot;
 
-// ── 盤整箱 (get-nowhere prices)：20 日高低差太窄且尚未突破 → 不表態 ──
-dcHi = ta.highest(high, 20)
-dcLo = ta.lowest(low, 20)
-inBox = (dcHi - dcLo) &lt; atr * rangeMult and not brkUp and not brkDn
+// ── 盤整箱 (get-nowhere prices) ──
+inBox = (ta.highest(high, boxLen) - ta.lowest(low, boxLen)) &lt; atr * rangeMult and not brkUp and not brkDn
 
-// ── 事件錨定 AVWAP：自最近一次結構反轉 (structDir 改變) 起算的成交量加權平均成本 ──
-//    對應「越過關鍵點後，多方 / 空方誰被套」；取代滾動視窗的價格重心
-var float aPV = 0.0
-var float aV  = 0.0
-if structDir != structDir[1]
-    aPV := 0.0
-    aV  := 0.0
-aPV += hlc3 * nz(volume, 0)
-aV  += nz(volume, 0)
-avwap = aV &gt; 0 ? aPV / aV : na
-
-// ── 綜合：最低阻力方向 = 結構 (含突破) 與 Market Key 趨勢欄一致、且不在盤整箱內才算定義；否則「未定義 (get-nowhere)」──
+// ── 這一條線：趨勢必守的樞紐價位，取較貼近價格者，並沿趨勢方向棘輪 ──
+//    上升：max(最近確認樞紐低, Market Key 最近自然回檔低)，兩者都必須在價格之下；只升不降
+//    下降：min(最近確認樞紐高, Market Key 最近自然反彈高)，兩者都必須在價格之上；只降不升
+//    趨勢翻轉時重新定位到新趨勢的第一個樞紐
+var float lrLine = na
+upC1 = not na(pl1) and pl1 &lt; close ? pl1 : na
+upC2 = not na(lastNRe) and lastNRe &lt; close ? lastNRe : na
+upCand = na(upC1) ? upC2 : na(upC2) ? upC1 : math.max(upC1, upC2)
+dnC1 = not na(ph1) and ph1 &gt; close ? ph1 : na
+dnC2 = not na(lastNR) and lastNR &gt; close ? lastNR : na
+dnCand = na(dnC1) ? dnC2 : na(dnC2) ? dnC1 : math.min(dnC1, dnC2)
+if structDir == 1
+    lrLine := structDir[1] != 1 or na(lrLine) ? upCand : na(upCand) ? lrLine : math.max(lrLine, upCand)
+else if structDir == -1
+    lrLine := structDir[1] != -1 or na(lrLine) ? dnCand : na(dnCand) ? lrLine : math.min(lrLine, dnCand)
 lrDir  = inBox ? 0 : structDir == 1 and mkTrend == 1 ? 1 : structDir == -1 and mkTrend == -1 ? -1 : 0
-lrLine = structDir == 1 ? pl1 : structDir == -1 ? ph1 : na        // 必守的樞紐價位
 lrDist = not na(lrLine) ? (close - lrLine) / close * 100 : na
-sma50Up = sma50 &gt; sma50[5]
 
 // ── ③ 突破放量與跟進（危險訊號）──
 var int   brkBar   = na
@@ -9092,63 +9069,52 @@ if brkUp or brkDn
     brkHigh  := high
     brkLow   := low
     brkDir   := brkUp ? 1 : -1
-// 跟進 = 突破後 followBars 根內至少創出突破根之上的新高 (向下反之)，且收盤沒有退回突破價
 hiF = ta.highest(high, followBars)
 loF = ta.lowest(low, followBars)
 danger = not na(brkBar) and bar_index == brkBar + followBars and
      ((brkDir == 1 and (close &lt;= brkClose or hiF &lt;= brkHigh)) or (brkDir == -1 and (close &gt;= brkClose or loF &gt;= brkLow)))
-volRatio = vAvg &gt; 0 ? volume / vAvg : na
 
-// ── 繪圖 ──
+// ── 繪圖：只有一條線 ──
 lrCol = lrDir == 1 ? color.new(#26a69a, 0) : lrDir == -1 ? color.new(#ef5350, 0) : color.new(#9ca3af, 0)
-plot(lrLine, &quot;最低阻力線 (趨勢必守樞紐)&quot;, color = lrCol, linewidth = 3, style = plot.style_stepline, display = display.pane + display.data_window + display.price_scale)
-plot(showRng ? ph1 : na, &quot;最後樞紐高&quot;, color = color.new(#ef5350, 65), linewidth = 1, style = plot.style_stepline, display = display.pane + display.data_window)
-plot(showRng ? pl1 : na, &quot;最後樞紐低&quot;, color = color.new(#26a69a, 65), linewidth = 1, style = plot.style_stepline, display = display.pane + display.data_window)
-plot(showFast ? ema21 : na, &quot;EMA21 (轉折參考)&quot;, color = color.new(#f59e0b, 30), linewidth = 1, display = display.pane + display.data_window)
-plot(showSlow ? sma50 : na, &quot;SMA50 (趨勢仍在參考)&quot;, color = color.new(#6b7280, 30), linewidth = 2, display = display.pane + display.data_window)
-plot(showAvw ? avwap : na, &quot;錨定 AVWAP (自最近反轉)&quot;, color = color.new(#8b5cf6, 20), linewidth = 2, style = plot.style_linebr, display = display.pane + display.data_window)
+plot(lrLine, &quot;Livermore 最低阻力線&quot;, color = lrCol, linewidth = 3, style = plot.style_stepline, display = display.pane + display.data_window + display.price_scale)
 plot(structDir, &quot;結構方向 (1/0/-1)&quot;, display = display.data_window)
-plot(mk, &quot;Market Key 欄 (1 UT 2 自然反彈 3 次級反彈 -1 DT -2 自然回檔 -3 次級回檔)&quot;, display = display.data_window)
-bgcolor(showBg ? (lrDir == 1 ? color.new(#26a69a, 92) : lrDir == -1 ? color.new(#ef5350, 92) : na) : na, title = &quot;最低阻力方向背景&quot;)
+plot(mk, &quot;Market Key 欄&quot;, display = display.data_window)
+plot(ph1, &quot;最後樞紐高 (數值)&quot;, display = display.data_window)
+plot(pl1, &quot;最後樞紐低 (數值)&quot;, display = display.data_window)
 
-plotshape(brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.small)
-plotshape(brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.small)
-plotshape(mkTrend == 1 and mkTrend[1] != 1,   &quot;Market Key 轉入上升趨勢欄&quot;, shape.circle, location.belowbar, color.new(#26a69a, 0), size = size.tiny)
-plotshape(mkTrend == -1 and mkTrend[1] != -1, &quot;Market Key 轉入下降趨勢欄&quot;, shape.circle, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
-if brkUp
+plotshape(showMarks and brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
+plotshape(showMarks and brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
+if showMarks and brkUp
     [l1, n1] = f_note(bar_index, low, low - atr * 0.9, volOK ? &quot;線向上定義 · 放量 ✓&quot; : &quot;升破樞紐 · 未放量 ⚠&quot;, #26a69a, false)
-if brkDn
+if showMarks and brkDn
     [l2, n2] = f_note(bar_index, high, high + atr * 0.9, volOK ? &quot;線向下定義 · 放量 ✓&quot; : &quot;跌破樞紐 · 未放量 ⚠&quot;, #ef5350, true)
-if danger
+if showMarks and danger
     [l3, n3] = f_note(bar_index, brkDir == 1 ? high : low, brkDir == 1 ? high + atr * 0.9 : low - atr * 0.9,
          &quot;突破後無跟進 · 危險訊號&quot;, #f59e0b, brkDir == 1)
 
 // ── 資訊框 ──
-var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),
+var table tb = table.new(f_boxPos(boxPos), 2, 7, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 if showBox and barstate.islast
-    rh = boxH / 8
-    stTxt = lrDir == 1 ? &quot;上升最低阻力 ✓&quot; : lrDir == -1 ? &quot;下降最低阻力 ✓&quot; : inBox ? &quot;盤整箱 · 不表態&quot; : &quot;未定義 (結構與 Market Key 不一致)&quot;
+    rh = boxH / 7
+    stTxt = lrDir == 1 ? &quot;上升最低阻力 ✓&quot; : lrDir == -1 ? &quot;下降最低阻力 ✓&quot; : inBox ? &quot;盤整箱 · 不表態&quot; : &quot;未定義&quot;
     stCol = lrDir == 1 ? color.new(#26a69a, 60) : lrDir == -1 ? color.new(#ef5350, 60) : color.new(#9ca3af, 70)
-    table.cell(tb, 0, 0, &quot;Livermore 最低阻力線&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
+    table.cell(tb, 0, 0, &quot;Livermore 最低阻力線 (中短線)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
     table.cell(tb, 1, 0, stTxt, width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 0, 1, &quot;結構 (樞紐 &quot; + str.tostring(lbL) + &quot;/&quot; + str.tostring(lbR) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 1, structDir == 1 ? &quot;HH+HL 上升&quot; : structDir == -1 ? &quot;LH+LL 下降&quot; : &quot;混合&quot;, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = stCol)
-    table.cell(tb, 0, 2, &quot;Market Key 欄 / 趨勢欄&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 2, f_mkTxt(mk) + &quot; / &quot; + (mkTrend == 1 ? &quot;UT&quot; : &quot;DT&quot;), width = boxW * 0.45, height = rh, text_size = size.small,
+    table.cell(tb, 0, 1, &quot;線位 · 價格距線&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 1, na(lrLine) ? &quot;—&quot; : str.tostring(lrLine, format.mintick) + &quot; (&quot; + str.tostring(lrDist, &quot;+#.#&quot;) + &quot;%)&quot;, width = boxW * 0.45, height = rh, text_size = size.small,
+         text_color = lrDir == 1 ? #26a69a : lrDir == -1 ? #ef5350 : color.gray, bgcolor = stCol)
+    table.cell(tb, 0, 2, &quot;結構 (樞紐 &quot; + str.tostring(lbL) + &quot;/&quot; + str.tostring(lbR) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 2, structDir == 1 ? &quot;HH+HL 上升&quot; : structDir == -1 ? &quot;LH+LL 下降&quot; : &quot;混合&quot;, width = boxW * 0.45, height = rh, text_size = size.small)
+    table.cell(tb, 0, 3, &quot;Market Key 欄 / 趨勢欄&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 3, f_mkTxt(mk) + &quot; / &quot; + (mkTrend == 1 ? &quot;UT&quot; : &quot;DT&quot;), width = boxW * 0.45, height = rh, text_size = size.small,
          text_color = mkTrend == 1 ? #26a69a : #ef5350)
-    table.cell(tb, 0, 3, &quot;最後樞紐 高 / 低&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 3, str.tostring(ph1, format.mintick) + &quot; / &quot; + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 4, &quot;必守樞紐 · 距離&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 4, na(lrLine) ? &quot;—&quot; : str.tostring(lrLine, format.mintick) + &quot; (&quot; + str.tostring(lrDist, &quot;+#.#&quot;) + &quot;%)&quot;, width = boxW * 0.45, height = rh, text_size = size.small,
-         text_color = lrDir == 1 ? #26a69a : lrDir == -1 ? #ef5350 : color.gray)
+    table.cell(tb, 0, 4, &quot;最後樞紐 高 / 低&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 4, str.tostring(ph1, format.mintick) + &quot; / &quot; + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
     table.cell(tb, 0, 5, &quot;本根量比 (突破需 ≥&quot; + str.tostring(volX, &quot;#.#&quot;) + &quot;×)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
     table.cell(tb, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + &quot;×&quot; + (volOK ? &quot; 放量&quot; : &quot;&quot;), width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = volOK ? color.new(#f59e0b, 60) : na)
-    table.cell(tb, 0, 6, &quot;EMA21 / SMA50(升降) / 錨定AVWAP&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 6, (close &gt; ema21 ? &quot;上&quot; : &quot;下&quot;) + &quot; / &quot; + (close &gt; sma50 ? &quot;上&quot; : &quot;下&quot;) + (sma50Up ? &quot;↑&quot; : &quot;↓&quot;) + &quot; / &quot; + (na(avwap) ? &quot;—&quot; : close &gt; avwap ? &quot;上&quot; : &quot;下&quot;),
-         width = boxW * 0.45, height = rh, text_size = size.small, text_color = close &gt; sma50 ? #26a69a : #ef5350)
-    table.cell(tb, 0, 7, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
-    table.cell(tb, 1, 7, &quot;▲▼ 樞紐突破 ● Market Key 趨勢欄&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 6, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 1, 6, &quot;線 = 趨勢必守樞紐，只沿趨勢棘輪&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
 
 // ── 警報 ──
 alertcondition(brkUp, &quot;Livermore 線向上定義 (升破樞紐高)&quot;, &quot;{{ticker}} 收盤升破最後樞紐高 — 最低阻力線向上定義，檢查是否放量&quot;)
