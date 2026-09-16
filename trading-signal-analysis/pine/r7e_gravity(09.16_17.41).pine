@@ -1,16 +1,16 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-E  主圖：價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -23,7 +23,7 @@
 //  訊號：重心上移 + 價在重心上 = 上升最低阻力；重心下移 + 價在重心下 = 下跌最低阻力；
 //        重心走平且穩定 = 定錨 (主力未走)；價格跌破重心後 M 根內收回 = 假跌破 (用股價打掩護)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator("R7-E Price Gravity r7(09:16_13:59)", shorttitle = "R7-E Gravity", overlay = true, max_labels_count = 100, max_lines_count = 100)
+indicator("R7-E Price Gravity r7(09:16_17:41)", shorttitle = "R7-E Gravity", overlay = true, max_labels_count = 100, max_lines_count = 100)
 
 // ── ① 重心定義 ──
 grpG = "① 重心定義"
@@ -52,7 +52,7 @@ f_boxPos(s) => s == "左上" ? position.top_left : s == "左中" ? position.midd
      s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
 f_note(x, yAnchor, yBox, txt, col, above) =>
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -122,9 +122,9 @@ fill(pU, pL, color = anchor ? color.new(#f59e0b, 90) : color.new(color.gray, 94)
 plot(shiftATR, "重心 M 根位移 (ATR)", display = display.data_window)
 plot(distSig,  "價格距重心 (σ)",      display = display.data_window)
 
-plotshape(pathUp and not pathUp[1], "上升最低阻力 開始", shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny, text = "重心上移", textcolor = #26a69a)
-plotshape(pathDn and not pathDn[1], "下跌最低阻力 開始", shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny, text = "重心下移", textcolor = #ef5350)
-plotshape(anchor and not anchor[1], "定錨開始", shape.diamond, location.belowbar, color.new(#f59e0b, 0), size = size.tiny)
+plotshape(pathUp and not pathUp[1], "上升最低阻力 開始", shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny, text = "重心上移", textcolor = #26a69a, display = display.pane)
+plotshape(pathDn and not pathDn[1], "下跌最低阻力 開始", shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny, text = "重心下移", textcolor = #ef5350, display = display.pane)
+plotshape(anchor and not anchor[1], "定錨開始", shape.diamond, location.belowbar, color.new(#f59e0b, 0), size = size.tiny, display = display.pane)
 
 if fakeBD
     [l1, n1] = f_note(bar_index, low, low - atr * 0.8, "假跌破 收回重心", #26a69a, false)
@@ -137,21 +137,21 @@ var table tb = table.new(f_boxPos(boxPos), 2, 7, bgcolor = color.new(#ffffff, 5)
 if showBox and barstate.islast
     rh = boxH / 7
     stateTxt = pathUp ? "上升最低阻力" : pathDn ? "下跌最低阻力" : anchor ? "定錨 (主力未走)" : stable ? "走平" : "位移中"
-    stateCol = pathUp ? color.new(#26a69a, 60) : pathDn ? color.new(#ef5350, 60) : anchor ? color.new(#f59e0b, 60) : na
-    table.cell(tb, 0, 0, "價格重心 · " + mode, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 1, 0, str.tostring(gravity, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 0, 1, "狀態", width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 1, stateTxt, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = stateCol)
-    table.cell(tb, 0, 2, "重心 " + str.tostring(slopeM) + " 根位移 (ATR)", width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 2, str.tostring(shiftATR, "+#.##"), width = boxW * 0.45, height = rh, text_size = size.small, text_color = gUp ? #26a69a : gDn ? #ef5350 : color.gray)
-    table.cell(tb, 0, 3, "價格距重心 (σ)", width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 3, str.tostring(distSig, "+#.##"), width = boxW * 0.45, height = rh, text_size = size.small, text_color = aboveG ? #26a69a : #ef5350)
-    table.cell(tb, 0, 4, "成本帶 (±" + str.tostring(kSig, "#.##") + "σ)", width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 4, str.tostring(lowerB, format.mintick) + " – " + str.tostring(upperB, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 5, "當日 VWAP / 錨定 VWAP", width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 5, str.tostring(vwapDay, format.mintick) + " / " + str.tostring(vwapAnc, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 6, "滾動 VWAP / POC", width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 6, str.tostring(vwapRoll, format.mintick) + " / " + str.tostring(pocVal, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
+    stateCol = pathUp ? color.new(#26a69a, 88) : pathDn ? color.new(#ef5350, 88) : anchor ? color.new(#f59e0b, 88) : na
+    table.cell(tb, 0, 0, "價格重心 · " + mode, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.black, bgcolor = color.new(#374151, 88), text_formatting = text.format_bold)
+    table.cell(tb, 1, 0, str.tostring(gravity, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.black, bgcolor = color.new(#374151, 88), text_formatting = text.format_bold)
+    table.cell(tb, 0, 1, "狀態", width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 1, stateTxt, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = stateCol, text_formatting = text.format_bold)
+    table.cell(tb, 0, 2, "重心 " + str.tostring(slopeM) + " 根位移 (ATR)", width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 2, str.tostring(shiftATR, "+#.##"), width = boxW * 0.45, height = rh, text_size = size.small, text_color = gUp ? #26a69a : gDn ? #ef5350 : color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 3, "價格距重心 (σ)", width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 3, str.tostring(distSig, "+#.##"), width = boxW * 0.45, height = rh, text_size = size.small, text_color = aboveG ? #26a69a : #ef5350, text_formatting = text.format_bold)
+    table.cell(tb, 0, 4, "成本帶 (±" + str.tostring(kSig, "#.##") + "σ)", width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 4, str.tostring(lowerB, format.mintick) + " – " + str.tostring(upperB, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 5, "當日 VWAP / 錨定 VWAP", width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 5, str.tostring(vwapDay, format.mintick) + " / " + str.tostring(vwapAnc, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 6, "滾動 VWAP / POC", width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 6, str.tostring(vwapRoll, format.mintick) + " / " + str.tostring(pocVal, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
 
 // ── 警報 ──
 alertcondition(pathUp and not pathUp[1], "重心上移 · 上升最低阻力", "{{ticker}} 價格重心上移且價在重心上 — 上升最低阻力")

@@ -1,16 +1,16 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -22,7 +22,7 @@
 //  R7：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("R7-B MACD + Cycle Clock r7(09:16_13:59)", shorttitle = "R7-B MACD Clock",
+indicator("R7-B MACD + Cycle Clock r7(09:16_17:41)", shorttitle = "R7-B MACD Clock",
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -73,7 +73,7 @@ f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bot
 // 備註框：淺色底 + 黑字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
 f_note(x, yAnchor, yBox, txt, col, above) =>
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -180,7 +180,7 @@ else
         extBar := bar_index
 // 以 location.absolute 畫在柱狀圖數值上；bool series 不能用 absolute，故傳入 hist
 plotshape(bar_index == extBar and not up ? hist : na, "本周期新低 (轉勢點候選)", shape.circle,
-     location.absolute, color.new(#eab308, 15), size = size.tiny)
+     location.absolute, color.new(#eab308, 15), size = size.tiny, display = display.pane)
 
 // 「N日」週期長度（次要備註）：透明無底色，貼在剛結束那段週期的最高柱 (上昇) / 最低柱 (下跌) 頂端，
 // 不超出柱狀圖本身的高度範圍；extVal[1] / extBar[1] = 翻轉當根之前記錄到的上一段週期極值與其位置
@@ -188,13 +188,13 @@ if showLbl and flipEvt and not na(extVal[1]) and not na(extBar[1])
     label.new(extBar[1], extVal[1], str.tostring(lastLen, "#") + "日",
          style = up[1] ? label.style_label_down : label.style_label_up,
          color = color.new(color.white, 100),
-         textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny)
+         textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny, text_formatting = text.format_bold)
 
 // ── M1 背馳標註（依據 MACD 快線的轉折）：▲/▼ 畫在轉折點；備註框放在曲線「內側」（谷底之上 / 峰頂之下，
 //    距離 = 近期振幅 × noteGap），不佔用 pane 上下多餘空間；虛線指回轉折點；與曲線同一座標系，縮放 / 捲動同步。背馳連線加粗、實線無箭頭。
 divGap = math.max((oscHi - oscLo) * noteGap, 1e-9)
-plotshape(bullDiv ? divOL : na, "底背馳 ▲", shape.triangleup,   location.absolute, color.new(cUp, 0), size = size.small, offset = divOff)
-plotshape(bearDiv ? divOH : na, "頂背馳 ▼", shape.triangledown, location.absolute, color.new(cDn, 0), size = size.small, offset = divOff)
+plotshape(bullDiv ? divOL : na, "底背馳 ▲", shape.triangleup,   location.absolute, color.new(cUp, 0), size = size.small, offset = divOff, display = display.pane)
+plotshape(bearDiv ? divOH : na, "頂背馳 ▼", shape.triangledown, location.absolute, color.new(cDn, 0), size = size.small, offset = divOff, display = display.pane)
 if bullDiv
     [lbB, lnB] = f_note(bar_index + divOff, divOL, divOL + divGap, "底背馳", cUp, true)    // 框在谷底上方 (曲線內側)
     if divLine and onCycTF
@@ -225,8 +225,8 @@ if showBrk and showLvl and onCycTF
             line.set_extend(lvL, extend.none)
         lvL := line.new(bar_index - lbR, lastPL, bar_index, lastPL, color = color.new(cUp, 40),
              style = line.style_dotted, width = 1, extend = extend.right)
-plotshape(brkUpEvt ? lastPH : na, "升破前頂 ◆", shape.diamond, location.absolute, color.new(cUp, 0), size = size.small)
-plotshape(brkDnEvt ? lastPL : na, "跌破前底 ◆", shape.diamond, location.absolute, color.new(cDn, 0), size = size.small)
+plotshape(brkUpEvt ? lastPH : na, "升破前頂 ◆", shape.diamond, location.absolute, color.new(cUp, 0), size = size.small, display = display.pane)
+plotshape(brkDnEvt ? lastPL : na, "跌破前底 ◆", shape.diamond, location.absolute, color.new(cDn, 0), size = size.small, display = display.pane)
 if brkUpEvt
     [lbU, lnU] = f_note(bar_index, lastPH, lastPH - divGap, "升破前頂", cUp, false)   // 框在前頂之下 (曲線內側)
 if brkDnEvt
@@ -254,15 +254,15 @@ if showClock and barstate.islast
     if not merged
         for ci = 0 to grid - 1
             for cj = 0 to grid + 1
-                table.cell(clk, ci, cj, "", width = cellW, height = cellH)
+                table.cell(clk, ci, cj, "", width = cellW, height = cellH, text_formatting = text.format_bold)
         table.merge_cells(clk, 0, 0, grid - 1, 0)                 // 上方狀態列
         table.merge_cells(clk, 0, grid + 1, grid - 1, grid + 1)   // 下方統計列
         merged := true
 
     activeCol = up ? cUp : cDn
     dateTxt = str.format_time(time, "MM/dd", tz)
-    table.cell(clk, 0, 0, phaseTxt + "  " + dateTxt, width = cellW, height = hdrH, text_color = color.white, bgcolor = color.new(activeCol, 10),
-         text_size = size.small, text_halign = text.align_center)
+    table.cell(clk, 0, 0, phaseTxt + "  " + dateTxt, width = cellW, height = hdrH, text_color = color.black, bgcolor = color.new(activeCol, 10),
+         text_size = size.small, text_halign = text.align_center, text_formatting = text.format_bold)
 
     // 高解析度時鐘：環厚、指針寬、圓心半徑都隨格數放大；12/3/6/9 刻度；已走過的弧段亮色
     c     = (grid - 1) / 2.0            // 圓心索引
@@ -316,15 +316,15 @@ if showClock and barstate.islast
 
             table.cell(clk, i, j + 1, cellTx, width = cellW, height = cellH,
                  bgcolor = cellBg, text_color = color.new(color.gray, 0), text_size = size.tiny,
-                 text_halign = text.align_center, text_valign = text.align_center)
+                 text_halign = text.align_center, text_valign = text.align_center, text_formatting = text.format_bold)
 
     statTxt = "第 " + str.tostring(elapsed) + " / 預期 " + str.tostring(expected, "#.#") + " 日 · " +
          str.tostring(progRaw * 100, "#") + "%" + (overdue ? " ⚠超時" : late ? " ·尾段" : "") +
          "\n均升 " + str.tostring(avgUp, "#.#") + " 日 · 均跌 " + str.tostring(avgDn, "#.#") + " 日" +
          (timeframe.period != cycTF ? "\n(日線週期 疊加於 " + timeframe.period + " 圖)" : "") +
          (not up and not na(extBar) ? "\n距轉勢點 " + str.tostring(bar_index - extBar) + " 根" : "")
-    table.cell(clk, 0, grid + 1, statTxt, width = cellW, height = hdrH, text_color = color.white,
-         bgcolor = color.new(color.gray, 30), text_size = size.tiny, text_halign = text.align_center)
+    table.cell(clk, 0, grid + 1, statTxt, width = cellW, height = hdrH, text_color = color.black,
+         bgcolor = color.new(color.gray, 88), text_size = size.tiny, text_halign = text.align_center, text_formatting = text.format_bold)
 
 // ── M1 警報 ──
 alertcondition(flipEvt and up,     "M1 日線轉入上昇周期", "{{ticker}} 日線 MACD 柱狀圖轉正 — 進入上昇周期 (9 點鐘)")

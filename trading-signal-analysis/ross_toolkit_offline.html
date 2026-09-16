@@ -6430,7 +6430,7 @@ alertcondition(gapGo, &quot;Gap&amp;Go 突破盤前高&quot;,
 //      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
 //      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;Livermore Least-Resistance r1&quot;, shorttitle = &quot;Livermore LR&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;Livermore Least-Resistance r2&quot;, shorttitle = &quot;Livermore LR&quot;, overlay = true, max_labels_count = 500, max_lines_count = 200)
 
 // ── ① 樞紐點 ──
 grpP = &quot;① 樞紐點 (Pivotal Points) — 中短線&quot;
@@ -6647,6 +6647,7 @@ showSig  = input.bool(true, &quot;顯示買賣決策點與原因&quot;, group = 
 showAdd  = input.bool(true, &quot;顯示加碼點 (pyramiding)&quot;, group = grpS, display = display.none)
 maxAdds  = input.int(2, &quot;最多加碼次數&quot;, minval = 0, maxval = 5, group = grpS, display = display.none)
 climaxX  = input.float(2.0, &quot;高潮反轉：量 ≥ 均量 ×&quot;, minval = 1.2, maxval = 5, step = 0.1, group = grpS, display = display.none)
+sigTrans = input.int(82, &quot;決策點底色透明度 (0 = 實色, 100 = 全透明)&quot;, minval = 0, maxval = 100, step = 2, group = grpS, display = display.none)
 
 // 整數關卡 (依價位分級)
 rn  = close &gt;= 200 ? 100 : close &gt;= 50 ? 50 : close &gt;= 20 ? 10 : 5
@@ -6723,19 +6724,26 @@ plot(pl1, &quot;最後樞紐低 (數值)&quot;, display = display.data_window)
 plotshape(showMarks and brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
 plotshape(showMarks and brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
 
-// ④ 買賣決策點：綠 = 買 / 加碼、紅 = 賣 / 放空、橙 = 危險訊號、灰 = 觀察不買；文字即觸發原因
-plotshape(showSig and buyBreak,   &quot;買① 升破樞紐高·放量&quot;,        shape.labelup,   location.belowbar, color.new(#16a34a, 0), text = &quot;買①\n升破樞紐·放量&quot;,     textcolor = color.white, size = size.small)
-plotshape(showSig and buyResume,  &quot;買② MK 回到上升趨勢欄&quot;,      shape.labelup,   location.belowbar, color.new(#16a34a, 20), text = &quot;買②\nMK回升勢欄&quot;,       textcolor = color.white, size = size.small)
-plotshape(showSig and buyRound,   &quot;買③ 首次穿越整數關卡&quot;,       shape.labelup,   location.belowbar, color.new(#0ea5e9, 0), text = &quot;買③\n首穿整數關卡&quot;,       textcolor = color.white, size = size.small)
-plotshape(showSig and buyAdd,     &quot;加碼：首筆有利潤&quot;,           shape.labelup,   location.belowbar, color.new(#65a30d, 0), text = &quot;加碼\n首筆有利潤&quot;,         textcolor = color.white, size = size.tiny)
-plotshape(showSig and watchBreak, &quot;觀察：升破未放量&quot;,           shape.labelup,   location.belowbar, color.new(#9ca3af, 0), text = &quot;觀察\n未放量不買&quot;,         textcolor = color.white, size = size.tiny)
-plotshape(showSig and sellBreak,  &quot;賣①/放空 跌破必守樞紐&quot;,      shape.labeldown, location.abovebar, color.new(#dc2626, 0), text = &quot;賣①\n跌破必守樞紐&quot;,       textcolor = color.white, size = size.small)
-plotshape(showSig and sellDanger, &quot;賣② 突破後無跟進&quot;,           shape.labeldown, location.abovebar, color.new(#f59e0b, 0), text = &quot;賣②\n突破無跟進&quot;,         textcolor = color.white, size = size.small)
-plotshape(showSig and sellRallyFail, &quot;賣③ 次級反彈失敗&quot;,        shape.labeldown, location.abovebar, color.new(#dc2626, 20), text = &quot;賣③\n次級反彈失敗&quot;,     textcolor = color.white, size = size.small)
-plotshape(showSig and sellClimax, &quot;賣④ 放量異常反轉&quot;,           shape.labeldown, location.abovebar, color.new(#b91c1c, 0), text = &quot;賣④\n放量異常反轉&quot;,       textcolor = color.white, size = size.small)
-plotshape(showSig and sellODR,    &quot;賣⑤ 一日反轉&quot;,               shape.labeldown, location.abovebar, color.new(#dc2626, 35), text = &quot;賣⑤\n一日反轉&quot;,           textcolor = color.white, size = size.tiny)
-plotshape(showSig and shortResume,&quot;放空② MK 回到下降趨勢欄&quot;,    shape.labeldown, location.abovebar, color.new(#7f1d1d, 0), text = &quot;放空②\nMK回跌勢欄&quot;,     textcolor = color.white, size = size.small)
-plotshape(showSig and coverDanger,&quot;回補：跌破後無跟進&quot;,         shape.labelup,   location.belowbar, color.new(#f59e0b, 0), text = &quot;回補\n跌破無跟進&quot;,         textcolor = color.white, size = size.small)
+// ④ 買賣決策點：淺色透明底 + 黑色粗體字；文字即觸發原因（用 label 而非 plotshape，故不佔狀態列）
+f_sig(cond, txt, col, above) =&gt;
+    if cond
+        label.new(bar_index, above ? low : high, txt,
+             yloc = above ? yloc.belowbar : yloc.abovebar,
+             style = above ? label.style_label_up : label.style_label_down,
+             color = color.new(col, sigTrans), textcolor = color.black, size = size.small,
+             text_formatting = text.format_bold, text_font_family = font.family_monospace)
+f_sig(showSig and buyBreak,      &quot;買① 升破樞紐·放量&quot;,   #16a34a, true)
+f_sig(showSig and buyResume,     &quot;買② MK回升勢欄&quot;,      #16a34a, true)
+f_sig(showSig and buyRound,      &quot;買③ 首穿整數關卡&quot;,    #0ea5e9, true)
+f_sig(showSig and buyAdd,        &quot;加碼 首筆有利潤&quot;,     #65a30d, true)
+f_sig(showSig and watchBreak,    &quot;觀察 未放量不買&quot;,     #9ca3af, true)
+f_sig(showSig and coverDanger,   &quot;回補 跌破無跟進&quot;,     #f59e0b, true)
+f_sig(showSig and sellBreak,     &quot;賣① 跌破必守樞紐&quot;,    #dc2626, false)
+f_sig(showSig and sellDanger,    &quot;賣② 突破無跟進&quot;,      #f59e0b, false)
+f_sig(showSig and sellRallyFail, &quot;賣③ 次級反彈失敗&quot;,    #dc2626, false)
+f_sig(showSig and sellClimax,    &quot;賣④ 放量異常反轉&quot;,    #b91c1c, false)
+f_sig(showSig and sellODR,       &quot;賣⑤ 一日反轉&quot;,        #dc2626, false)
+f_sig(showSig and shortResume,   &quot;放空② MK回跌勢欄&quot;,    #7f1d1d, false)
 
 // ── 資訊框 ──
 var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),
@@ -7125,21 +7133,21 @@ alertcondition(flipEvt and not up, &quot;日線轉入下跌周期&quot;, &quot;{
 alertcondition(lateEvt and up,     &quot;日線上昇周期進入尾段&quot;, &quot;{{ticker}} 日線上昇周期已走 &gt;75%，留意轉折 (接近 3 點鐘)&quot;)
 alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &quot;{{ticker}} 日線下跌周期已走 &gt;75%，留意反轉 (接近 9 點鐘)&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7a_main(09.16_13.59).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.16_13.59).pine')">複製</button></summary>
-      <pre id="pine-r7a_main(09.16_13.59).pine">//@version=5
+<details class="pinebox"><summary><b>r7a_main(09.16_17.41).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.16_17.41).pine')">複製</button></summary>
+      <pre id="pine-r7a_main(09.16_17.41).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-A  主圖：EMA9 Band Width Strategy
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 2（EMA9 中線 ± 帶寬、擠壓突破 / 回踩進場、風控出場）。
@@ -7147,7 +7155,7 @@ alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &
 //  但它們的圖形改由 R7-B / R7-C / R7-D 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
 // ═══════════════════════════════════════════════════════════════════════════
 
-strategy(&quot;R7-A EMA9 BW (main) r7(09:16_13:59)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
+strategy(&quot;R7-A EMA9 BW (main) r7(09:16_17:41)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
      overlay = true, initial_capital = 10000,
      default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
      commission_type = strategy.commission.percent, commission_value = 0.05,
@@ -7478,7 +7486,7 @@ f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右�
 // 備註框：淺色底 + 黑字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -7591,8 +7599,8 @@ plot(ema21, &quot;EMA21 (趨勢過濾)&quot;, color = color.new(color.gray, 20),
 plot(bw, &quot;Band Width %&quot;, color = color.purple, display = display.data_window)
 plot(bwLow, &quot;Band Width N 期最低&quot;, color = color.gray, display = display.data_window)
 
-plotshape(longSig,  &quot;做多訊號&quot;, shape.triangleup,   location.belowbar, color.green, size = size.small, text = &quot;多&quot;)
-plotshape(shortSig, &quot;做空訊號&quot;, shape.triangledown, location.abovebar, color.red,   size = size.small, text = &quot;空&quot;)
+plotshape(longSig,  &quot;做多訊號&quot;, shape.triangleup,   location.belowbar, color.green, size = size.small, text = &quot;多&quot;, display = display.pane)
+plotshape(shortSig, &quot;做空訊號&quot;, shape.triangledown, location.abovebar, color.red,   size = size.small, text = &quot;空&quot;, display = display.pane)
 plot(strategy.position_size != 0 ? stopPx : na, &quot;止損線&quot;, color = color.red,   style = plot.style_linebr, linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 plot(strategy.position_size != 0 ? tpPx   : na, &quot;止盈線&quot;, color = color.green, style = plot.style_linebr, linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 
@@ -7613,8 +7621,8 @@ bigBuy  = bigVol and close &gt; open and rngPos &gt;= bigPos
 bigSell = bigVol and close &lt; open and rngPos &lt;= 1 - bigPos
 nBuy20  = math.sum(bigBuy  ? 1 : 0, 20)
 nSell20 = math.sum(bigSell ? 1 : 0, 20)
-plotshape(markBig and bigBuy,  &quot;主力大單買入日&quot;, shape.diamond, location.belowbar, cBuy,  size = size.tiny)
-plotshape(markBig and bigSell, &quot;主力大單賣出日&quot;, shape.diamond, location.abovebar, cSell, size = size.tiny)
+plotshape(markBig and bigBuy,  &quot;主力大單買入日&quot;, shape.diamond, location.belowbar, cBuy,  size = size.tiny, display = display.pane)
+plotshape(markBig and bigSell, &quot;主力大單賣出日&quot;, shape.diamond, location.abovebar, cSell, size = size.tiny, display = display.pane)
 plot(volume, &quot;成交量&quot;, color = bigBuy ? cBuy : bigSell ? cSell : color.gray, display = display.data_window)
 plot(vAvg,   &quot;均量&quot;,   color = color.gray, display = display.data_window)
 
@@ -7622,30 +7630,30 @@ plot(vAvg,   &quot;均量&quot;,   color = color.gray, display = display.data_wi
 var tbl = table.new(f_boxPos(boxPos), 2, 10, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 if barstate.islast
-    table.cell(tbl, 0, 0, &quot;Band Width %&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 1, 0, str.tostring(bw, &quot;#.##&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 0, 1, &quot;N期最低 BW&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 1, 1, str.tostring(bwLow, &quot;#.##&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 0, 2, &quot;擠壓中&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 1, 2, squeeze ? &quot;是 ⚠&quot; : (recentSqz ? &quot;剛結束&quot; : &quot;否&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = squeeze ? color.new(color.yellow, 60) : na)
-    table.cell(tbl, 0, 3, &quot;帶寬方向&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 1, 3, expanding ? &quot;擴張 ↑&quot; : &quot;收縮 ↓&quot;, width = boxW * 0.45, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 0, 4, &quot;MACD (圖表TF)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 1, 4, m2_macd &gt; 0 ? &quot;綠燈&quot; : &quot;紅燈&quot;, width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = m2_macd &gt; 0 ? color.new(color.green, 70) : color.new(color.red, 70))
-    table.cell(tbl, 0, 5, &quot;EMA9 斜率&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 1, 5, basisUp ? &quot;上升&quot; : (basisDn ? &quot;下降&quot; : &quot;走平&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 0, 6, &quot;日線週期 (R7-B)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
+    table.cell(tbl, 0, 0, &quot;Band Width %&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 1, 0, str.tostring(bw, &quot;#.##&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 0, 1, &quot;N期最低 BW&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 1, 1, str.tostring(bwLow, &quot;#.##&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 0, 2, &quot;擠壓中&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 1, 2, squeeze ? &quot;是 ⚠&quot; : (recentSqz ? &quot;剛結束&quot; : &quot;否&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = squeeze ? color.new(color.yellow, 88) : na, text_formatting = text.format_bold)
+    table.cell(tbl, 0, 3, &quot;帶寬方向&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 1, 3, expanding ? &quot;擴張 ↑&quot; : &quot;收縮 ↓&quot;, width = boxW * 0.45, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 0, 4, &quot;MACD (圖表TF)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 1, 4, m2_macd &gt; 0 ? &quot;綠燈&quot; : &quot;紅燈&quot;, width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = m2_macd &gt; 0 ? color.new(color.green, 88) : color.new(color.red, 88), text_formatting = text.format_bold)
+    table.cell(tbl, 0, 5, &quot;EMA9 斜率&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 1, 5, basisUp ? &quot;上升&quot; : (basisDn ? &quot;下降&quot; : &quot;走平&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 0, 6, &quot;日線週期 (R7-B)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
     table.cell(tbl, 1, 6, (up ? &quot;上昇 &quot; : &quot;下跌 &quot;) + str.tostring(progRaw * 100, &quot;#&quot;) + &quot;%&quot; + (useDailyCycle ? &quot; ·過濾中&quot; : &quot;&quot;), width = boxW * 0.45, height = boxH / 10,
-         text_size = size.small, bgcolor = up ? color.new(cUp, 70) : color.new(cDn, 70))
-    table.cell(tbl, 0, 7, &quot;VCP 等級 (R7-C)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 1, 7, f_gradeTxt(vcpGrade) + &quot; · &quot; + str.tostring(vcpScore, &quot;#&quot;) + (useVcpGrade ? &quot; ·過濾中&quot; : &quot;&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = color.new(f_gradeCol(vcpGrade), 60))
-    table.cell(tbl, 0, 8, &quot;確定性 (R7-D)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
-    table.cell(tbl, 1, 8, str.tostring(certTotal, &quot;#.#&quot;) + (minCert &gt; 0 ? &quot; ·門檻 &quot; + str.tostring(minCert, &quot;#&quot;) : &quot;&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = certTotal &gt;= certAlert ? color.new(#3FB68B, 60) : na)
+         text_size = size.small, bgcolor = up ? color.new(cUp, 88) : color.new(cDn, 88), text_formatting = text.format_bold)
+    table.cell(tbl, 0, 7, &quot;VCP 等級 (R7-C)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 1, 7, f_gradeTxt(vcpGrade) + &quot; · &quot; + str.tostring(vcpScore, &quot;#&quot;) + (useVcpGrade ? &quot; ·過濾中&quot; : &quot;&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = color.new(f_gradeCol(vcpGrade), 88), text_formatting = text.format_bold)
+    table.cell(tbl, 0, 8, &quot;確定性 (R7-D)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 1, 8, str.tostring(certTotal, &quot;#.#&quot;) + (minCert &gt; 0 ? &quot; ·門檻 &quot; + str.tostring(minCert, &quot;#&quot;) : &quot;&quot;), width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = certTotal &gt;= certAlert ? color.new(#3FB68B, 88) : na, text_formatting = text.format_bold)
 
-    table.cell(tbl, 0, 9, &quot;主力大單 (20日)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small)
+    table.cell(tbl, 0, 9, &quot;主力大單 (20日)&quot;, width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
     table.cell(tbl, 1, 9, &quot;買 &quot; + str.tostring(nBuy20) + &quot; · 賣 &quot; + str.tostring(nSell20) + (bigBuy ? &quot; ·今日主買&quot; : bigSell ? &quot; ·今日主賣&quot; : &quot;&quot;),
          width = boxW * 0.45, height = boxH / 10, text_size = size.small,
-         bgcolor = bigBuy ? color.new(cBuy, 60) : bigSell ? color.new(cSell, 60) : na)
+         bgcolor = bigBuy ? color.new(cBuy, 88) : bigSell ? color.new(cSell, 88) : na, text_formatting = text.format_bold)
 
 // ── M2 警報 ──
 alertcondition(longSig,  &quot;M2 EMA9-BW 做多訊號&quot;, &quot;{{ticker}} EMA9 帶寬策略做多訊號 @{{close}}&quot;)
@@ -7654,21 +7662,21 @@ alertcondition(squeeze and not squeeze[1], &quot;M2 EMA9-BW 擠壓開始&quot;, 
 alertcondition(bigBuy,  &quot;⑧ 主力大單買入日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間上緣 — 主力大單買入&quot;)
 alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間下緣 — 主力大單賣出&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7b_macd_clock(09.16_13.59).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.16_13.59).pine')">複製</button></summary>
-      <pre id="pine-r7b_macd_clock(09.16_13.59).pine">//@version=5
+<details class="pinebox"><summary><b>r7b_macd_clock(09.16_17.41).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.16_17.41).pine')">複製</button></summary>
+      <pre id="pine-r7b_macd_clock(09.16_17.41).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -7680,7 +7688,7 @@ alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 
 //  R7：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-B MACD + Cycle Clock r7(09:16_13:59)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
+indicator(&quot;R7-B MACD + Cycle Clock r7(09:16_17:41)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -7731,7 +7739,7 @@ f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右�
 // 備註框：淺色底 + 黑字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -7838,7 +7846,7 @@ else
         extBar := bar_index
 // 以 location.absolute 畫在柱狀圖數值上；bool series 不能用 absolute，故傳入 hist
 plotshape(bar_index == extBar and not up ? hist : na, &quot;本周期新低 (轉勢點候選)&quot;, shape.circle,
-     location.absolute, color.new(#eab308, 15), size = size.tiny)
+     location.absolute, color.new(#eab308, 15), size = size.tiny, display = display.pane)
 
 // 「N日」週期長度（次要備註）：透明無底色，貼在剛結束那段週期的最高柱 (上昇) / 最低柱 (下跌) 頂端，
 // 不超出柱狀圖本身的高度範圍；extVal[1] / extBar[1] = 翻轉當根之前記錄到的上一段週期極值與其位置
@@ -7846,13 +7854,13 @@ if showLbl and flipEvt and not na(extVal[1]) and not na(extBar[1])
     label.new(extBar[1], extVal[1], str.tostring(lastLen, &quot;#&quot;) + &quot;日&quot;,
          style = up[1] ? label.style_label_down : label.style_label_up,
          color = color.new(color.white, 100),
-         textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny)
+         textcolor = up[1] ? color.new(cUp, 15) : color.new(cDn, 15), size = size.tiny, text_formatting = text.format_bold)
 
 // ── M1 背馳標註（依據 MACD 快線的轉折）：▲/▼ 畫在轉折點；備註框放在曲線「內側」（谷底之上 / 峰頂之下，
 //    距離 = 近期振幅 × noteGap），不佔用 pane 上下多餘空間；虛線指回轉折點；與曲線同一座標系，縮放 / 捲動同步。背馳連線加粗、實線無箭頭。
 divGap = math.max((oscHi - oscLo) * noteGap, 1e-9)
-plotshape(bullDiv ? divOL : na, &quot;底背馳 ▲&quot;, shape.triangleup,   location.absolute, color.new(cUp, 0), size = size.small, offset = divOff)
-plotshape(bearDiv ? divOH : na, &quot;頂背馳 ▼&quot;, shape.triangledown, location.absolute, color.new(cDn, 0), size = size.small, offset = divOff)
+plotshape(bullDiv ? divOL : na, &quot;底背馳 ▲&quot;, shape.triangleup,   location.absolute, color.new(cUp, 0), size = size.small, offset = divOff, display = display.pane)
+plotshape(bearDiv ? divOH : na, &quot;頂背馳 ▼&quot;, shape.triangledown, location.absolute, color.new(cDn, 0), size = size.small, offset = divOff, display = display.pane)
 if bullDiv
     [lbB, lnB] = f_note(bar_index + divOff, divOL, divOL + divGap, &quot;底背馳&quot;, cUp, true)    // 框在谷底上方 (曲線內側)
     if divLine and onCycTF
@@ -7883,8 +7891,8 @@ if showBrk and showLvl and onCycTF
             line.set_extend(lvL, extend.none)
         lvL := line.new(bar_index - lbR, lastPL, bar_index, lastPL, color = color.new(cUp, 40),
              style = line.style_dotted, width = 1, extend = extend.right)
-plotshape(brkUpEvt ? lastPH : na, &quot;升破前頂 ◆&quot;, shape.diamond, location.absolute, color.new(cUp, 0), size = size.small)
-plotshape(brkDnEvt ? lastPL : na, &quot;跌破前底 ◆&quot;, shape.diamond, location.absolute, color.new(cDn, 0), size = size.small)
+plotshape(brkUpEvt ? lastPH : na, &quot;升破前頂 ◆&quot;, shape.diamond, location.absolute, color.new(cUp, 0), size = size.small, display = display.pane)
+plotshape(brkDnEvt ? lastPL : na, &quot;跌破前底 ◆&quot;, shape.diamond, location.absolute, color.new(cDn, 0), size = size.small, display = display.pane)
 if brkUpEvt
     [lbU, lnU] = f_note(bar_index, lastPH, lastPH - divGap, &quot;升破前頂&quot;, cUp, false)   // 框在前頂之下 (曲線內側)
 if brkDnEvt
@@ -7912,15 +7920,15 @@ if showClock and barstate.islast
     if not merged
         for ci = 0 to grid - 1
             for cj = 0 to grid + 1
-                table.cell(clk, ci, cj, &quot;&quot;, width = cellW, height = cellH)
+                table.cell(clk, ci, cj, &quot;&quot;, width = cellW, height = cellH, text_formatting = text.format_bold)
         table.merge_cells(clk, 0, 0, grid - 1, 0)                 // 上方狀態列
         table.merge_cells(clk, 0, grid + 1, grid - 1, grid + 1)   // 下方統計列
         merged := true
 
     activeCol = up ? cUp : cDn
     dateTxt = str.format_time(time, &quot;MM/dd&quot;, tz)
-    table.cell(clk, 0, 0, phaseTxt + &quot;  &quot; + dateTxt, width = cellW, height = hdrH, text_color = color.white, bgcolor = color.new(activeCol, 10),
-         text_size = size.small, text_halign = text.align_center)
+    table.cell(clk, 0, 0, phaseTxt + &quot;  &quot; + dateTxt, width = cellW, height = hdrH, text_color = color.black, bgcolor = color.new(activeCol, 10),
+         text_size = size.small, text_halign = text.align_center, text_formatting = text.format_bold)
 
     // 高解析度時鐘：環厚、指針寬、圓心半徑都隨格數放大；12/3/6/9 刻度；已走過的弧段亮色
     c     = (grid - 1) / 2.0            // 圓心索引
@@ -7974,15 +7982,15 @@ if showClock and barstate.islast
 
             table.cell(clk, i, j + 1, cellTx, width = cellW, height = cellH,
                  bgcolor = cellBg, text_color = color.new(color.gray, 0), text_size = size.tiny,
-                 text_halign = text.align_center, text_valign = text.align_center)
+                 text_halign = text.align_center, text_valign = text.align_center, text_formatting = text.format_bold)
 
     statTxt = &quot;第 &quot; + str.tostring(elapsed) + &quot; / 預期 &quot; + str.tostring(expected, &quot;#.#&quot;) + &quot; 日 · &quot; +
          str.tostring(progRaw * 100, &quot;#&quot;) + &quot;%&quot; + (overdue ? &quot; ⚠超時&quot; : late ? &quot; ·尾段&quot; : &quot;&quot;) +
          &quot;\n均升 &quot; + str.tostring(avgUp, &quot;#.#&quot;) + &quot; 日 · 均跌 &quot; + str.tostring(avgDn, &quot;#.#&quot;) + &quot; 日&quot; +
          (timeframe.period != cycTF ? &quot;\n(日線週期 疊加於 &quot; + timeframe.period + &quot; 圖)&quot; : &quot;&quot;) +
          (not up and not na(extBar) ? &quot;\n距轉勢點 &quot; + str.tostring(bar_index - extBar) + &quot; 根&quot; : &quot;&quot;)
-    table.cell(clk, 0, grid + 1, statTxt, width = cellW, height = hdrH, text_color = color.white,
-         bgcolor = color.new(color.gray, 30), text_size = size.tiny, text_halign = text.align_center)
+    table.cell(clk, 0, grid + 1, statTxt, width = cellW, height = hdrH, text_color = color.black,
+         bgcolor = color.new(color.gray, 88), text_size = size.tiny, text_halign = text.align_center, text_formatting = text.format_bold)
 
 // ── M1 警報 ──
 alertcondition(flipEvt and up,     &quot;M1 日線轉入上昇周期&quot;, &quot;{{ticker}} 日線 MACD 柱狀圖轉正 — 進入上昇周期 (9 點鐘)&quot;)
@@ -7994,21 +8002,21 @@ alertcondition(bearDiv, &quot;M1 頂背馳&quot;, &quot;{{ticker}} 日線 MACD �
 alertcondition(brkUpEvt, &quot;M1 MACD 升破前頂&quot;, &quot;{{ticker}} 日線 MACD 快線升破前一個轉折高點 — 動能創新高&quot;)
 alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日線 MACD 快線跌破前一個轉折低點 — 動能創新低&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7c_vcp(09.16_13.59).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.16_13.59).pine')">複製</button></summary>
-      <pre id="pine-r7c_vcp(09.16_13.59).pine">//@version=5
+<details class="pinebox"><summary><b>r7c_vcp(09.16_17.41).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.16_17.41).pine')">複製</button></summary>
+      <pre id="pine-r7c_vcp(09.16_17.41).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-C  下方 pane：VCP 指數曲線
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
@@ -8016,7 +8024,7 @@ alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日�
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-C VCP Score r7(09:16_13:59)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-C VCP Score r7(09:16_17:41)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8038,7 +8046,7 @@ f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右�
 // 備註框：淺色底 + 黑字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -8283,56 +8291,56 @@ var bool vInit = false
 if showVcp and barstate.islast
     if not vInit
         for rj = 0 to 8
-            table.cell(tV, 0, rj, &quot;&quot;)
-            table.cell(tV, 1, rj, &quot;&quot;)
+            table.cell(tV, 0, rj, &quot;&quot;, text_formatting = text.format_bold)
+            table.cell(tV, 1, rj, &quot;&quot;, text_formatting = text.format_bold)
         vInit := true
-    table.cell(tV, 0, 0, &quot;VCP &quot; + str.tostring(vcpScore, &quot;#.#&quot;), width = boxW * 0.45, height = boxH / 9, text_color = color.white,
-         bgcolor = color.new(gCol, 10), text_size = size.small)
-    table.cell(tV, 1, 0, f_gradeTxt(vcpGrade), width = boxW * 0.55, height = boxH / 9, text_color = color.white,
-         bgcolor = color.new(gCol, 10), text_size = size.small)
-    table.cell(tV, 0, 1, &quot;距 52 週高&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+    table.cell(tV, 0, 0, &quot;VCP &quot; + str.tostring(vcpScore, &quot;#.#&quot;), width = boxW * 0.45, height = boxH / 9, text_color = color.black,
+         bgcolor = color.new(gCol, 88), text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tV, 1, 0, f_gradeTxt(vcpGrade), width = boxW * 0.55, height = boxH / 9, text_color = color.black,
+         bgcolor = color.new(gCol, 88), text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tV, 0, 1, &quot;距 52 週高&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_formatting = text.format_bold)
     table.cell(tV, 1, 1, str.tostring(-offHigh, &quot;#.#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
-         text_color = offHigh &lt;= 10 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 2, &quot;距 52 週低&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+         text_color = offHigh &lt;= 10 ? #3FB68B : color.gray, text_formatting = text.format_bold)
+    table.cell(tV, 0, 2, &quot;距 52 週低&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_formatting = text.format_bold)
     table.cell(tV, 1, 2, &quot;+&quot; + str.tostring(aboveLow, &quot;#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
-         text_color = aboveLow &gt;= 30 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 3, &quot;1 月 / 3 月&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+         text_color = aboveLow &gt;= 30 ? #3FB68B : color.gray, text_formatting = text.format_bold)
+    table.cell(tV, 0, 3, &quot;1 月 / 3 月&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_formatting = text.format_bold)
     table.cell(tV, 1, 3, str.tostring(chg1m, &quot;+#.#&quot;) + &quot;% / &quot; + str.tostring(chg3m, &quot;+#.#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = boxH / 9,
-         text_size = size.tiny, text_color = extendedB ? #E5B15C : color.gray)
-    table.cell(tV, 0, 4, &quot;21 日收盤區間&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+         text_size = size.tiny, text_color = extendedB ? #E5B15C : color.gray, text_formatting = text.format_bold)
+    table.cell(tV, 0, 4, &quot;21 日收盤區間&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_formatting = text.format_bold)
     table.cell(tV, 1, 4, str.tostring(rng21, &quot;#.#&quot;) + &quot;%&quot; + (tightB ? &quot; 緊縮 ✓&quot; : &quot;&quot;), width = boxW * 0.55, height = boxH / 9,
-         text_size = size.tiny, text_color = tightB ? #3FB68B : color.gray)
-    table.cell(tV, 0, 5, &quot;量比 10d/50d&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+         text_size = size.tiny, text_color = tightB ? #3FB68B : color.gray, text_formatting = text.format_bold)
+    table.cell(tV, 0, 5, &quot;量比 10d/50d&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_formatting = text.format_bold)
     table.cell(tV, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + (volRatio &lt; 0.95 ? &quot; 量縮 ✓&quot; : &quot;&quot;), width = boxW * 0.55, height = boxH / 9,
-         text_size = size.tiny, text_color = volRatio &lt; 0.95 ? #3FB68B : color.gray)
-    table.cell(tV, 0, 6, &quot;趨勢模板&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+         text_size = size.tiny, text_color = volRatio &lt; 0.95 ? #3FB68B : color.gray, text_formatting = text.format_bold)
+    table.cell(tV, 0, 6, &quot;趨勢模板&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_formatting = text.format_bold)
     table.cell(tV, 1, 6, (trendOK ? &quot;通過 ✓&quot; : &quot;未通過&quot;) + &quot;  MA50&quot; + (a50B ? &quot;✓&quot; : &quot;✗&quot;) +
          &quot; MA200&quot; + (a200B ? &quot;✓&quot; : &quot;✗&quot;) + &quot; 50&gt;200&quot; + (crossB ? &quot;✓&quot; : &quot;✗&quot;), width = boxW * 0.55, height = boxH / 9,
-         text_size = size.tiny, text_color = trendOK ? #3FB68B : #E0705F)
-    table.cell(tV, 0, 7, &quot;延伸判定&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny)
+         text_size = size.tiny, text_color = trendOK ? #3FB68B : #E0705F, text_formatting = text.format_bold)
+    table.cell(tV, 0, 7, &quot;延伸判定&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_formatting = text.format_bold)
     table.cell(tV, 1, 7, extendedB ? &quot;21 日漲幅 &gt;15% → E&quot; : &quot;否&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny,
-         text_color = extendedB ? #E5B15C : color.gray)
-    table.cell(tV, 0, 8, &quot;A=待突破 B=上升 C=修復&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
-    table.cell(tV, 1, 8, &quot;D=趨勢弱 E=延伸&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+         text_color = extendedB ? #E5B15C : color.gray, text_formatting = text.format_bold)
+    table.cell(tV, 0, 8, &quot;A=待突破 B=上升 C=修復&quot;, width = boxW * 0.45, height = boxH / 9, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tV, 1, 8, &quot;D=趨勢弱 E=延伸&quot;, width = boxW * 0.55, height = boxH / 9, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
 
 alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, &quot;VCP 轉 A 級 (待突破)&quot;, &quot;{{ticker}} VCP 等級轉為 A · VCP 待突破&quot;)
 alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&quot;, &quot;{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7d_cert(09.16_13.59).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.16_13.59).pine')">複製</button></summary>
-      <pre id="pine-r7d_cert(09.16_13.59).pine">//@version=5
+<details class="pinebox"><summary><b>r7d_cert(09.16_17.41).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.16_17.41).pine')">複製</button></summary>
+      <pre id="pine-r7d_cert(09.16_17.41).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-D  下方 pane：確定性指數曲線
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-A。把 7 項加權後的 0–100 確定性總分畫成一條曲線，
@@ -8341,7 +8349,7 @@ alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo build_r17_data.py）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-D Certainty 7 r7(09:16_13:59)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-D Certainty 7 r7(09:16_17:41)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8363,7 +8371,7 @@ f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右�
 // 備註框：淺色底 + 黑字，放在錨點上方 (above) 或下方，與曲線同一座標系 (縮放/捲動同步)，虛線指回被標註的點
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -8571,7 +8579,7 @@ if hiEvt
     if array.size(hL) &gt; 8
         label.delete(array.shift(hL))
         line.delete(array.shift(hN))
-plotshape(hiEvt ? certTotal : na, &quot;進入高確定性點&quot;, shape.circle, location.absolute, color.new(#3FB68B, 0), size = size.tiny)
+plotshape(hiEvt ? certTotal : na, &quot;進入高確定性點&quot;, shape.circle, location.absolute, color.new(#3FB68B, 0), size = size.tiny, display = display.pane)
 pThr  = plot(certAlert, &quot;高確定性分界 (門檻)&quot;, color = color.new(#3FB68B, 30), linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 fill(pCert, pThr, color = hiCert ? color.new(#3FB68B, 70) : na, title = &quot;高確定性區 (曲線 ≥ 門檻)&quot;)
 bgcolor(hiCert ? color.new(#3FB68B, 88) : na, title = &quot;高確定性背景&quot;)
@@ -8593,43 +8601,43 @@ if showCert and barstate.islast
     if not dInit
         for cc = 0 to 2
             for rj = 0 to 8
-                table.cell(tD, cc, rj, &quot;&quot;)
+                table.cell(tD, cc, rj, &quot;&quot;, text_formatting = text.format_bold)
         dInit := true
-    hdrCol = hiCert ? color.new(#3FB68B, 10) : color.new(#6B7885, 10)   // 只有高確定性才上色
-    table.cell(tD, 0, 0, &quot;確定性&quot;, width = boxW * 0.40, height = boxH / 9, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
-    table.cell(tD, 1, 0, str.tostring(certTotal, &quot;#.#&quot;), width = boxW * 0.38, height = boxH / 9, text_color = color.white, bgcolor = hdrCol, text_size = size.small)
-    table.cell(tD, 2, 0, hlOk ? &quot;HL ✓ &quot; + str.tostring(nBot) + &quot; 底&quot; : &quot;無 HL&quot;, width = boxW * 0.22, height = boxH / 9, text_color = color.white,
-         bgcolor = hdrCol, text_size = size.tiny)
+    hdrCol = hiCert ? color.new(#3FB68B, 88) : color.new(#6B7885, 88)   // 只有高確定性才上色
+    table.cell(tD, 0, 0, &quot;確定性&quot;, width = boxW * 0.40, height = boxH / 9, text_color = color.black, bgcolor = hdrCol, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tD, 1, 0, str.tostring(certTotal, &quot;#.#&quot;), width = boxW * 0.38, height = boxH / 9, text_color = color.black, bgcolor = hdrCol, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tD, 2, 0, hlOk ? &quot;HL ✓ &quot; + str.tostring(nBot) + &quot; 底&quot; : &quot;無 HL&quot;, width = boxW * 0.22, height = boxH / 9, text_color = color.black,
+         bgcolor = hdrCol, text_size = size.tiny, text_formatting = text.format_bold)
     names = array.from(&quot;突破 25%&quot;, &quot;回升 10%&quot;, &quot;守底 15%&quot;, &quot;量縮 15%&quot;, &quot;收縮 10%&quot;, &quot;RS 10%&quot;, &quot;均線 15%&quot;)
     vals  = array.from(cBreak, cRetr, cTime, cDv, cContr, cRs, cMa)
     for i = 0 to 6
         v = array.get(vals, i)
-        table.cell(tD, 0, i + 1, array.get(names, i), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_halign = text.align_left)
+        table.cell(tD, 0, i + 1, array.get(names, i), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_halign = text.align_left, text_formatting = text.format_bold)
         table.cell(tD, 1, i + 1, f_bar(v, 8), width = boxW * 0.38, height = boxH / 9, text_size = size.tiny,
-             text_color = v &gt;= 0.7 ? #3FB68B : v &gt;= 0.4 ? #E5B15C : #8B98A5)
-        table.cell(tD, 2, i + 1, str.tostring(v * 100, &quot;#&quot;), width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_halign = text.align_right)
-    table.cell(tD, 0, 8, &quot;量比(跌/漲) &quot; + str.tostring(dvRatio, &quot;#.##&quot;), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
-    table.cell(tD, 1, 8, &quot;RS21 &quot; + str.tostring(rs21 * 100, &quot;+#.#&quot;) + &quot;%&quot;, width = boxW * 0.38, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
-    table.cell(tD, 2, 8, hlOk ? &quot;守底 &quot; + str.tostring(dHeld) + &quot;日&quot; : &quot;–&quot;, width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_color = color.gray)
+             text_color = v &gt;= 0.7 ? #3FB68B : v &gt;= 0.4 ? #E5B15C : #8B98A5, text_formatting = text.format_bold)
+        table.cell(tD, 2, i + 1, str.tostring(v * 100, &quot;#&quot;), width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_halign = text.align_right, text_formatting = text.format_bold)
+    table.cell(tD, 0, 8, &quot;量比(跌/漲) &quot; + str.tostring(dvRatio, &quot;#.##&quot;), width = boxW * 0.40, height = boxH / 9, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tD, 1, 8, &quot;RS21 &quot; + str.tostring(rs21 * 100, &quot;+#.#&quot;) + &quot;%&quot;, width = boxW * 0.38, height = boxH / 9, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tD, 2, 8, hlOk ? &quot;守底 &quot; + str.tostring(dHeld) + &quot;日&quot; : &quot;–&quot;, width = boxW * 0.22, height = boxH / 9, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
 
 alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;確定性達門檻&quot;,
      &quot;{{ticker}} 確定性總分升至門檻以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7e_gravity(09.16_13.59).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.16_13.59).pine')">複製</button></summary>
-      <pre id="pine-r7e_gravity(09.16_13.59).pine">//@version=5
+<details class="pinebox"><summary><b>r7e_gravity(09.16_17.41).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.16_17.41).pine')">複製</button></summary>
+      <pre id="pine-r7e_gravity(09.16_17.41).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-E  主圖：價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8642,7 +8650,7 @@ alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;
 //  訊號：重心上移 + 價在重心上 = 上升最低阻力；重心下移 + 價在重心下 = 下跌最低阻力；
 //        重心走平且穩定 = 定錨 (主力未走)；價格跌破重心後 M 根內收回 = 假跌破 (用股價打掩護)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-E Price Gravity r7(09:16_13:59)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-E Price Gravity r7(09:16_17:41)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
 
 // ── ① 重心定義 ──
 grpG = &quot;① 重心定義&quot;
@@ -8671,7 +8679,7 @@ f_boxPos(s) =&gt; s == &quot;左上&quot; ? position.top_left : s == &quot;左�
      s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -8741,9 +8749,9 @@ fill(pU, pL, color = anchor ? color.new(#f59e0b, 90) : color.new(color.gray, 94)
 plot(shiftATR, &quot;重心 M 根位移 (ATR)&quot;, display = display.data_window)
 plot(distSig,  &quot;價格距重心 (σ)&quot;,      display = display.data_window)
 
-plotshape(pathUp and not pathUp[1], &quot;上升最低阻力 開始&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny, text = &quot;重心上移&quot;, textcolor = #26a69a)
-plotshape(pathDn and not pathDn[1], &quot;下跌最低阻力 開始&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny, text = &quot;重心下移&quot;, textcolor = #ef5350)
-plotshape(anchor and not anchor[1], &quot;定錨開始&quot;, shape.diamond, location.belowbar, color.new(#f59e0b, 0), size = size.tiny)
+plotshape(pathUp and not pathUp[1], &quot;上升最低阻力 開始&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny, text = &quot;重心上移&quot;, textcolor = #26a69a, display = display.pane)
+plotshape(pathDn and not pathDn[1], &quot;下跌最低阻力 開始&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny, text = &quot;重心下移&quot;, textcolor = #ef5350, display = display.pane)
+plotshape(anchor and not anchor[1], &quot;定錨開始&quot;, shape.diamond, location.belowbar, color.new(#f59e0b, 0), size = size.tiny, display = display.pane)
 
 if fakeBD
     [l1, n1] = f_note(bar_index, low, low - atr * 0.8, &quot;假跌破 收回重心&quot;, #26a69a, false)
@@ -8756,21 +8764,21 @@ var table tb = table.new(f_boxPos(boxPos), 2, 7, bgcolor = color.new(#ffffff, 5)
 if showBox and barstate.islast
     rh = boxH / 7
     stateTxt = pathUp ? &quot;上升最低阻力&quot; : pathDn ? &quot;下跌最低阻力&quot; : anchor ? &quot;定錨 (主力未走)&quot; : stable ? &quot;走平&quot; : &quot;位移中&quot;
-    stateCol = pathUp ? color.new(#26a69a, 60) : pathDn ? color.new(#ef5350, 60) : anchor ? color.new(#f59e0b, 60) : na
-    table.cell(tb, 0, 0, &quot;價格重心 · &quot; + mode, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 1, 0, str.tostring(gravity, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 0, 1, &quot;狀態&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 1, stateTxt, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = stateCol)
-    table.cell(tb, 0, 2, &quot;重心 &quot; + str.tostring(slopeM) + &quot; 根位移 (ATR)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 2, str.tostring(shiftATR, &quot;+#.##&quot;), width = boxW * 0.45, height = rh, text_size = size.small, text_color = gUp ? #26a69a : gDn ? #ef5350 : color.gray)
-    table.cell(tb, 0, 3, &quot;價格距重心 (σ)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 3, str.tostring(distSig, &quot;+#.##&quot;), width = boxW * 0.45, height = rh, text_size = size.small, text_color = aboveG ? #26a69a : #ef5350)
-    table.cell(tb, 0, 4, &quot;成本帶 (±&quot; + str.tostring(kSig, &quot;#.##&quot;) + &quot;σ)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 4, str.tostring(lowerB, format.mintick) + &quot; – &quot; + str.tostring(upperB, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 5, &quot;當日 VWAP / 錨定 VWAP&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 5, str.tostring(vwapDay, format.mintick) + &quot; / &quot; + str.tostring(vwapAnc, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 6, &quot;滾動 VWAP / POC&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 6, str.tostring(vwapRoll, format.mintick) + &quot; / &quot; + str.tostring(pocVal, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
+    stateCol = pathUp ? color.new(#26a69a, 88) : pathDn ? color.new(#ef5350, 88) : anchor ? color.new(#f59e0b, 88) : na
+    table.cell(tb, 0, 0, &quot;價格重心 · &quot; + mode, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.black, bgcolor = color.new(#374151, 88), text_formatting = text.format_bold)
+    table.cell(tb, 1, 0, str.tostring(gravity, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.black, bgcolor = color.new(#374151, 88), text_formatting = text.format_bold)
+    table.cell(tb, 0, 1, &quot;狀態&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 1, stateTxt, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = stateCol, text_formatting = text.format_bold)
+    table.cell(tb, 0, 2, &quot;重心 &quot; + str.tostring(slopeM) + &quot; 根位移 (ATR)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 2, str.tostring(shiftATR, &quot;+#.##&quot;), width = boxW * 0.45, height = rh, text_size = size.small, text_color = gUp ? #26a69a : gDn ? #ef5350 : color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 3, &quot;價格距重心 (σ)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 3, str.tostring(distSig, &quot;+#.##&quot;), width = boxW * 0.45, height = rh, text_size = size.small, text_color = aboveG ? #26a69a : #ef5350, text_formatting = text.format_bold)
+    table.cell(tb, 0, 4, &quot;成本帶 (±&quot; + str.tostring(kSig, &quot;#.##&quot;) + &quot;σ)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 4, str.tostring(lowerB, format.mintick) + &quot; – &quot; + str.tostring(upperB, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 5, &quot;當日 VWAP / 錨定 VWAP&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 5, str.tostring(vwapDay, format.mintick) + &quot; / &quot; + str.tostring(vwapAnc, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 6, &quot;滾動 VWAP / POC&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 6, str.tostring(vwapRoll, format.mintick) + &quot; / &quot; + str.tostring(pocVal, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
 
 // ── 警報 ──
 alertcondition(pathUp and not pathUp[1], &quot;重心上移 · 上升最低阻力&quot;, &quot;{{ticker}} 價格重心上移且價在重心上 — 上升最低阻力&quot;)
@@ -8780,21 +8788,21 @@ alertcondition(anchor and not anchor[1], &quot;重心定錨&quot;, &quot;{{ticke
 alertcondition(fakeBD, &quot;假跌破收回重心&quot;, &quot;{{ticker}} 跌破價格重心後數根內收回 — 洗盤嫌疑&quot;)
 alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突破價格重心後數根內跌回 — 誘多嫌疑&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7f_force(09.16_13.59).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.16_13.59).pine')">複製</button></summary>
-      <pre id="pine-r7f_force(09.16_13.59).pine">//@version=5
+<details class="pinebox"><summary><b>r7f_force(09.16_17.41).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.16_17.41).pine')">複製</button></summary>
+      <pre id="pine-r7f_force(09.16_17.41).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-F  下方 pane：買賣力度 (Buy / Sell Force) —— 推論重建猫姐「買賣力道」
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8808,7 +8816,7 @@ alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突�
 //  無結構低點 = 價格創 N 根新低，累積力度同步新低 (無承接、賣壓出清)
 //  主力防守位 = 同一價位 (± ATR × 容差) 被多次觸及且觸及時力度為正 → 計數
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-F Buy/Sell Force r7(09:16_13:59)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;R7-F Buy/Sell Force r7(09:16_17:41)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
 
 // ── ① 資料 ──
 grpD = &quot;① 資料&quot;
@@ -8833,7 +8841,7 @@ boxPos = input.string(&quot;右中&quot;, &quot;位置&quot;, options = [&quot;�
 f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -8909,9 +8917,9 @@ plot(force, &quot;力度 (原始 −1…1)&quot;, display = display.data_window)
 plot(cumD,  &quot;累積力度 (原始)&quot;, display = display.data_window)
 plot(bigNet, &quot;大單淨額&quot;, display = display.data_window)
 
-plotshape(structLow   ? delta[lbR] : na, &quot;結構低點 ▲&quot;,   shape.triangleup,   location.absolute, color.new(#26a69a, 0), size = size.small, offset = -lbR)
-plotshape(noStructLow ? delta[lbR] : na, &quot;無結構低點 ◆&quot;, shape.diamond,      location.absolute, color.new(#ef5350, 0), size = size.small, offset = -lbR)
-plotshape(structHigh  ? delta[lbR] : na, &quot;結構高點 ▼&quot;,   shape.triangledown, location.absolute, color.new(#ef5350, 0), size = size.small, offset = -lbR)
+plotshape(structLow   ? delta[lbR] : na, &quot;結構低點 ▲&quot;,   shape.triangleup,   location.absolute, color.new(#26a69a, 0), size = size.small, offset = -lbR, display = display.pane)
+plotshape(noStructLow ? delta[lbR] : na, &quot;無結構低點 ◆&quot;, shape.diamond,      location.absolute, color.new(#ef5350, 0), size = size.small, offset = -lbR, display = display.pane)
+plotshape(structHigh  ? delta[lbR] : na, &quot;結構高點 ▼&quot;,   shape.triangledown, location.absolute, color.new(#ef5350, 0), size = size.small, offset = -lbR, display = display.pane)
 gap = scaleV * 0.25
 if structLow
     [a1, b1] = f_note(bar_index - lbR, delta[lbR], delta[lbR] + gap, &quot;結構低點 · 有承接&quot;, #26a69a, true)
@@ -8925,24 +8933,24 @@ var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5)
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 if showBox and barstate.islast
     rh = boxH / 8
-    fCol = forceS &gt; 0.15 ? color.new(#26a69a, 60) : forceS &lt; -0.15 ? color.new(#ef5350, 60) : na
-    table.cell(tb, 0, 0, &quot;買賣力度 (&quot; + (hasLtf ? ltf + &quot; 分鐘近似&quot; : &quot;K 線近似&quot;) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 1, 0, str.tostring(forceS * 100, &quot;+#&quot;) + &quot;%&quot;, width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 0, 1, &quot;本根 買量 / 賣量&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 1, str.tostring(buyV, format.volume) + &quot; / &quot; + str.tostring(sellV, format.volume), width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 2, &quot;本根 力度&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 2, str.tostring(force * 100, &quot;+#&quot;) + &quot;%&quot;, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = fCol)
-    table.cell(tb, 0, 3, useDay ? &quot;累積力度 (當日)&quot; : &quot;累積力度 (滾動 &quot; + str.tostring(cumN) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 3, str.tostring(cumD, format.volume), width = boxW * 0.45, height = rh, text_size = size.small, text_color = cumD &gt;= 0 ? #26a69a : #ef5350)
-    table.cell(tb, 0, 4, &quot;大單淨額 (≥&quot; + str.tostring(bigX, &quot;#.#&quot;) + &quot;× 均量)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 4, str.tostring(bigNet, format.volume), width = boxW * 0.45, height = rh, text_size = size.small, text_color = bigNet &gt;= 0 ? #26a69a : #ef5350)
-    table.cell(tb, 0, 5, &quot;主力防守位 (&quot; + str.tostring(defWin) + &quot; 根最低)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 5, str.tostring(defLvl, format.mintick) + &quot; · 防守 &quot; + str.tostring(defCnt) + &quot; 次&quot;, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = defCnt &gt;= 3 ? color.new(#f59e0b, 60) : na)
+    fCol = forceS &gt; 0.15 ? color.new(#26a69a, 88) : forceS &lt; -0.15 ? color.new(#ef5350, 88) : na
+    table.cell(tb, 0, 0, &quot;買賣力度 (&quot; + (hasLtf ? ltf + &quot; 分鐘近似&quot; : &quot;K 線近似&quot;) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.black, bgcolor = color.new(#374151, 88), text_formatting = text.format_bold)
+    table.cell(tb, 1, 0, str.tostring(forceS * 100, &quot;+#&quot;) + &quot;%&quot;, width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.black, bgcolor = color.new(#374151, 88), text_formatting = text.format_bold)
+    table.cell(tb, 0, 1, &quot;本根 買量 / 賣量&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 1, str.tostring(buyV, format.volume) + &quot; / &quot; + str.tostring(sellV, format.volume), width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 2, &quot;本根 力度&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 2, str.tostring(force * 100, &quot;+#&quot;) + &quot;%&quot;, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = fCol, text_formatting = text.format_bold)
+    table.cell(tb, 0, 3, useDay ? &quot;累積力度 (當日)&quot; : &quot;累積力度 (滾動 &quot; + str.tostring(cumN) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 3, str.tostring(cumD, format.volume), width = boxW * 0.45, height = rh, text_size = size.small, text_color = cumD &gt;= 0 ? #26a69a : #ef5350, text_formatting = text.format_bold)
+    table.cell(tb, 0, 4, &quot;大單淨額 (≥&quot; + str.tostring(bigX, &quot;#.#&quot;) + &quot;× 均量)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 4, str.tostring(bigNet, format.volume), width = boxW * 0.45, height = rh, text_size = size.small, text_color = bigNet &gt;= 0 ? #26a69a : #ef5350, text_formatting = text.format_bold)
+    table.cell(tb, 0, 5, &quot;主力防守位 (&quot; + str.tostring(defWin) + &quot; 根最低)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 5, str.tostring(defLvl, format.mintick) + &quot; · 防守 &quot; + str.tostring(defCnt) + &quot; 次&quot;, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = defCnt &gt;= 3 ? color.new(#f59e0b, 88) : na, text_formatting = text.format_bold)
     lastLow = structLow ? &quot;結構低點 (有承接)&quot; : noStructLow ? &quot;無結構低點 (無承接)&quot; : &quot;—&quot;
-    table.cell(tb, 0, 6, &quot;最近訊號&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 6, lastLow, width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 7, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
-    table.cell(tb, 1, 7, &quot;▲承接 ◆無承接 ▼派發&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 6, &quot;最近訊號&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 6, lastLow, width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 7, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 1, 7, &quot;▲承接 ◆無承接 ▼派發&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
 
 // ── 警報 ──
 alertcondition(structLow,   &quot;結構低點 (有承接)&quot;,  &quot;{{ticker}} 價格新低但買賣力度未新低 — 主力承接 / 防守&quot;)
@@ -8950,21 +8958,21 @@ alertcondition(noStructLow, &quot;無結構低點 (無承接)&quot;, &quot;{{tic
 alertcondition(structHigh,  &quot;結構高點 (派發)&quot;,    &quot;{{ticker}} 價格新高但買賣力度未新高 — 派發嫌疑&quot;)
 alertcondition(defCnt &gt;= 3 and defCnt[1] &lt; 3, &quot;主力防守位 3 次&quot;, &quot;{{ticker}} 同一低位被防守 3 次以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7g_livermore(09.16_13.59).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7g_livermore(09.16_13.59).pine')">複製</button></summary>
-      <pre id="pine-r7g_livermore(09.16_13.59).pine">//@version=5
+<details class="pinebox"><summary><b>r7g_livermore(09.16_17.41).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7g_livermore(09.16_17.41).pine')">複製</button></summary>
+      <pre id="pine-r7g_livermore(09.16_17.41).pine">//@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_13:59)
+//  版本 r7(09:16_17:41)
 //  R7-G  主圖：Livermore 最低阻力線 (Line of Least Resistance)
 //
 //  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_13.59).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_13.59).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_13.59).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_13.59).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_13.59).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_13.59).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_13.59).pine
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.41).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.41).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.41).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.41).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.41).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.41).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.41).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8985,7 +8993,7 @@ alertcondition(defCnt &gt;= 3 and defCnt[1] &lt; 3, &quot;主力防守位 3 次&
 //      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
 //      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-G Livermore Least-Resistance r7(09:16_13:59)&quot;, shorttitle = &quot;R7-G Livermore&quot;, overlay = true, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;R7-G Livermore Least-Resistance r7(09:16_17:41)&quot;, shorttitle = &quot;R7-G Livermore&quot;, overlay = true, max_labels_count = 500, max_lines_count = 200)
 
 // ── ① 樞紐點 ──
 grpP = &quot;① 樞紐點 (Pivotal Points) — 中短線&quot;
@@ -9021,7 +9029,7 @@ f_boxPos(s) =&gt; s == &quot;左上&quot; ? position.top_left : s == &quot;左�
      s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
 f_note(x, yAnchor, yBox, txt, col, above) =&gt;
     lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
-         color = color.new(col, 40), textcolor = color.black, size = size.small)
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
     ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
     [lb, ln]
 
@@ -9202,6 +9210,7 @@ showSig  = input.bool(true, &quot;顯示買賣決策點與原因&quot;, group = 
 showAdd  = input.bool(true, &quot;顯示加碼點 (pyramiding)&quot;, group = grpS, display = display.none)
 maxAdds  = input.int(2, &quot;最多加碼次數&quot;, minval = 0, maxval = 5, group = grpS, display = display.none)
 climaxX  = input.float(2.0, &quot;高潮反轉：量 ≥ 均量 ×&quot;, minval = 1.2, maxval = 5, step = 0.1, group = grpS, display = display.none)
+sigTrans = input.int(82, &quot;決策點底色透明度 (0 = 實色, 100 = 全透明)&quot;, minval = 0, maxval = 100, step = 2, group = grpS, display = display.none)
 
 // 整數關卡 (依價位分級)
 rn  = close &gt;= 200 ? 100 : close &gt;= 50 ? 50 : close &gt;= 20 ? 10 : 5
@@ -9275,22 +9284,29 @@ plot(ph1, &quot;最後樞紐高 (數值)&quot;, display = display.data_window)
 plot(pl1, &quot;最後樞紐低 (數值)&quot;, display = display.data_window)
 
 // 突破記號 (▲▼) — 只標線的定義點；文字說明由 ④ 的決策點標籤負責
-plotshape(showMarks and brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
-plotshape(showMarks and brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
+plotshape(showMarks and brkUp, &quot;升破樞紐高&quot;, shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny, display = display.pane)
+plotshape(showMarks and brkDn, &quot;跌破樞紐低&quot;, shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny, display = display.pane)
 
-// ④ 買賣決策點：綠 = 買 / 加碼、紅 = 賣 / 放空、橙 = 危險訊號、灰 = 觀察不買；文字即觸發原因
-plotshape(showSig and buyBreak,   &quot;買① 升破樞紐高·放量&quot;,        shape.labelup,   location.belowbar, color.new(#16a34a, 0), text = &quot;買①\n升破樞紐·放量&quot;,     textcolor = color.white, size = size.small)
-plotshape(showSig and buyResume,  &quot;買② MK 回到上升趨勢欄&quot;,      shape.labelup,   location.belowbar, color.new(#16a34a, 20), text = &quot;買②\nMK回升勢欄&quot;,       textcolor = color.white, size = size.small)
-plotshape(showSig and buyRound,   &quot;買③ 首次穿越整數關卡&quot;,       shape.labelup,   location.belowbar, color.new(#0ea5e9, 0), text = &quot;買③\n首穿整數關卡&quot;,       textcolor = color.white, size = size.small)
-plotshape(showSig and buyAdd,     &quot;加碼：首筆有利潤&quot;,           shape.labelup,   location.belowbar, color.new(#65a30d, 0), text = &quot;加碼\n首筆有利潤&quot;,         textcolor = color.white, size = size.tiny)
-plotshape(showSig and watchBreak, &quot;觀察：升破未放量&quot;,           shape.labelup,   location.belowbar, color.new(#9ca3af, 0), text = &quot;觀察\n未放量不買&quot;,         textcolor = color.white, size = size.tiny)
-plotshape(showSig and sellBreak,  &quot;賣①/放空 跌破必守樞紐&quot;,      shape.labeldown, location.abovebar, color.new(#dc2626, 0), text = &quot;賣①\n跌破必守樞紐&quot;,       textcolor = color.white, size = size.small)
-plotshape(showSig and sellDanger, &quot;賣② 突破後無跟進&quot;,           shape.labeldown, location.abovebar, color.new(#f59e0b, 0), text = &quot;賣②\n突破無跟進&quot;,         textcolor = color.white, size = size.small)
-plotshape(showSig and sellRallyFail, &quot;賣③ 次級反彈失敗&quot;,        shape.labeldown, location.abovebar, color.new(#dc2626, 20), text = &quot;賣③\n次級反彈失敗&quot;,     textcolor = color.white, size = size.small)
-plotshape(showSig and sellClimax, &quot;賣④ 放量異常反轉&quot;,           shape.labeldown, location.abovebar, color.new(#b91c1c, 0), text = &quot;賣④\n放量異常反轉&quot;,       textcolor = color.white, size = size.small)
-plotshape(showSig and sellODR,    &quot;賣⑤ 一日反轉&quot;,               shape.labeldown, location.abovebar, color.new(#dc2626, 35), text = &quot;賣⑤\n一日反轉&quot;,           textcolor = color.white, size = size.tiny)
-plotshape(showSig and shortResume,&quot;放空② MK 回到下降趨勢欄&quot;,    shape.labeldown, location.abovebar, color.new(#7f1d1d, 0), text = &quot;放空②\nMK回跌勢欄&quot;,     textcolor = color.white, size = size.small)
-plotshape(showSig and coverDanger,&quot;回補：跌破後無跟進&quot;,         shape.labelup,   location.belowbar, color.new(#f59e0b, 0), text = &quot;回補\n跌破無跟進&quot;,         textcolor = color.white, size = size.small)
+// ④ 買賣決策點：淺色透明底 + 黑色粗體字；文字即觸發原因（用 label 而非 plotshape，故不佔狀態列）
+f_sig(cond, txt, col, above) =&gt;
+    if cond
+        label.new(bar_index, above ? low : high, txt,
+             yloc = above ? yloc.belowbar : yloc.abovebar,
+             style = above ? label.style_label_up : label.style_label_down,
+             color = color.new(col, sigTrans), textcolor = color.black, size = size.small,
+             text_formatting = text.format_bold, text_font_family = font.family_monospace)
+f_sig(showSig and buyBreak,      &quot;買① 升破樞紐·放量&quot;,   #16a34a, true)
+f_sig(showSig and buyResume,     &quot;買② MK回升勢欄&quot;,      #16a34a, true)
+f_sig(showSig and buyRound,      &quot;買③ 首穿整數關卡&quot;,    #0ea5e9, true)
+f_sig(showSig and buyAdd,        &quot;加碼 首筆有利潤&quot;,     #65a30d, true)
+f_sig(showSig and watchBreak,    &quot;觀察 未放量不買&quot;,     #9ca3af, true)
+f_sig(showSig and coverDanger,   &quot;回補 跌破無跟進&quot;,     #f59e0b, true)
+f_sig(showSig and sellBreak,     &quot;賣① 跌破必守樞紐&quot;,    #dc2626, false)
+f_sig(showSig and sellDanger,    &quot;賣② 突破無跟進&quot;,      #f59e0b, false)
+f_sig(showSig and sellRallyFail, &quot;賣③ 次級反彈失敗&quot;,    #dc2626, false)
+f_sig(showSig and sellClimax,    &quot;賣④ 放量異常反轉&quot;,    #b91c1c, false)
+f_sig(showSig and sellODR,       &quot;賣⑤ 一日反轉&quot;,        #dc2626, false)
+f_sig(showSig and shortResume,   &quot;放空② MK回跌勢欄&quot;,    #7f1d1d, false)
 
 // ── 資訊框 ──
 var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),
@@ -9298,27 +9314,27 @@ var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5)
 if showBox and barstate.islast
     rh = boxH / 8
     stTxt = lrDir == 1 ? &quot;上升最低阻力 ✓&quot; : lrDir == -1 ? &quot;下降最低阻力 ✓&quot; : inBox ? &quot;盤整箱 · 不表態&quot; : &quot;未定義&quot;
-    stCol = lrDir == 1 ? color.new(#26a69a, 60) : lrDir == -1 ? color.new(#ef5350, 60) : color.new(#9ca3af, 70)
-    table.cell(tb, 0, 0, &quot;Livermore 最低阻力線 (中短線)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 1, 0, stTxt, width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
-    table.cell(tb, 0, 1, &quot;線位 · 價格距線&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+    stCol = lrDir == 1 ? color.new(#26a69a, 88) : lrDir == -1 ? color.new(#ef5350, 88) : color.new(#9ca3af, 88)
+    table.cell(tb, 0, 0, &quot;Livermore 最低阻力線 (中短線)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.black, bgcolor = color.new(#374151, 88), text_formatting = text.format_bold)
+    table.cell(tb, 1, 0, stTxt, width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.black, bgcolor = color.new(#374151, 88), text_formatting = text.format_bold)
+    table.cell(tb, 0, 1, &quot;線位 · 價格距線&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
     table.cell(tb, 1, 1, na(lrLine) ? &quot;—&quot; : str.tostring(lrLine, format.mintick) + &quot; (&quot; + str.tostring(lrDist, &quot;+#.#&quot;) + &quot;%)&quot;, width = boxW * 0.45, height = rh, text_size = size.small,
-         text_color = lrDir == 1 ? #26a69a : lrDir == -1 ? #ef5350 : color.gray, bgcolor = stCol)
-    table.cell(tb, 0, 2, &quot;結構 (樞紐 &quot; + str.tostring(lbL) + &quot;/&quot; + str.tostring(lbR) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 2, structDir == 1 ? &quot;HH+HL 上升&quot; : structDir == -1 ? &quot;LH+LL 下降&quot; : &quot;混合&quot;, width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 3, &quot;Market Key 欄 / 趨勢欄&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
+         text_color = lrDir == 1 ? #26a69a : lrDir == -1 ? #ef5350 : color.gray, bgcolor = stCol, text_formatting = text.format_bold)
+    table.cell(tb, 0, 2, &quot;結構 (樞紐 &quot; + str.tostring(lbL) + &quot;/&quot; + str.tostring(lbR) + &quot;)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 2, structDir == 1 ? &quot;HH+HL 上升&quot; : structDir == -1 ? &quot;LH+LL 下降&quot; : &quot;混合&quot;, width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 3, &quot;Market Key 欄 / 趨勢欄&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
     table.cell(tb, 1, 3, f_mkTxt(mk) + &quot; / &quot; + (mkTrend == 1 ? &quot;UT&quot; : &quot;DT&quot;), width = boxW * 0.45, height = rh, text_size = size.small,
-         text_color = mkTrend == 1 ? #26a69a : #ef5350)
-    table.cell(tb, 0, 4, &quot;最後樞紐 高 / 低&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 4, str.tostring(ph1, format.mintick) + &quot; / &quot; + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
-    table.cell(tb, 0, 5, &quot;本根量比 (突破需 ≥&quot; + str.tostring(volX, &quot;#.#&quot;) + &quot;×)&quot;, width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + &quot;×&quot; + (volOK ? &quot; 放量&quot; : &quot;&quot;), width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = volOK ? color.new(#f59e0b, 60) : na)
-    sigCol = str.startswith(lastSig, &quot;買&quot;) or str.startswith(lastSig, &quot;加碼&quot;) or str.startswith(lastSig, &quot;回補&quot;) ? color.new(#16a34a, 60) :
+         text_color = mkTrend == 1 ? #26a69a : #ef5350, text_formatting = text.format_bold)
+    table.cell(tb, 0, 4, &quot;最後樞紐 高 / 低&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 4, str.tostring(ph1, format.mintick) + &quot; / &quot; + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 5, &quot;本根量比 (突破需 ≥&quot; + str.tostring(volX, &quot;#.#&quot;) + &quot;×)&quot;, width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 5, str.tostring(volRatio, &quot;#.##&quot;) + &quot;×&quot; + (volOK ? &quot; 放量&quot; : &quot;&quot;), width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = volOK ? color.new(#f59e0b, 88) : na, text_formatting = text.format_bold)
+    sigCol = str.startswith(lastSig, &quot;買&quot;) or str.startswith(lastSig, &quot;加碼&quot;) or str.startswith(lastSig, &quot;回補&quot;) ? color.new(#16a34a, 88) :
          str.startswith(lastSig, &quot;賣&quot;) or str.startswith(lastSig, &quot;放空&quot;) ? color.new(#dc2626, 60) : na
-    table.cell(tb, 0, 6, &quot;最近決策點 (原因)&quot; + (inLong ? &quot; · 持多 加碼&quot; + str.tostring(adds) : &quot;&quot;), width = boxW * 0.55, height = rh, text_size = size.small)
-    table.cell(tb, 1, 6, lastSig, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = sigCol)
-    table.cell(tb, 0, 7, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
-    table.cell(tb, 1, 7, &quot;線 = 趨勢必守樞紐 · 標籤文字 = 觸發原因&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 6, &quot;最近決策點 (原因)&quot; + (inLong ? &quot; · 持多 加碼&quot; + str.tostring(adds) : &quot;&quot;), width = boxW * 0.55, height = rh, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 6, lastSig, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = sigCol, text_formatting = text.format_bold)
+    table.cell(tb, 0, 7, &quot;說明&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 1, 7, &quot;線 = 趨勢必守樞紐 · 標籤文字 = 觸發原因&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
 
 // ── 警報 ──
 alertcondition(brkUp, &quot;Livermore 線向上定義 (升破樞紐高)&quot;, &quot;{{ticker}} 收盤升破最後樞紐高 — 最低阻力線向上定義，檢查是否放量&quot;)

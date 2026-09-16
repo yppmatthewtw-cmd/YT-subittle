@@ -19,7 +19,7 @@
 //      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
 //      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator("Livermore Least-Resistance r1", shorttitle = "Livermore LR", overlay = true, max_labels_count = 200, max_lines_count = 200)
+indicator("Livermore Least-Resistance r2", shorttitle = "Livermore LR", overlay = true, max_labels_count = 500, max_lines_count = 200)
 
 // ── ① 樞紐點 ──
 grpP = "① 樞紐點 (Pivotal Points) — 中短線"
@@ -236,6 +236,7 @@ showSig  = input.bool(true, "顯示買賣決策點與原因", group = grpS, disp
 showAdd  = input.bool(true, "顯示加碼點 (pyramiding)", group = grpS, display = display.none)
 maxAdds  = input.int(2, "最多加碼次數", minval = 0, maxval = 5, group = grpS, display = display.none)
 climaxX  = input.float(2.0, "高潮反轉：量 ≥ 均量 ×", minval = 1.2, maxval = 5, step = 0.1, group = grpS, display = display.none)
+sigTrans = input.int(82, "決策點底色透明度 (0 = 實色, 100 = 全透明)", minval = 0, maxval = 100, step = 2, group = grpS, display = display.none)
 
 // 整數關卡 (依價位分級)
 rn  = close >= 200 ? 100 : close >= 50 ? 50 : close >= 20 ? 10 : 5
@@ -312,19 +313,26 @@ plot(pl1, "最後樞紐低 (數值)", display = display.data_window)
 plotshape(showMarks and brkUp, "升破樞紐高", shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
 plotshape(showMarks and brkDn, "跌破樞紐低", shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
 
-// ④ 買賣決策點：綠 = 買 / 加碼、紅 = 賣 / 放空、橙 = 危險訊號、灰 = 觀察不買；文字即觸發原因
-plotshape(showSig and buyBreak,   "買① 升破樞紐高·放量",        shape.labelup,   location.belowbar, color.new(#16a34a, 0), text = "買①\n升破樞紐·放量",     textcolor = color.white, size = size.small)
-plotshape(showSig and buyResume,  "買② MK 回到上升趨勢欄",      shape.labelup,   location.belowbar, color.new(#16a34a, 20), text = "買②\nMK回升勢欄",       textcolor = color.white, size = size.small)
-plotshape(showSig and buyRound,   "買③ 首次穿越整數關卡",       shape.labelup,   location.belowbar, color.new(#0ea5e9, 0), text = "買③\n首穿整數關卡",       textcolor = color.white, size = size.small)
-plotshape(showSig and buyAdd,     "加碼：首筆有利潤",           shape.labelup,   location.belowbar, color.new(#65a30d, 0), text = "加碼\n首筆有利潤",         textcolor = color.white, size = size.tiny)
-plotshape(showSig and watchBreak, "觀察：升破未放量",           shape.labelup,   location.belowbar, color.new(#9ca3af, 0), text = "觀察\n未放量不買",         textcolor = color.white, size = size.tiny)
-plotshape(showSig and sellBreak,  "賣①/放空 跌破必守樞紐",      shape.labeldown, location.abovebar, color.new(#dc2626, 0), text = "賣①\n跌破必守樞紐",       textcolor = color.white, size = size.small)
-plotshape(showSig and sellDanger, "賣② 突破後無跟進",           shape.labeldown, location.abovebar, color.new(#f59e0b, 0), text = "賣②\n突破無跟進",         textcolor = color.white, size = size.small)
-plotshape(showSig and sellRallyFail, "賣③ 次級反彈失敗",        shape.labeldown, location.abovebar, color.new(#dc2626, 20), text = "賣③\n次級反彈失敗",     textcolor = color.white, size = size.small)
-plotshape(showSig and sellClimax, "賣④ 放量異常反轉",           shape.labeldown, location.abovebar, color.new(#b91c1c, 0), text = "賣④\n放量異常反轉",       textcolor = color.white, size = size.small)
-plotshape(showSig and sellODR,    "賣⑤ 一日反轉",               shape.labeldown, location.abovebar, color.new(#dc2626, 35), text = "賣⑤\n一日反轉",           textcolor = color.white, size = size.tiny)
-plotshape(showSig and shortResume,"放空② MK 回到下降趨勢欄",    shape.labeldown, location.abovebar, color.new(#7f1d1d, 0), text = "放空②\nMK回跌勢欄",     textcolor = color.white, size = size.small)
-plotshape(showSig and coverDanger,"回補：跌破後無跟進",         shape.labelup,   location.belowbar, color.new(#f59e0b, 0), text = "回補\n跌破無跟進",         textcolor = color.white, size = size.small)
+// ④ 買賣決策點：淺色透明底 + 黑色粗體字；文字即觸發原因（用 label 而非 plotshape，故不佔狀態列）
+f_sig(cond, txt, col, above) =>
+    if cond
+        label.new(bar_index, above ? low : high, txt,
+             yloc = above ? yloc.belowbar : yloc.abovebar,
+             style = above ? label.style_label_up : label.style_label_down,
+             color = color.new(col, sigTrans), textcolor = color.black, size = size.small,
+             text_formatting = text.format_bold, text_font_family = font.family_monospace)
+f_sig(showSig and buyBreak,      "買① 升破樞紐·放量",   #16a34a, true)
+f_sig(showSig and buyResume,     "買② MK回升勢欄",      #16a34a, true)
+f_sig(showSig and buyRound,      "買③ 首穿整數關卡",    #0ea5e9, true)
+f_sig(showSig and buyAdd,        "加碼 首筆有利潤",     #65a30d, true)
+f_sig(showSig and watchBreak,    "觀察 未放量不買",     #9ca3af, true)
+f_sig(showSig and coverDanger,   "回補 跌破無跟進",     #f59e0b, true)
+f_sig(showSig and sellBreak,     "賣① 跌破必守樞紐",    #dc2626, false)
+f_sig(showSig and sellDanger,    "賣② 突破無跟進",      #f59e0b, false)
+f_sig(showSig and sellRallyFail, "賣③ 次級反彈失敗",    #dc2626, false)
+f_sig(showSig and sellClimax,    "賣④ 放量異常反轉",    #b91c1c, false)
+f_sig(showSig and sellODR,       "賣⑤ 一日反轉",        #dc2626, false)
+f_sig(showSig and shortResume,   "放空② MK回跌勢欄",    #7f1d1d, false)
 
 // ── 資訊框 ──
 var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),

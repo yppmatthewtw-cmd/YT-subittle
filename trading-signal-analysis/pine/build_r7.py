@@ -114,6 +114,73 @@ def convert_f(src):
     return src
 
 
+# ═══════════ 版面統一後處理：狀態列瘦身 + 備註框透明 + 文字加粗 ═══════════
+def _close_paren(t, i):
+    """t[i] 是 '(' 之後第一個字元；回傳對應右括號位置（跳過字串）。"""
+    depth, q = 0, None
+    while i < len(t):
+        ch = t[i]
+        if q:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == q:
+                q = None
+        elif ch in "\"'":
+            q = ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            if depth == 0:
+                return i
+            depth -= 1
+        i += 1
+    raise ValueError("unbalanced")
+
+
+def add_kw(t, call_re, kw):
+    """對每個符合 call_re 的呼叫，若尚無該具名引數，就在右括號前補上 ', kw'。"""
+    out, pos = [], 0
+    key = kw.split("=")[0].strip()
+    for m in re.finditer(call_re, t):
+        if m.start() < pos:
+            continue
+        close = _close_paren(t, m.end())
+        body = t[m.end():close]
+        out.append(t[pos:close])
+        if not re.search(r"\b" + key + r"\s*=", body):
+            out.append(", " + kw)
+        pos = close
+    out.append(t[pos:])
+    return "".join(out)
+
+
+BOLD = "text_formatting = text.format_bold"
+
+
+def soften_boxes(src):
+    # ① plotshape / plotchar 不上狀態列（否則每個訊號都在標題列印一串 0.0000）
+    src = add_kw(src, r"(?<![\w.])plotshape\(", "display = display.pane")
+    src = add_kw(src, r"(?<![\w.])plotchar\(", "display = display.pane")
+    # ② 所有備註框 (label) 與資訊框 (table) 文字加粗
+    src = add_kw(src, r"(?<![\w.])label\.new\(", BOLD)
+    src = add_kw(src, r"(?<![\w.])table\.cell\(", BOLD)
+    # ③ 備註框底色改為近乎透明（f_note 共用 helper）
+    src = src.replace("color = color.new(col, 40)", "color = color.new(col, 88)")
+    # ④ 資訊框深色表頭 → 透明 + 黑字（白字在透明底上看不見）
+    for dark in ("#374151", "#3FB68B", "#6B7885", "gCol"):
+        src = src.replace(f"color.new({dark}, 10)", f"color.new({dark}, 88)")
+    src = re.sub(r"(table\.cell\([^\n]*?)text_color = color\.white", r"\1text_color = color.black", src)
+    # ⑤ 資訊框內的highlight 底色一律更淡（只動明確是 bgcolor / 顏色變數的那幾行）
+    def lighten(m):
+        line = m.group(0)
+        if "cellBg" in line or "activeCol" in line or "clk" in line:   # 時鐘格子是圖形，不動
+            return line
+        return re.sub(r", (30|55|60|65|70)\)", ", 88)", line)
+    src = re.sub(r"^.*(bgcolor =|Col = |Col := ).*$", lighten, src, flags=re.M)
+    return src
+
+
 for key, out, srcfile, title, short in SPEC:
     s = srcfile.read_text(encoding="utf-8")
     if key in "abcd":
@@ -126,6 +193,7 @@ for key, out, srcfile, title, short in SPEC:
         s = convert_g(s)
     else:
         s = convert_f(s)
+    s = soften_boxes(s)
     (P / out).write_text(s, encoding="utf-8")
     decl = len(re.findall(r"^(?:indicator|strategy)\(", s, re.M))
     bad_alert = [l for l in s.splitlines() if l.startswith("alertcondition(") and "str.tostring" in l]
