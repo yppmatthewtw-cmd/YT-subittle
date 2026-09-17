@@ -46,7 +46,7 @@ trading-signal-analysis/
 │   ├── r7f_force(mm.dd_hh.mm).pine       ← R7-F 下方 pane：買賣力度
 │   ├── r7g_livermore(mm.dd_hh.mm).pine   ← R7-G 主圖：Livermore 最低阻力線（樞紐點結構 + Market Key 六欄 + 放量/跟進濾網）
 │   ├── livermore_least_resistance.pine ← R7-G 的原始版 (r0)
-│   ├── r7h_volidx(mm.dd_hh.mm).pine      ← R7-H 下方 pane：波動指數 0–100（高 = 平靜 = 未來 20/40 日大幅回撤機率低；取代 VCP 看下跌風險）
+│   ├── r7h_volidx(mm.dd_hh.mm).pine      ← R7-H 下方 pane：波動指數 0–100（高 = 平靜 = 未來 20/40 日大幅回撤機率低；分隔線 80 隔出低波動高分區）
 │   ├── volatility_index.pine           ← R7-H 的原始版 (r0)
 │   ├── build_r7.py                     ← 由最新 R6 四件套 + maojie 兩支 + Livermore + 波動指數產生 R7 八件套
 ├── maojie/                             ← XTrader 猫姐「第二維度」推論：價格重心 / 買賣力度

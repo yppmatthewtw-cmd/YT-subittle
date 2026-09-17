@@ -1,6 +1,6 @@
 //@version=5
 // ═══════════════════════════════════════════════════════════════════════════
-//  波動指數 (Volatility Index) r0 —— 下方 pane，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小
+//  波動指數 (Volatility Index) r1 —— 下方 pane，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小
 //
 //  為什麼不用 VCP 指數看「會不會大跌」：
 //    在 2,779 檔 × 2026-04 → 09 的日線樣本 (293,860 個交易日) 回測，VCP 指數對「未來 20 日出現 ≥10% 回撤」
@@ -14,9 +14,13 @@
 //    p    = 1 / (1 + e^-(a + b·ln volD))，a = −3.381、b = 1.892 (樣本校準；40 日 ≥15% 版 a = −3.818、b = 1.788)
 //  校準樣本內的實際回撤率 (20 日 ≥10%)：指數 ≥85 → 6.5%、70–85 → 25%、55–70 → 38%、40–55 → 51%、<40 → 65%。
 //  代價：平靜的股票 20 日內 ≥10% 的「上漲」機會也低 (指數 ≥85 只有 6%)，這是「不大跌」的另一面。
+//
+//  分隔線 (cut-off，預設 80)：把「高分 = 低波動」區隔出來。在校準樣本中掃 50–95 每一個門檻：
+//    Youden (命中率 − 誤納率) 在 73–80 是平台 (0.36–0.37)；取 80 → 線上 41% 的交易日，20 日內 ≥10% 回撤 10.4%
+//    (線下 40%、全樣本 28%)，逐月 7–15%。85 更嚴 (6.5% / 29% 交易日)，75 更寬 (13.5% / 51%)。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator("波動指數 Volatility Index r0", shorttitle = "VolIdx", overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator("波動指數 Volatility Index r1", shorttitle = "VolIdx", overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = "① 波動來源"
 atrLen  = input.int(14, "ATR 長度", minval = 5, maxval = 50, group = grpV, display = display.none)
@@ -31,7 +35,12 @@ b20 = input.float(1.892,  "b (20 日)", step = 0.01, group = grpC, display = dis
 a40 = input.float(-3.818, "a (40 日)", step = 0.01, group = grpC, display = display.none)
 b40 = input.float(1.788,  "b (40 日)", step = 0.01, group = grpC, display = display.none)
 
-grpB = "③ 分級與備註"
+grpX = "③ 分隔線 (高分 = 低波動 區)"
+cutLv   = input.float(80, "分隔線：指數 ≥ 此值 = 高分區", minval = 40, maxval = 98, step = 1, group = grpX, display = display.none)
+showZone = input.bool(true, "高分區底色", group = grpX, display = display.none)
+showCross = input.bool(true, "進入 / 跌出高分區 標記", group = grpX, display = display.none)
+
+grpB = "④ 分級與備註"
 lvCalm = input.float(85, "平靜 ≥", minval = 50, maxval = 99, group = grpB, display = display.none)
 lvLow  = input.float(70, "低波 ≥", minval = 30, maxval = 95, group = grpB, display = display.none)
 lvMid  = input.float(55, "中等 ≥", minval = 20, maxval = 90, group = grpB, display = display.none)
@@ -86,13 +95,26 @@ gCol = f_gCol(grade)
 squeeze = volPr <= sqzPct            // 壓得比自己 prLen 根內 sqzPct% 還緊 → 波動擴張前兆 (不是安全訊號)
 expanding = expR >= 1.3
 
-// ── 曲線 ──
-plot(volIdx, "波動指數 (100 = 最平靜)", color = color.new(gCol, 0), linewidth = 3, display = display.pane + display.data_window + display.price_scale)
+// ── 分隔線與高分區 ──
+inZone  = volIdx >= cutLv
+zoneIn  = inZone and not inZone[1]
+zoneOut = not inZone and inZone[1]
+barsIn  = ta.barssince(zoneOut)      // 進入高分區後已維持幾根
+barsOut = ta.barssince(zoneIn)
+hCut = hline(cutLv, "分隔線 (高分 = 低波動 區)", color = color.new(#16a34a, 0), linestyle = hline.style_solid, linewidth = 2)
+hTop = hline(100, "100", color = color.new(color.gray, 100))
+fill(hCut, hTop, color = showZone ? color.new(#3FB68B, 90) : na, title = "高分區底色")
+
+// ── 曲線：高分區內綠色、區外紅色，一眼分開 ──
+lineCol = inZone ? #16a34a : #E0705F
+plot(volIdx, "波動指數 (100 = 最平靜)", color = color.new(lineCol, 0), linewidth = 3, display = display.pane + display.data_window + display.price_scale)
 plot(grade, "波動等級 (0=平靜…4=極高)", color = color.gray, display = display.data_window)
-hline(85, "85 平靜", color = color.new(#3FB68B, 45), linestyle = hline.style_dashed)
-hline(70, "70 低波", color = color.new(#5CA3D6, 55), linestyle = hline.style_dotted)
-hline(55, "55 中等", color = color.new(#6B7885, 55), linestyle = hline.style_dotted)
-hline(40, "40 高波", color = color.new(#E0705F, 45), linestyle = hline.style_dashed)
+plotshape(showCross and zoneIn ? volIdx : na, "進入高分區 ▲", shape.triangleup, location.absolute, color.new(#16a34a, 0), size = size.tiny)
+plotshape(showCross and zoneOut ? volIdx : na, "跌出高分區 ▼", shape.triangledown, location.absolute, color.new(#E0705F, 0), size = size.tiny)
+hline(85, "85 平靜", color = color.new(#3FB68B, 70), linestyle = hline.style_dotted)
+hline(70, "70 低波", color = color.new(#5CA3D6, 70), linestyle = hline.style_dotted)
+hline(55, "55 中等", color = color.new(#6B7885, 70), linestyle = hline.style_dotted)
+hline(40, "40 高波", color = color.new(#E0705F, 70), linestyle = hline.style_dotted)
 plotshape(squeeze and not squeeze[1] ? volIdx : na, "擠壓警示 (波動擴張前兆)", shape.diamond, location.absolute, color.new(#E5B15C, 0), size = size.tiny)
 
 // ── 等級變動備註 (與 R7-C 同一風格) ──
@@ -145,9 +167,15 @@ if showBox and barstate.islast
     table.cell(tb, 0, 7, "樣本回撤率 (指數區間)", width = boxW * 0.45, height = rh, text_size = size.tiny)
     table.cell(tb, 1, 7, grade == 0 ? "≥85：6.5%" : grade == 1 ? "70–85：25%" : grade == 2 ? "55–70：38%" : grade == 3 ? "40–55：51%" : "<40：65%",
          width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
-    table.cell(tb, 0, 8, "高 = 平靜 = 不易大跌", width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
-    table.cell(tb, 1, 8, "但大漲機會也同步降低", width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 8, "分隔線 " + str.tostring(cutLv, "#"), width = boxW * 0.45, height = rh, text_size = size.tiny,
+         text_color = inZone ? #16a34a : #E0705F)
+    table.cell(tb, 1, 8, inZone ? "高分區內 第 " + str.tostring(barsIn + 1) + " 根 (+" + str.tostring(volIdx - cutLv, "#.#") + ")"
+         : "區外 第 " + str.tostring(barsOut + 1) + " 根 (" + str.tostring(volIdx - cutLv, "#.#") + ")",
+         width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = inZone ? #16a34a : #E0705F,
+         bgcolor = color.new(inZone ? #3FB68B : #E0705F, 88))
 
+alertcondition(zoneIn,  "進入高分區 (分隔線之上)", "{{ticker}} 波動指數升越分隔線：進入低波動高分區，20 日內大幅回撤機會低")
+alertcondition(zoneOut, "跌出高分區 (分隔線之下)", "{{ticker}} 波動指數跌破分隔線：離開低波動高分區")
 alertcondition(grade == 0 and grade[1] != 0, "波動指數進入平靜區", "{{ticker}} 波動指數進入平靜區 (≥85)：20 日內大幅回撤機會低")
 alertcondition(grade >= 3 and grade[1] < 3, "波動指數進入高波區", "{{ticker}} 波動指數跌入高波區 (<55)：大幅回撤機會升高")
 alertcondition(squeeze and not squeeze[1], "波動擠壓 (擴張前兆)", "{{ticker}} 波動壓到自身低位：留意波動擴張，不是安全訊號")
