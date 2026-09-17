@@ -247,9 +247,9 @@ def scan_one(sym, df):
         ema21=round(ema21.iloc[i], 2), ema21_slope=round(g_21, 3),
         c2=bool(g_20 > 0), ma20=round(ma20.iloc[i], 2), ma20_slope=round(g_20, 3),
         c3=bool(g_v > 0), vcp=round(vs.iloc[i], 1), vcp_slope=round(g_v, 1), vcp_grade=GRADE[int(vg[i])],
-        c4=bool(180 <= theta[i] <= 270), clock=clock_txt(theta[i]), theta=round(theta[i], 1), cycle="跌" if not up[i] else "升",
+        c4=bool(180 <= theta[i] <= 300), clock=clock_txt(theta[i]), theta=round(theta[i], 1), cycle="跌" if not up[i] else "升",
         cyc_prog=round(prog[i] * 100, 0), cyc_days=int(elapsed[i]),
-        c5=bool(lr_days == 0), c5_days=lr_days, hist=round(h[i], 4), hist_prev=round(h[i - 1], 4), hist_trough=round(trough, 4) if not np.isnan(trough) else np.nan,
+        c5=bool((not np.isnan(lr_days)) and lr_days <= 2 and still_light), c5_days=lr_days, hist=round(h[i], 4), hist_prev=round(h[i - 1], 4), hist_trough=round(trough, 4) if not np.isnan(trough) else np.nan,
         still_light=still_light,
         c6=bool(near(dE) and near(dG)), dist_grav_pct=round(dE / c.iloc[i] * 100, 2), dist_grav_atr=round(dE / A, 2) if A > 0 else np.nan,
         lr_line=round(lr[i], 2) if not np.isnan(lr[i]) else np.nan,
@@ -257,7 +257,7 @@ def scan_one(sym, df):
         lr_dir={1: "↑", -1: "↓", 0: "—"}[int(lrDir[i])], struct={1: "HH/HL", -1: "LH/LL", 0: "—"}[int(st[i])], mk=MK[int(mk[i])], inBox=bool(inBox[i]),
         bars=len(df),
     )
-    r["score"] = sum(int(r[k]) for k in ("c1", "c2", "c3", "c4", "c5", "c6"))
+    r["score"] = sum(int(r[k]) for k in ("c1", "c3", "c4", "c5", "c6"))   # ② 不適用，不計分
     return r
 
 if __name__ == "__main__":
@@ -283,4 +283,4 @@ if __name__ == "__main__":
     json.dump({"missing": missing, "n": len(rows), "lastday": str(d.date.max().date())}, open(f"{S}/scan_r7_meta.json", "w"))
     print("scanned", len(rows), "missing", len(missing), missing[:30])
     print(out.score.value_counts().sort_index())
-    print(out[out.score >= 5].head(40).to_string())
+    print(out[out.score >= 4].head(40).to_string())

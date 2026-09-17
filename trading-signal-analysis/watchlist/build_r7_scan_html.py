@@ -9,19 +9,20 @@ OUT_DIR = "/home/user/YT-subittle/trading-signal-analysis/watchlist"
 d = pd.read_csv(f"{S}/scan_r7_result.csv")
 meta = json.load(open(f"{S}/scan_r7_meta.json"))
 now = datetime.datetime.now(ZoneInfo("Asia/Taipei"))
-stamp = now.strftime("%m.%d_%H.%M")
-stamp_t = now.strftime("%m:%d_%H:%M")
+stamp = now.strftime("%m_%d; %H.%M")     # 檔名（冒號不能用於檔名 → 點）
+stamp_t = now.strftime("%m_%d; %H:%M")   # 標題
 TV = "https://www.tradingview.com/chart/Q1c5VWwD/?symbol="
 
 CRIT = [
     ("c1", "① 重心 + EMA21 向上", "r7e_gravity 線（滾動 VWAP 30，hlc3）與 r7a_main EMA21 的最新一根斜率皆 > 0"),
-    ("c2", "② MA20 向上", "20 日簡單均線最新一根斜率 > 0"),
-    ("c3", "③ VCP 指數向上", "r7c_vcp 0–100 分數最新一根斜率 > 0（原文此項截斷，暫以「正數」處理）"),
-    ("c4", "④ 時鐘 6–9 點", "r7b_macd_clock 指針在 180°–270°：日線下跌周期已走 ≥ 50%"),
-    ("c5", "⑤ 首根淺紅", "MACD 柱狀圖 < 0 且今日回升（淺紅 #ffcdd2），昨日仍在加深（深紅）= 下跌動能峰值剛過"),
+    ("c2", "② MA20（不適用，只顯示）", "r2 起不計分；表中仍列 MA20 值與斜率供參考"),
+    ("c3", "③ VCP 指數向上", "r7c_vcp 0–100 分數最新一根斜率 > 0"),
+    ("c4", "④ 時鐘 6–10 點", "r7b_macd_clock 指針在 180°–300°：日線下跌周期已走 ≥ 50%，或上昇周期剛起步（9–10 點）"),
+    ("c5", "⑤ 淺紅第 1–3 根", "MACD 柱狀圖 < 0 且回升（淺紅 #ffcdd2）已連續 1–3 根、中間未再加深 = 下跌動能峰值剛過"),
     ("c6", "⑥ 價格貼近兩線", "收盤距 r7e 重心線與 r7g 最低阻力線皆 ≤ 1.0 × ATR14 或 ≤ 3%"),
 ]
-CK = [c[0] for c in CRIT]
+CK = [c[0] for c in CRIT if c[0] != "c2"]   # ② 不計分
+NC = len(CK)
 
 def esc(x): return html.escape(str(x))
 def f2(x, n=2):
@@ -37,8 +38,8 @@ def tick(b): return '<span class="ok">✓</span>' if b else '<span class="no">�
 def lrday(r):
     if pd.isna(r.c5_days): return '<span class="mut">—</span>'
     k = int(r.c5_days)
-    if k == 0: return '<b class="ok">首根</b>'
-    if r.still_light: return f'<span class="warn">第 {k + 1} 根</span>'
+    if r.still_light and k <= 2: return f'<b class="ok">淺紅第 {k + 1} 根</b>'
+    if r.still_light: return f'<span class="warn">淺紅第 {k + 1} 根</span>'
     return f'<span class="mut">{k} 日前 · 已中斷</span>'
 
 def row(r, i, mark=None):
@@ -50,7 +51,7 @@ def row(r, i, mark=None):
         f'<td class="rk">{i}</td>',
         f'<td class="tk">{tk}<span class="lst">{esc(r.lists).replace("+", " · ")}</span></td>',
         f'<td class="nums">{f2(r.close)}</td>',
-        f'<td class="nums sc">{int(r.score)}/6' + (f'<span class="miss">缺 {" ".join(k[1] for k in fails)}</span>' if fails and len(fails) <= 2 else "") + '</td>',
+        f'<td class="nums sc">{int(r.score)}/{NC}' + (f'<span class="miss">缺 {" ".join(k[1] for k in fails)}</span>' if fails and len(fails) <= 2 else "") + '</td>',
         f'<td class="cr">{tick(r.c1)}<span class="sub">重心 {f2(r.grav)} {sgn(r.grav_slope, 3)}<br>EMA21 {f2(r.ema21)} {sgn(r.ema21_slope, 3)}</span></td>',
         f'<td class="cr">{tick(r.c2)}<span class="sub">MA20 {f2(r.ma20)} {sgn(r.ma20_slope, 3)}</span></td>',
         f'<td class="cr">{tick(r.c3)}<span class="sub">VCP {f2(r.vcp, 1)} {sgn(r.vcp_slope, 1)}<br>{esc(r.vcp_grade)}</span></td>',
@@ -62,15 +63,14 @@ def row(r, i, mark=None):
     return f'<tr data-score="{int(r.score)}" data-tk="{esc(r.ticker)}">' + "".join(cells) + "</tr>"
 
 HEAD = """<tr><th>#</th><th>Ticker · 來源榜單</th><th>收盤</th><th>命中</th>
-<th>① 重心 / EMA21 斜率</th><th>② MA20 斜率</th><th>③ VCP 斜率</th><th>④ MACD 時鐘</th><th>⑤ 柱狀圖 淺紅</th><th>⑥ 距重心 / 最低阻力線</th><th>結構 · Market Key · 方向</th></tr>"""
+<th>① 重心 / EMA21 斜率</th><th>② MA20（不計分）</th><th>③ VCP 斜率</th><th>④ MACD 時鐘</th><th>⑤ 柱狀圖 淺紅</th><th>⑥ 距重心 / 最低阻力線</th><th>結構 · Market Key · 方向</th></tr>"""
 
 def table(df, start=1):
     if df.empty: return '<p class="empty">— 無 —</p>'
     return '<table><thead>' + HEAD + '</thead><tbody>' + "".join(row(r, i) for i, (_, r) in enumerate(df.iterrows(), start)) + '</tbody></table>'
 
-strict = d[d.score == 6]
-relax = d[d.c1 & d.c2 & d.c3 & d.c4 & d.c6 & (d.c5_days <= 3) & d.still_light & ~d.c5].sort_values("c5_days")
-five = d[d.score == 5].copy()
+strict = d[d.score == NC].sort_values(["c5_days", "theta"], ascending=[True, False])
+five = d[d.score == NC - 1].copy()
 five["fail"] = five.apply(lambda r: [k for k in CK if not r[k]][0], axis=1)
 five = five.sort_values(["fail", "theta"], ascending=[True, False])
 allrows = d.sort_values(["score", "c5_days", "theta"], ascending=[False, True, False])
@@ -83,7 +83,7 @@ src_html = " · ".join(f"{esc(k)} {len(v)} 檔" for k, v in n_src.items())
 
 doc = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>R7 六項條件掃描 r1({stamp_t})</title>
+<title>R7_six_criteria_scan_r2 ({stamp_t})</title>
 <style>
 :root{{color-scheme:light dark;--bg:#f6f7f5;--panel:#fff;--ink:#16202b;--mut:#64748b;--line:#e2e6e3;--head:#eef1ed;--hover:#f2f5f1;
  --up:#16a34a;--dn:#dc2626;--warn:#b45309;--acc:#b07b24;--accs:#f6ecd8;--okbg:#e8f6ee;}}
@@ -117,24 +117,21 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 .tags{{display:flex;flex-wrap:wrap;gap:4px;font-size:12px}} .tags span{{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 6px}}
 @media (max-width:720px){{.sub{{white-space:normal}} th,td{{padding:5px 5px}}}}
 </style></head><body><div class="wrap">
-<header><h1>R7 A–G <em>六項條件掃描</em> r1({stamp_t})</h1>
+<header><h1>R7 A–G <em>六項條件掃描</em> r2 ({stamp_t})</h1>
 <div class="sw"><button data-t="light">☀️ 淺色</button><button data-t="dark">🌙 深色</button></div>
 <div class="meta">日線 · 數據基準 <b>{esc(meta["lastday"])} 收盤</b>（vcp-watchlist repo Yahoo 日線鏡像；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7a/b/c/e/g 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
-<div class="note">⑤「首根淺紅」採嚴格定義（今日必須是回升第 1 根）。因 9/16 為 FOMC 加息日，多數股票柱狀圖仍在加深或已回升數日，嚴格全中為 <b>{len(strict)} 檔</b>；下方另列「⑤ 放寬：淺紅第 2–4 根且未中斷」與「五中一」以供追蹤。③ 原文截斷，暫以 VCP 分數斜率為正處理；若應為負，請告知重掃。</div>
+<div class="note">r2 變更：② 不適用（不計分，只顯示）；④ 放寬到 6–10 點（180°–300°）；⑤ 改為淺紅第 1–3 根（連續、未中斷）；③ 確認為向上。計分項目 {NC} 項，全中 <b>{len(strict)} 檔</b>。</div>
 
-<h2>六項全中 <span class="n">嚴格 · {len(strict)} 檔</span></h2>
+<h2>全部條件命中 <span class="n">{NC}/{NC} · {len(strict)} 檔 · 依淺紅根數排序</span></h2>
 {table(strict)}
 
-<h2>六項全中（⑤ 放寬：柱狀圖淺紅第 2–4 根、仍為淺紅） <span class="n">{len(relax)} 檔 · 其餘五項全中</span></h2>
-{table(relax)}
-
-<h2>五中一 <span class="n">{len(five)} 檔 · 按缺少的條件分組</span></h2>
+<h2>差一項 <span class="n">{NC - 1}/{NC} · {len(five)} 檔 · 按缺少的條件分組</span></h2>
 {table(five)}
 
 <h2>全部 {len(d)} 檔 <span class="n">按命中數排序 · 可篩選</span></h2>
-<div class="filters"><span class="mut">命中 ≥</span>{"".join(f'<button data-min="{k}" class="{"on" if k == 0 else ""}">{k}</button>' for k in range(0, 7))}
+<div class="filters"><span class="mut">命中 ≥</span>{"".join(f'<button data-min="{k}" class="{"on" if k == 0 else ""}">{k}</button>' for k in range(0, NC + 1))}
 <input id="q" placeholder="搜 Ticker…" size="14"></div>
 <div id="all">{table(allrows)}</div>
 
@@ -153,7 +150,7 @@ document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{{minS=+b.
 document.getElementById('q').oninput=e=>{{q=e.target.value.trim().toUpperCase();apply()}};
 </script></body></html>"""
 
-out = f"{OUT_DIR}/R7_six_criteria_scan_r1({stamp}).html"
+out = f"{OUT_DIR}/R7_six_criteria_scan_r2 ({stamp}).html"
 open(out, "w", encoding="utf-8").write(doc)
-d.to_csv(f"{OUT_DIR}/R7_six_criteria_scan_r1({stamp}).csv", index=False, encoding="utf-8-sig")
+d.to_csv(f"{OUT_DIR}/R7_six_criteria_scan_r2 ({stamp}).csv", index=False, encoding="utf-8-sig")
 print(out, len(doc))
