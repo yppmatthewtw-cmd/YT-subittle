@@ -57,9 +57,9 @@ trading-signal-analysis/
 │   ├── cert7_indicator.pine            ← 指標 3-A 確定性 7 項（獨立版，副圖）
 │   └── vcp_score_indicator.pine        ← 指標 3-B VCP 分數/等級 A–E（獨立版，副圖）
 ├── watchlist/                          ← 以 Python 重現 Pine 規則的日線掃描
-│   ├── scan_r7.py                      ← R7 A–G 六項條件掃描（r7e 重心 / EMA21 / MA20 / r7c VCP / r7b 時鐘與淺紅 / r7g 最低阻力線）
-│   ├── build_r7_scan_html.py           ← 掃描結果 → HTML 列表（六項全中 / ⑤ 放寬 / 五中一 / 全表可篩選）
-│   ├── R7_six_criteria_scan_r2 (mm_dd; hh.mm).html / .csv ← 掃描輸出（附件 4 份榜單去重 738 檔；r1 = 首版六項嚴格版）
+│   ├── scan_r7.py                      ← R7 A–H 六項條件掃描（r3：r7e 重心斜率與距離 / r7h 波動指數斜率與 ≥75 / r7b 時鐘與淺紅第 1–3 根）
+│   ├── build_r7_scan_html.py           ← 掃描結果 → HTML 列表（六項全中按淺紅第 1/2/3 根分類 / 差一項 / 全表可篩選）
+│   ├── R7_six_criteria_scan_r3 (mm_dd; hh.mm).html / .csv ← 掃描輸出（附件 4 份榜單去重 738 檔；r1/r2 = 舊版條件）
 │   ├── volatility_index_eval.md / eval_volidx.py ← 波動指數 vs VCP 指數回測（2,779 檔 × 29 萬交易日；R7-H 的依據）
 │   ├── scan_clock2.py / build_rank_html2.py ← MACD 轉勢點時鐘排名 R1
 │   └── macd_clock_rank.html / .csv     ← 排名輸出

@@ -14,14 +14,14 @@ stamp_t = now.strftime("%m_%d; %H:%M")   # 標題
 TV = "https://www.tradingview.com/chart/Q1c5VWwD/?symbol="
 
 CRIT = [
-    ("c1", "① 重心 + EMA21 向上", "r7e_gravity 線（滾動 VWAP 30，hlc3）與 r7a_main EMA21 的最新一根斜率皆 > 0"),
-    ("c2", "② MA20（不適用，只顯示）", "r2 起不計分；表中仍列 MA20 值與斜率供參考"),
-    ("c3", "③ VCP 指數向上", "r7c_vcp 0–100 分數最新一根斜率 > 0"),
+    ("c1", "① 重心線向上", "r7e_gravity 線（滾動 VWAP 30，hlc3）最新一根斜率 > 0"),
+    ("c2", "② 波動指數向上", "r7h_volidx（0–100，高 = 平靜）最新一根斜率 > 0"),
+    ("c3", "③ 波動指數 ≥ 75", "r7h_volidx 數值 ≥ 75（分隔線 80 之下一級；校準樣本 20 日內 ≥10% 回撤約 13%）"),
     ("c4", "④ 時鐘 6–10 點", "r7b_macd_clock 指針在 180°–300°：日線下跌周期已走 ≥ 50%，或上昇周期剛起步（9–10 點）"),
     ("c5", "⑤ 淺紅第 1–3 根", "MACD 柱狀圖 < 0 且回升（淺紅 #ffcdd2）已連續 1–3 根、中間未再加深 = 下跌動能峰值剛過"),
-    ("c6", "⑥ 價格貼近兩線", "收盤距 r7e 重心線與 r7g 最低阻力線皆 ≤ 1.0 × ATR14 或 ≤ 3%"),
+    ("c6", "⑥ 價格貼近重心線", "收盤距 r7e 重心線 ≤ 1.0 × ATR14 或 ≤ 3%"),
 ]
-CK = [c[0] for c in CRIT if c[0] != "c2"]   # ② 不計分
+CK = [c[0] for c in CRIT]
 NC = len(CK)
 
 def esc(x): return html.escape(str(x))
@@ -52,24 +52,25 @@ def row(r, i, mark=None):
         f'<td class="tk">{tk}<span class="lst">{esc(r.lists).replace("+", " · ")}</span></td>',
         f'<td class="nums">{f2(r.close)}</td>',
         f'<td class="nums sc">{int(r.score)}/{NC}' + (f'<span class="miss">缺 {" ".join(k[1] for k in fails)}</span>' if fails and len(fails) <= 2 else "") + '</td>',
-        f'<td class="cr">{tick(r.c1)}<span class="sub">重心 {f2(r.grav)} {sgn(r.grav_slope, 3)}<br>EMA21 {f2(r.ema21)} {sgn(r.ema21_slope, 3)}</span></td>',
-        f'<td class="cr">{tick(r.c2)}<span class="sub">MA20 {f2(r.ma20)} {sgn(r.ma20_slope, 3)}</span></td>',
-        f'<td class="cr">{tick(r.c3)}<span class="sub">VCP {f2(r.vcp, 1)} {sgn(r.vcp_slope, 1)}<br>{esc(r.vcp_grade)}</span></td>',
+        f'<td class="cr">{tick(r.c1)}<span class="sub">重心 {f2(r.grav)} {sgn(r.grav_slope, 3)}<br>5 根位移 {sgn(r.grav_shift5atr, 2)} ATR</span></td>',
+        f'<td class="cr">{tick(r.c2)}<span class="sub">VolIdx {f2(r.volidx, 1)} {sgn(r.volidx_slope, 2)}<br>前值 {f2(r.volidx_prev, 1)}</span></td>',
+        f'<td class="cr">{tick(r.c3)}<span class="sub"><b>{f2(r.volidx, 1)}</b> {"≥ 75" if r.c3 else "< 75"}<br>ATR {f2(r.atr_pct, 2)}% · σ60 {f2(r.sd60_pct, 2)}%</span></td>',
         f'<td class="cr">{tick(r.c4)}<span class="sub"><b>{esc(r.clock)}</b> {esc(r.cycle)}周期 第 {int(r.cyc_days)} 日<br>進度 {int(r.cyc_prog)}%</span></td>',
         f'<td class="cr">{tick(r.c5)}<span class="sub">{lrday(r)}<br>Hist {f2(r["hist"], 3)} ← {f2(r["hist_prev"], 3)}</span></td>',
-        f'<td class="cr">{tick(r.c6)}<span class="sub">距重心 {sgn(r.dist_grav_pct, 2, "%")} ({sgn(r.dist_grav_atr, 2)} ATR)<br>距阻力線 {sgn(r.dist_lr_pct, 2, "%")} ({sgn(r.dist_lr_atr, 2)} ATR) · 線 {f2(r.lr_line)}</span></td>',
-        f'<td class="mut sm">{esc(r.struct)} · {esc(r.mk)} · {esc(r.lr_dir)}{" · 盤整箱" if r.inBox else ""}</td>',
+        f'<td class="cr">{tick(r.c6)}<span class="sub">距重心 {sgn(r.dist_grav_pct, 2, "%")}<br>({sgn(r.dist_grav_atr, 2)} ATR)</span></td>',
+        f'<td class="mut sm">VCP {f2(r.vcp, 1)} {esc(r.vcp_grade)}<br>{esc(r.struct)} · {esc(r.mk)} · 阻力線 {f2(r.lr_line)} ({sgn(r.dist_lr_pct, 1, "%")})</td>',
     ]
     return f'<tr data-score="{int(r.score)}" data-tk="{esc(r.ticker)}">' + "".join(cells) + "</tr>"
 
 HEAD = """<tr><th>#</th><th>Ticker · 來源榜單</th><th>收盤</th><th>命中</th>
-<th>① 重心 / EMA21 斜率</th><th>② MA20（不計分）</th><th>③ VCP 斜率</th><th>④ MACD 時鐘</th><th>⑤ 柱狀圖 淺紅</th><th>⑥ 距重心 / 最低阻力線</th><th>結構 · Market Key · 方向</th></tr>"""
+<th>① 重心線斜率</th><th>② 波動指數斜率</th><th>③ 波動指數 ≥ 75</th><th>④ MACD 時鐘</th><th>⑤ 柱狀圖 淺紅</th><th>⑥ 距重心線</th><th>參考：VCP · 結構 · 最低阻力線</th></tr>"""
 
 def table(df, start=1):
     if df.empty: return '<p class="empty">— 無 —</p>'
     return '<table><thead>' + HEAD + '</thead><tbody>' + "".join(row(r, i) for i, (_, r) in enumerate(df.iterrows(), start)) + '</tbody></table>'
 
-strict = d[d.score == NC].sort_values(["c5_days", "theta"], ascending=[True, False])
+strict = d[d.score == NC].sort_values(["c5_days", "volidx"], ascending=[True, False])
+cats = [(k, strict[strict.c5_days == k]) for k in (0, 1, 2)]   # ⑤ 淺紅第 1 / 2 / 3 根 分類
 five = d[d.score == NC - 1].copy()
 five["fail"] = five.apply(lambda r: [k for k in CK if not r[k]][0], axis=1)
 five = five.sort_values(["fail", "theta"], ascending=[True, False])
@@ -83,7 +84,7 @@ src_html = " · ".join(f"{esc(k)} {len(v)} 檔" for k, v in n_src.items())
 
 doc = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>R7_six_criteria_scan_r2 ({stamp_t})</title>
+<title>R7_six_criteria_scan_r3 ({stamp_t})</title>
 <style>
 :root{{color-scheme:light dark;--bg:#f6f7f5;--panel:#fff;--ink:#16202b;--mut:#64748b;--line:#e2e6e3;--head:#eef1ed;--hover:#f2f5f1;
  --up:#16a34a;--dn:#dc2626;--warn:#b45309;--acc:#b07b24;--accs:#f6ecd8;--okbg:#e8f6ee;}}
@@ -97,6 +98,7 @@ header{{border-bottom:3px solid var(--ink);padding-bottom:10px;display:flex;flex
 h1{{font-size:24px;margin:0}} h1 em{{font-style:normal;color:var(--acc)}} .meta{{flex-basis:100%;color:var(--mut);font-size:12.5px}} .meta b{{color:var(--ink)}}
 .sw{{margin-left:auto;display:inline-flex;gap:4px;background:var(--panel);border:1.5px solid var(--acc);border-radius:99px;padding:3px 4px}}
 .sw button{{font:inherit;font-size:12px;font-weight:600;color:var(--mut);background:none;border:0;border-radius:99px;padding:3px 10px;cursor:pointer}} .sw button.on{{background:var(--acc);color:#fff}}
+h3{{font-size:14.5px;margin:16px 0 6px;display:flex;gap:8px;align-items:baseline}} h3 .n{{font-size:12.5px;color:var(--mut);font-weight:500}}
 h2{{font-size:17px;margin:26px 0 8px;display:flex;gap:10px;align-items:baseline}} h2 .n{{font-size:13px;color:var(--mut);font-weight:500}}
 .crit{{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px 14px}}
 .crit li{{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12.5px}} .crit b{{display:block;margin-bottom:2px}} .crit span{{color:var(--mut)}}
@@ -117,15 +119,15 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 .tags{{display:flex;flex-wrap:wrap;gap:4px;font-size:12px}} .tags span{{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 6px}}
 @media (max-width:720px){{.sub{{white-space:normal}} th,td{{padding:5px 5px}}}}
 </style></head><body><div class="wrap">
-<header><h1>R7 A–G <em>六項條件掃描</em> r2 ({stamp_t})</h1>
+<header><h1>R7 A–H <em>六項條件掃描</em> r3 ({stamp_t})</h1>
 <div class="sw"><button data-t="light">☀️ 淺色</button><button data-t="dark">🌙 深色</button></div>
-<div class="meta">日線 · 數據基準 <b>{esc(meta["lastday"])} 收盤</b>（vcp-watchlist repo Yahoo 日線鏡像；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7a/b/c/e/g 預設參數在 Python 重現</div></header>
+<div class="meta">日線 · 數據基準 <b>{esc(meta["lastday"])} 收盤</b>（vcp-watchlist repo Yahoo 日線鏡像；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
-<div class="note">r2 變更：② 不適用（不計分，只顯示）；④ 放寬到 6–10 點（180°–300°）；⑤ 改為淺紅第 1–3 根（連續、未中斷）；③ 確認為向上。計分項目 {NC} 項，全中 <b>{len(strict)} 檔</b>。</div>
+<div class="note">r3 變更：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
 
-<h2>全部條件命中 <span class="n">{NC}/{NC} · {len(strict)} 檔 · 依淺紅根數排序</span></h2>
-{table(strict)}
+<h2>六項全中 <span class="n">{len(strict)} 檔 · 按 ⑤ 淺紅根數分三類，類內依波動指數由高至低</span></h2>
+{"".join(f'<h3>淺紅第 {k + 1} 根 <span class="n">{len(g)} 檔</span></h3>{table(g)}' for k, g in cats)}
 
 <h2>差一項 <span class="n">{NC - 1}/{NC} · {len(five)} 檔 · 按缺少的條件分組</span></h2>
 {table(five)}
@@ -150,7 +152,7 @@ document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{{minS=+b.
 document.getElementById('q').oninput=e=>{{q=e.target.value.trim().toUpperCase();apply()}};
 </script></body></html>"""
 
-out = f"{OUT_DIR}/R7_six_criteria_scan_r2 ({stamp}).html"
+out = f"{OUT_DIR}/R7_six_criteria_scan_r3 ({stamp}).html"
 open(out, "w", encoding="utf-8").write(doc)
-d.to_csv(f"{OUT_DIR}/R7_six_criteria_scan_r2 ({stamp}).csv", index=False, encoding="utf-8-sig")
+d.to_csv(f"{OUT_DIR}/R7_six_criteria_scan_r3 ({stamp}).csv", index=False, encoding="utf-8-sig")
 print(out, len(doc))

@@ -13,6 +13,8 @@ FILES = [f"{S}/eod/eod_2025-09-01_2026-09-09.csv.gz",
          f"{S}/eod/eod_2026-09-04_2026-09-17.csv.gz"]
 NEAR_ATR = 1.0          # criteria 6：|close − line| ≤ 1.0 × ATR14 算「附近」
 NEAR_PCT = 3.0          # 或 ≤ 3%（兩者取其一即可）
+VOL_MIN = 75.0          # criteria 3：R7-H 波動指數 ≥ 75
+VA, VB = -3.381, 1.892  # R7-H 校準係數（20 日 ≥10% 回撤）
 
 # ───────────────────────── Pine 等價工具 ─────────────────────────
 def ema(s, n):  return s.ewm(span=n, adjust=False).mean()
@@ -203,6 +205,17 @@ def livermore_line(df, lbL=3, lbR=2, brkPct=0.0, boxLen=10, rangeMult=2.5, mkRev
 
 MK = {1: "UT", 2: "自然反彈", 3: "次級反彈", -1: "DT", -2: "自然回檔", -3: "次級回檔", 0: "—"}
 
+# ───────────────────────── R7-H 波動指數 ─────────────────────────
+def vol_index(df, atrLen=14, sdLen=60, wAtr=0.5, a=VA, b=VB):
+    """r7h_volidx 等價：volD = ½ ATR14/close% + ½ 60 日對數報酬 stdev%；指數 = 100 × (1 − logistic(a + b·ln volD))"""
+    c = df.close
+    atrP = atr(df, atrLen) / c * 100
+    lr = np.log(c / c.shift())
+    sdP = lr.rolling(sdLen).std(ddof=1) * 100          # ta.stdev 亦為樣本標準差
+    volD = wAtr * atrP + (1 - wAtr) * sdP
+    p = 1 / (1 + np.exp(-(a + b * np.log(volD))))
+    return 100 * (1 - p), atrP, sdP, volD
+
 # ───────────────────────── 主掃描 ─────────────────────────
 def load():
     fr = [pd.read_csv(f) for f in FILES]
@@ -220,14 +233,14 @@ def scan_one(sym, df):
     sumPV = (hlc3 * vol).rolling(30).sum(); sumV = vol.rolling(30).sum()
     grav = np.where(sumV > 0, sumPV / sumV, sma(hlc3, 30))
     grav = pd.Series(grav, index=df.index)
-    ema21 = ema(c, 21); ma20 = sma(c, 20)
+    vidx, atrP, sdP, volD = vol_index(df)
     vs, vg, vr = vcp_score(df)
     m, s, h, up, theta, prog, elapsed = macd_clock(c)
     lr, lrDir, st, mk, mkTr, inBox = livermore_line(df)
     i = len(df) - 1
     A = a14.iloc[i]
     g_e = grav.iloc[i] - grav.iloc[i - 1]; g_e5 = (grav.iloc[i] - grav.iloc[i - 5]) / A if A > 0 else np.nan
-    g_21 = ema21.iloc[i] - ema21.iloc[i - 1]; g_20 = ma20.iloc[i] - ma20.iloc[i - 1]
+    g_vi = vidx.iloc[i] - vidx.iloc[i - 1]
     g_v = vs.iloc[i] - vs.iloc[i - 1]
     # criteria 5：首根淺紅 = 今日 hist<0 且 hist 回升，昨日仍在加深（深紅）
     lightRed = (h < 0) & (h > np.roll(h, 1)); darkRedPrev = np.roll(h, 1) < np.roll(h, 2)
@@ -243,21 +256,21 @@ def scan_one(sym, df):
     near = lambda d: (not np.isnan(d)) and (abs(d) <= NEAR_ATR * A or abs(d) / c.iloc[i] * 100 <= NEAR_PCT)
     r = dict(
         ticker=sym, date=df.date.iloc[i].strftime("%Y-%m-%d"), close=round(c.iloc[i], 2), atr=round(A, 2),
-        c1=bool(g_e > 0 and g_21 > 0), grav=round(grav.iloc[i], 2), grav_slope=round(g_e, 3), grav_shift5atr=round(g_e5, 2),
-        ema21=round(ema21.iloc[i], 2), ema21_slope=round(g_21, 3),
-        c2=bool(g_20 > 0), ma20=round(ma20.iloc[i], 2), ma20_slope=round(g_20, 3),
-        c3=bool(g_v > 0), vcp=round(vs.iloc[i], 1), vcp_slope=round(g_v, 1), vcp_grade=GRADE[int(vg[i])],
+        c1=bool(g_e > 0), grav=round(grav.iloc[i], 2), grav_slope=round(g_e, 3), grav_shift5atr=round(g_e5, 2),
+        c2=bool(g_vi > 0), volidx=round(vidx.iloc[i], 1), volidx_slope=round(g_vi, 2), volidx_prev=round(vidx.iloc[i - 1], 1),
+        c3=bool(vidx.iloc[i] >= VOL_MIN), atr_pct=round(atrP.iloc[i], 2), sd60_pct=round(sdP.iloc[i], 2),
+        vcp=round(vs.iloc[i], 1), vcp_slope=round(g_v, 1), vcp_grade=GRADE[int(vg[i])],
         c4=bool(180 <= theta[i] <= 300), clock=clock_txt(theta[i]), theta=round(theta[i], 1), cycle="跌" if not up[i] else "升",
         cyc_prog=round(prog[i] * 100, 0), cyc_days=int(elapsed[i]),
         c5=bool((not np.isnan(lr_days)) and lr_days <= 2 and still_light), c5_days=lr_days, hist=round(h[i], 4), hist_prev=round(h[i - 1], 4), hist_trough=round(trough, 4) if not np.isnan(trough) else np.nan,
         still_light=still_light,
-        c6=bool(near(dE) and near(dG)), dist_grav_pct=round(dE / c.iloc[i] * 100, 2), dist_grav_atr=round(dE / A, 2) if A > 0 else np.nan,
+        c6=bool(near(dE)), dist_grav_pct=round(dE / c.iloc[i] * 100, 2), dist_grav_atr=round(dE / A, 2) if A > 0 else np.nan,
         lr_line=round(lr[i], 2) if not np.isnan(lr[i]) else np.nan,
         dist_lr_pct=round(dG / c.iloc[i] * 100, 2) if not np.isnan(dG) else np.nan, dist_lr_atr=round(dG / A, 2) if (A > 0 and not np.isnan(dG)) else np.nan,
         lr_dir={1: "↑", -1: "↓", 0: "—"}[int(lrDir[i])], struct={1: "HH/HL", -1: "LH/LL", 0: "—"}[int(st[i])], mk=MK[int(mk[i])], inBox=bool(inBox[i]),
         bars=len(df),
     )
-    r["score"] = sum(int(r[k]) for k in ("c1", "c3", "c4", "c5", "c6"))   # ② 不適用，不計分
+    r["score"] = sum(int(r[k]) for k in ("c1", "c2", "c3", "c4", "c5", "c6"))
     return r
 
 if __name__ == "__main__":
@@ -283,4 +296,4 @@ if __name__ == "__main__":
     json.dump({"missing": missing, "n": len(rows), "lastday": str(d.date.max().date())}, open(f"{S}/scan_r7_meta.json", "w"))
     print("scanned", len(rows), "missing", len(missing), missing[:30])
     print(out.score.value_counts().sort_index())
-    print(out[out.score >= 4].head(40).to_string())
+    print(out[out.score >= 5].head(40).to_string())
