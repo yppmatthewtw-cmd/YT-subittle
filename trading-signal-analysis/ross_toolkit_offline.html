@@ -7136,22 +7136,23 @@ alertcondition(flipEvt and not up, &quot;日線轉入下跌周期&quot;, &quot;{
 alertcondition(lateEvt and up,     &quot;日線上昇周期進入尾段&quot;, &quot;{{ticker}} 日線上昇周期已走 &gt;75%，留意轉折 (接近 3 點鐘)&quot;)
 alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &quot;{{ticker}} 日線下跌周期已走 &gt;75%，留意反轉 (接近 9 點鐘)&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7a_main(09.16_17.56).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.16_17.56).pine')">複製</button></summary>
-      <pre id="pine-r7a_main(09.16_17.56).pine">//@version=6
+<details class="pinebox"><summary><b>r7a_main(09.17_17.03).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7a_main(09.17_17.03).pine')">複製</button></summary>
+      <pre id="pine-r7a_main(09.17_17.03).pine">//@version=6
 // R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_17:56)
+//  版本 r7(09:17_17:03)
 //  R7-A  主圖：EMA9 Band Width Strategy
 //
-//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.56).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.56).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.56).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.56).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.56).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.56).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.56).pine
+//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.03).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.03).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.03).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.03).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.03).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.03).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.03).pine
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.03).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 2（EMA9 中線 ± 帶寬、擠壓突破 / 回踩進場、風控出場）。
@@ -7159,7 +7160,7 @@ alertcondition(lateEvt and not up, &quot;日線下跌周期進入尾段&quot;, &
 //  但它們的圖形改由 R7-B / R7-C / R7-D 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
 // ═══════════════════════════════════════════════════════════════════════════
 
-strategy(&quot;R7-A EMA9 BW (main) r7(09:16_17:56)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
+strategy(&quot;R7-A EMA9 BW (main) r7(09:17_17:03)&quot;, shorttitle = &quot;R7-A EMA9-BW&quot;,
      overlay = true, initial_capital = 10000,
      default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
      commission_type = strategy.commission.percent, commission_value = 0.05,
@@ -7666,22 +7667,23 @@ alertcondition(squeeze and not squeeze[1], &quot;M2 EMA9-BW 擠壓開始&quot;, 
 alertcondition(bigBuy,  &quot;⑧ 主力大單買入日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間上緣 — 主力大單買入&quot;)
 alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 成交量 ≥ 均量 ×門檻 且收在區間下緣 — 主力大單賣出&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7b_macd_clock(09.16_17.56).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.16_17.56).pine')">複製</button></summary>
-      <pre id="pine-r7b_macd_clock(09.16_17.56).pine">//@version=6
+<details class="pinebox"><summary><b>r7b_macd_clock(09.17_17.03).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7b_macd_clock(09.17_17.03).pine')">複製</button></summary>
+      <pre id="pine-r7b_macd_clock(09.17_17.03).pine">//@version=6
 // R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_17:56)
+//  版本 r7(09:17_17:03)
 //  R7-B  下方 pane：MACD 柱狀圖 + 週期時鐘
 //
-//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.56).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.56).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.56).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.56).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.56).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.56).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.56).pine
+//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.03).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.03).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.03).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.03).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.03).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.03).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.03).pine
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.03).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 1。MACD 柱狀圖以四色畫在本 pane（升加速／升減速／跌減弱／跌加速），
@@ -7693,7 +7695,7 @@ alertcondition(bigSell, &quot;⑧ 主力大單賣出日&quot;, &quot;{{ticker}} 
 //  R7：新增 MACD 頂背馳 / 底背馳（M1 ④），時鐘解析度提高、已走過的弧段以亮色顯示。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-B MACD + Cycle Clock r7(09:16_17:56)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
+indicator(&quot;R7-B MACD + Cycle Clock r7(09:17_17:03)&quot;, shorttitle = &quot;R7-B MACD Clock&quot;,
      overlay = false, max_labels_count = 300, max_lines_count = 200)
 
 // ── M1 參數 ──
@@ -8007,22 +8009,23 @@ alertcondition(bearDiv, &quot;M1 頂背馳&quot;, &quot;{{ticker}} 日線 MACD �
 alertcondition(brkUpEvt, &quot;M1 MACD 升破前頂&quot;, &quot;{{ticker}} 日線 MACD 快線升破前一個轉折高點 — 動能創新高&quot;)
 alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日線 MACD 快線跌破前一個轉折低點 — 動能創新低&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7c_vcp(09.16_17.56).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.16_17.56).pine')">複製</button></summary>
-      <pre id="pine-r7c_vcp(09.16_17.56).pine">//@version=6
+<details class="pinebox"><summary><b>r7c_vcp(09.17_17.03).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7c_vcp(09.17_17.03).pine')">複製</button></summary>
+      <pre id="pine-r7c_vcp(09.17_17.03).pine">//@version=6
 // R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_17:56)
+//  版本 r7(09:17_17:03)
 //  R7-C  下方 pane：VCP 指數曲線
 //
-//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.56).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.56).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.56).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.56).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.56).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.56).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.56).pine
+//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.03).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.03).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.03).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.03).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.03).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.03).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.03).pine
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.03).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-B。把 vcp_classify 的 0–100 分數畫成一條曲線，
@@ -8030,7 +8033,7 @@ alertcondition(brkDnEvt, &quot;M1 MACD 跌破前底&quot;, &quot;{{ticker}} 日�
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo，Combined Watchlist R17）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-C VCP Score r7(09:16_17:56)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-C VCP Score r7(09:17_17:03)&quot;, shorttitle = &quot;R7-C VCP&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8332,22 +8335,23 @@ if showVcp and barstate.islast
 alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, &quot;VCP 轉 A 級 (待突破)&quot;, &quot;{{ticker}} VCP 等級轉為 A · VCP 待突破&quot;)
 alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&quot;, &quot;{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7d_cert(09.16_17.56).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.16_17.56).pine')">複製</button></summary>
-      <pre id="pine-r7d_cert(09.16_17.56).pine">//@version=6
+<details class="pinebox"><summary><b>r7d_cert(09.17_17.03).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7d_cert(09.17_17.03).pine')">複製</button></summary>
+      <pre id="pine-r7d_cert(09.17_17.03).pine">//@version=6
 // R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_17:56)
+//  版本 r7(09:17_17:03)
 //  R7-D  下方 pane：確定性指數曲線
 //
-//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.56).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.56).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.56).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.56).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.56).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.56).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.56).pine
+//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.03).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.03).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.03).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.03).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.03).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.03).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.03).pine
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.03).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 3-A。把 7 項加權後的 0–100 確定性總分畫成一條曲線，
@@ -8356,7 +8360,7 @@ alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;VCP 轉 E 級 (延伸)&
 //  算法與 R4 的 MODULE 3 逐字相同（來源：VCP-watchlist repo build_r17_data.py）。
 // ═══════════════════════════════════════════════════════════════════════════
 
-indicator(&quot;R7-D Certainty 7 r7(09:16_17:56)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-D Certainty 7 r7(09:17_17:03)&quot;, shorttitle = &quot;R7-D Cert7&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
 
 grpV = &quot;M3 ① 資料來源&quot;
 m3TF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線)&quot;, group = grpV, display = display.none)
@@ -8630,22 +8634,23 @@ if showCert and barstate.islast
 alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;確定性達門檻&quot;,
      &quot;{{ticker}} 確定性總分升至門檻以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7e_gravity(09.16_17.56).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.16_17.56).pine')">複製</button></summary>
-      <pre id="pine-r7e_gravity(09.16_17.56).pine">//@version=6
+<details class="pinebox"><summary><b>r7e_gravity(09.17_17.03).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7e_gravity(09.17_17.03).pine')">複製</button></summary>
+      <pre id="pine-r7e_gravity(09.17_17.03).pine">//@version=6
 // R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_17:56)
+//  版本 r7(09:17_17:03)
 //  R7-E  主圖：價格重心 (Price Gravity) —— 推論重建猫姐「重心指標」
 //
-//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.56).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.56).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.56).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.56).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.56).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.56).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.56).pine
+//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.03).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.03).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.03).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.03).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.03).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.03).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.03).pine
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.03).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8658,7 +8663,7 @@ alertcondition(certTotal &gt;= certAlert and certTotal[1] &lt; certAlert, &quot;
 //  訊號：重心上移 + 價在重心上 = 上升最低阻力；重心下移 + 價在重心下 = 下跌最低阻力；
 //        重心走平且穩定 = 定錨 (主力未走)；價格跌破重心後 M 根內收回 = 假跌破 (用股價打掩護)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-E Price Gravity r7(09:16_17:56)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
+indicator(&quot;R7-E Price Gravity r7(09:17_17:03)&quot;, shorttitle = &quot;R7-E Gravity&quot;, overlay = true, max_labels_count = 100, max_lines_count = 100)
 
 // ── ① 重心定義 ──
 grpG = &quot;① 重心定義&quot;
@@ -8796,22 +8801,23 @@ alertcondition(anchor and not anchor[1], &quot;重心定錨&quot;, &quot;{{ticke
 alertcondition(fakeBD, &quot;假跌破收回重心&quot;, &quot;{{ticker}} 跌破價格重心後數根內收回 — 洗盤嫌疑&quot;)
 alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突破價格重心後數根內跌回 — 誘多嫌疑&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7f_force(09.16_17.56).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.16_17.56).pine')">複製</button></summary>
-      <pre id="pine-r7f_force(09.16_17.56).pine">//@version=6
+<details class="pinebox"><summary><b>r7f_force(09.17_17.03).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7f_force(09.17_17.03).pine')">複製</button></summary>
+      <pre id="pine-r7f_force(09.17_17.03).pine">//@version=6
 // R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_17:56)
+//  版本 r7(09:17_17:03)
 //  R7-F  下方 pane：買賣力度 (Buy / Sell Force) —— 推論重建猫姐「買賣力道」
 //
-//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.56).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.56).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.56).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.56).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.56).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.56).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.56).pine
+//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.03).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.03).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.03).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.03).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.03).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.03).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.03).pine
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.03).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -8825,7 +8831,7 @@ alertcondition(fakeBU, &quot;假突破跌回重心&quot;, &quot;{{ticker}} 突�
 //  無結構低點 = 價格創 N 根新低，累積力度同步新低 (無承接、賣壓出清)
 //  主力防守位 = 同一價位 (± ATR × 容差) 被多次觸及且觸及時力度為正 → 計數
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-F Buy/Sell Force r7(09:16_17:56)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
+indicator(&quot;R7-F Buy/Sell Force r7(09:17_17:03)&quot;, shorttitle = &quot;R7-F Force&quot;, overlay = false, max_labels_count = 200, max_lines_count = 200)
 
 // ── ① 資料 ──
 grpD = &quot;① 資料&quot;
@@ -8967,22 +8973,23 @@ alertcondition(noStructLow, &quot;無結構低點 (無承接)&quot;, &quot;{{tic
 alertcondition(structHigh,  &quot;結構高點 (派發)&quot;,    &quot;{{ticker}} 價格新高但買賣力度未新高 — 派發嫌疑&quot;)
 alertcondition(defCnt &gt;= 3 and defCnt[1] &lt; 3, &quot;主力防守位 3 次&quot;, &quot;{{ticker}} 同一低位被防守 3 次以上&quot;)
 </pre></details>
-<details class="pinebox"><summary><b>r7g_livermore(09.16_17.56).pine</b>
-      <button class="copybtn" onclick="copyPine(event,'r7g_livermore(09.16_17.56).pine')">複製</button></summary>
-      <pre id="pine-r7g_livermore(09.16_17.56).pine">//@version=6
+<details class="pinebox"><summary><b>r7g_livermore(09.17_17.03).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7g_livermore(09.17_17.03).pine')">複製</button></summary>
+      <pre id="pine-r7g_livermore(09.17_17.03).pine">//@version=6
 // R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:16_17:56)
+//  版本 r7(09:17_17:03)
 //  R7-G  主圖：Livermore 最低阻力線 (Line of Least Resistance)
 //
-//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.16_17.56).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.16_17.56).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.16_17.56).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.16_17.56).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.16_17.56).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.16_17.56).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.16_17.56).pine
+//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.03).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.03).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.03).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.03).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.03).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.03).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.03).pine
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.03).pine
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 //
 //
@@ -9003,7 +9010,7 @@ alertcondition(defCnt &gt;= 3 and defCnt[1] &lt; 3, &quot;主力防守位 3 次&
 //      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
 //      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
 // ═══════════════════════════════════════════════════════════════════════════
-indicator(&quot;R7-G Livermore Least-Resistance r7(09:16_17:56)&quot;, shorttitle = &quot;R7-G Livermore&quot;, overlay = true, max_labels_count = 500, max_lines_count = 500)
+indicator(&quot;R7-G Livermore Least-Resistance r7(09:17_17:03)&quot;, shorttitle = &quot;R7-G Livermore&quot;, overlay = true, max_labels_count = 500, max_lines_count = 500)
 
 // ── ① 樞紐點 ──
 grpP = &quot;① 樞紐點 (Pivotal Points) — 中短線&quot;
@@ -9368,6 +9375,177 @@ alertcondition(sellODR,    &quot;賣⑤ 一日反轉&quot;,             &quot;{{
 alertcondition(shortResume,&quot;放空② MK 回到下降趨勢欄&quot;,  &quot;{{ticker}} 放空②：自然反彈結束，Market Key 回到下降趨勢欄&quot;)
 alertcondition(coverDanger,&quot;回補：跌破後無跟進&quot;,       &quot;{{ticker}} 回補：跌破樞紐後數根內無跟進&quot;)
 </pre></details>
+<details class="pinebox"><summary><b>r7h_volidx(09.17_17.03).pine</b>
+      <button class="copybtn" onclick="copyPine(event,'r7h_volidx(09.17_17.03).pine')">複製</button></summary>
+      <pre id="pine-r7h_volidx(09.17_17.03).pine">//@version=6
+// R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
+// ═══════════════════════════════════════════════════════════════════════════
+//  版本 r7(09:17_17:03)
+//  R7-H  下方 pane：波動指數 (Volatility Index)，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小
+//
+//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.03).pine
+//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.03).pine
+//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.03).pine
+//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.03).pine
+//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.03).pine
+//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.03).pine
+//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.03).pine
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.03).pine
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
+//
+//
+//  為什麼不用 VCP 指數看「會不會大跌」：
+//    在 2,779 檔 × 2026-04 → 09 的日線樣本 (293,860 個交易日) 回測，VCP 指數對「未來 20 日出現 ≥10% 回撤」
+//    的 AUC 只有 0.52 (擲硬幣 = 0.50)；而「絕對波動水準」(ATR14% 與 60 日日波動率) 的 AUC 為 0.71，
+//    十分位單調：最平靜 10% 的交易日只有 2.6% 會在 20 日內回撤 ≥10%，最波動 10% 則有 61%。
+//    注意：相對自身歷史的「收縮百分位」(擠壓) 反而是反向指標 —— 同樣 ATR% 的股票，壓得越緊之後越常大跌
+//    (波動擴張)，這正是 VCP 想抓的突破，也是它不能拿來看下跌風險的原因。
+//
+//  指數 = 100 × (1 − p)，p = 未來 20 日回撤 ≥10% 的機率 (對數邏輯迴歸，用日波動 % 校準)：
+//    volD = ½ ATR14/收盤 % + ½ 60 日對數報酬標準差 %
+//    p    = 1 / (1 + e^-(a + b·ln volD))，a = −3.381、b = 1.892 (樣本校準；40 日 ≥15% 版 a = −3.818、b = 1.788)
+//  校準樣本內的實際回撤率 (20 日 ≥10%)：指數 ≥85 → 6.5%、70–85 → 25%、55–70 → 38%、40–55 → 51%、&lt;40 → 65%。
+//  代價：平靜的股票 20 日內 ≥10% 的「上漲」機會也低 (指數 ≥85 只有 6%)，這是「不大跌」的另一面。
+// ═══════════════════════════════════════════════════════════════════════════
+
+indicator(&quot;R7-H Volatility Index r7(09:17_17:03)&quot;, shorttitle = &quot;R7-H VolIdx&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+
+grpV = &quot;① 波動來源&quot;
+atrLen  = input.int(14, &quot;ATR 長度&quot;, minval = 5, maxval = 50, group = grpV, display = display.none)
+sdLen   = input.int(60, &quot;日波動率長度 (對數報酬標準差)&quot;, minval = 10, maxval = 250, group = grpV, display = display.none)
+wAtr    = input.float(0.5, &quot;ATR% 權重 (其餘給日波動率)&quot;, minval = 0, maxval = 1, step = 0.1, group = grpV, display = display.none)
+calcTF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線；日內圖也會用日線算)&quot;, group = grpV, display = display.none)
+
+grpC = &quot;② 校準 (回撤機率 → 指數)&quot;
+horizon = input.string(&quot;20 日 ≥10% 回撤&quot;, &quot;校準目標&quot;, options = [&quot;20 日 ≥10% 回撤&quot;, &quot;40 日 ≥15% 回撤&quot;], group = grpC, display = display.none)
+a20 = input.float(-3.381, &quot;a (20 日)&quot;, step = 0.01, group = grpC, display = display.none)
+b20 = input.float(1.892,  &quot;b (20 日)&quot;, step = 0.01, group = grpC, display = display.none)
+a40 = input.float(-3.818, &quot;a (40 日)&quot;, step = 0.01, group = grpC, display = display.none)
+b40 = input.float(1.788,  &quot;b (40 日)&quot;, step = 0.01, group = grpC, display = display.none)
+
+grpB = &quot;③ 分級與備註&quot;
+lvCalm = input.float(85, &quot;平靜 ≥&quot;, minval = 50, maxval = 99, group = grpB, display = display.none)
+lvLow  = input.float(70, &quot;低波 ≥&quot;, minval = 30, maxval = 95, group = grpB, display = display.none)
+lvMid  = input.float(55, &quot;中等 ≥&quot;, minval = 20, maxval = 90, group = grpB, display = display.none)
+lvHigh = input.float(40, &quot;高波 ≥ (低於此 = 極高波)&quot;, minval = 5, maxval = 80, group = grpB, display = display.none)
+lblHold = input.int(3, &quot;等級備註：新等級需持續幾根才標註 (去雜訊)&quot;, minval = 1, maxval = 20, group = grpB, display = display.none)
+lblMax  = input.int(8, &quot;等級備註：最多保留最近幾個&quot;, minval = 1, maxval = 40, group = grpB, display = display.none)
+lblGap  = input.float(18, &quot;備註框與曲線距離 (0–100 刻度)&quot;, minval = 5, maxval = 40, group = grpB, display = display.none)
+prLen   = input.int(126, &quot;擠壓警示：相對自身百分位回看 (根)&quot;, minval = 20, maxval = 500, group = grpB, display = display.none)
+sqzPct  = input.float(15, &quot;擠壓警示：波動落在自身最低 % 以內&quot;, minval = 1, maxval = 50, group = grpB, display = display.none)
+
+// ── ⑦ 版面（與其他 R7 腳本設同一 boxW，資訊框即等寬、右緣對齊）──
+grpL   = &quot;⑦ 版面 (各 pane 統一)&quot;
+showBox = input.bool(true, &quot;顯示資訊框&quot;, group = grpL, display = display.none)
+boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬；各支腳本設同值)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
+boxH   = input.float(100, &quot;資訊框高度 (% 本 pane 高；100 = 撐滿)&quot;, minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
+boxPos = input.string(&quot;右中&quot;, &quot;垂直位置 (高度 &lt;100 時才有差別)&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;], group = grpL, display = display.none)
+f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
+// 備註框：淺色底 + 黑字，與曲線同一座標系，虛線指回被標註的點
+f_note(x, yAnchor, yBox, txt, col, above) =&gt;
+    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
+         color = color.new(col, 88), textcolor = color.black, size = size.small, text_formatting = text.format_bold)
+    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
+    [lb, ln]
+
+// ── 波動計算 (在 calcTF 環境執行，日內圖也拿日線值) ──
+f_vol() =&gt;
+    atrP = ta.atr(atrLen) / close * 100
+    lr   = math.log(close / close[1])
+    sdP  = ta.stdev(lr, sdLen) * 100
+    volD = wAtr * atrP + (1 - wAtr) * sdP
+    // 相對自身歷史的百分位 (只作擠壓警示，不進指數)
+    pr   = ta.percentrank(volD, prLen)
+    // 近 20 日相對 60 日：&gt;1.3 = 波動正在擴張
+    sd20 = ta.stdev(lr, 20) * 100
+    expR = sdP &gt; 0 ? sd20 / sdP : 1.0
+    [atrP, sdP, volD, pr, expR]
+
+[atrP, sdP, volD, volPr, expR] = request.security(syminfo.tickerid, calcTF, f_vol(), lookahead = barmerge.lookahead_off)
+
+a = horizon == &quot;20 日 ≥10% 回撤&quot; ? a20 : a40
+b = horizon == &quot;20 日 ≥10% 回撤&quot; ? b20 : b40
+pDrop = volD &gt; 0 ? 1.0 / (1.0 + math.exp(-(a + b * math.log(volD)))) : na
+volIdx = na(pDrop) ? na : 100 * (1 - pDrop)
+// 另一個 horizon 的機率 (資訊框並列)
+pOther = volD &gt; 0 ? 1.0 / (1.0 + math.exp(-((horizon == &quot;20 日 ≥10% 回撤&quot; ? a40 : a20) + (horizon == &quot;20 日 ≥10% 回撤&quot; ? b40 : b20) * math.log(volD)))) : na
+
+// ── 等級：0 平靜 / 1 低波 / 2 中等 / 3 高波 / 4 極高波 ──
+int grade = na(volIdx) ? 2 : volIdx &gt;= lvCalm ? 0 : volIdx &gt;= lvLow ? 1 : volIdx &gt;= lvMid ? 2 : volIdx &gt;= lvHigh ? 3 : 4
+f_gTxt(g) =&gt; g == 0 ? &quot;平靜 · 大跌機會低&quot; : g == 1 ? &quot;低波&quot; : g == 2 ? &quot;中等&quot; : g == 3 ? &quot;高波&quot; : &quot;極高波 · 大跌機會高&quot;
+f_gCol(g) =&gt; g == 0 ? #3FB68B : g == 1 ? #5CA3D6 : g == 2 ? #6B7885 : g == 3 ? #E5B15C : #E0705F
+gCol = f_gCol(grade)
+squeeze = volPr &lt;= sqzPct            // 壓得比自己 prLen 根內 sqzPct% 還緊 → 波動擴張前兆 (不是安全訊號)
+expanding = expR &gt;= 1.3
+
+// ── 曲線 ──
+plot(volIdx, &quot;波動指數 (100 = 最平靜)&quot;, color = color.new(gCol, 0), linewidth = 3, display = display.pane + display.data_window + display.price_scale)
+plot(grade, &quot;波動等級 (0=平靜…4=極高)&quot;, color = color.gray, display = display.data_window)
+hline(85, &quot;85 平靜&quot;, color = color.new(#3FB68B, 45), linestyle = hline.style_dashed)
+hline(70, &quot;70 低波&quot;, color = color.new(#5CA3D6, 55), linestyle = hline.style_dotted)
+hline(55, &quot;55 中等&quot;, color = color.new(#6B7885, 55), linestyle = hline.style_dotted)
+hline(40, &quot;40 高波&quot;, color = color.new(#E0705F, 45), linestyle = hline.style_dashed)
+plotshape(squeeze and not squeeze[1] ? volIdx : na, &quot;擠壓警示 (波動擴張前兆)&quot;, shape.diamond, location.absolute, color.new(#E5B15C, 0), size = size.tiny, display = display.pane)
+
+// ── 等級變動備註 (與 R7-C 同一風格) ──
+gradeChangedAgo = ta.barssince(grade != grade[1])
+var int     lastLblGrade = -1
+var label[] gL = array.new_label()
+var line[]  gN = array.new_line()
+gradeEvt = gradeChangedAgo == lblHold - 1 and grade != lastLblGrade
+if gradeEvt
+    lastLblGrade := grade
+    above = grade &lt;= 1 ? volIdx &lt;= 100 - lblGap : volIdx &lt; lblGap
+    [lb, ln] = f_note(bar_index, volIdx, above ? volIdx + lblGap : volIdx - lblGap, f_gTxt(grade), f_gCol(grade), above)
+    array.push(gL, lb)
+    array.push(gN, ln)
+    if array.size(gL) &gt; lblMax
+        label.delete(array.shift(gL))
+        line.delete(array.shift(gN))
+
+// ── 資訊框 ──
+var table tb = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
+     frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
+var bool tInit = false
+if showBox and barstate.islast
+    if not tInit
+        for rj = 0 to 8
+            table.cell(tb, 0, rj, &quot;&quot;, text_formatting = text.format_bold)
+            table.cell(tb, 1, rj, &quot;&quot;, text_formatting = text.format_bold)
+        tInit := true
+    rh = boxH / 9
+    is20 = horizon == &quot;20 日 ≥10% 回撤&quot;
+    table.cell(tb, 0, 0, &quot;波動指數 &quot; + str.tostring(volIdx, &quot;#.#&quot;), width = boxW * 0.45, height = rh, text_color = color.black,
+         bgcolor = color.new(gCol, 88), text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 1, 0, f_gTxt(grade), width = boxW * 0.55, height = rh, text_color = color.black,
+         bgcolor = color.new(gCol, 88), text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tb, 0, 1, (is20 ? &quot;20 日內回撤 ≥10%&quot; : &quot;40 日內回撤 ≥15%&quot;) + &quot; 機率&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_formatting = text.format_bold)
+    table.cell(tb, 1, 1, str.tostring(pDrop * 100, &quot;#.#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = pDrop &lt;= 0.15 ? #3FB68B : pDrop &gt;= 0.45 ? #E0705F : color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 2, (is20 ? &quot;40 日內回撤 ≥15%&quot; : &quot;20 日內回撤 ≥10%&quot;) + &quot; 機率&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_formatting = text.format_bold)
+    table.cell(tb, 1, 2, str.tostring(pOther * 100, &quot;#.#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 3, &quot;ATR&quot; + str.tostring(atrLen) + &quot; / 收盤&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_formatting = text.format_bold)
+    table.cell(tb, 1, 3, str.tostring(atrP, &quot;#.##&quot;) + &quot;%&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 4, str.tostring(sdLen) + &quot; 日日波動率&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_formatting = text.format_bold)
+    table.cell(tb, 1, 4, str.tostring(sdP, &quot;#.##&quot;) + &quot;%  (年化 &quot; + str.tostring(sdP * math.sqrt(252), &quot;#&quot;) + &quot;%)&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 5, &quot;20 日 / &quot; + str.tostring(sdLen) + &quot; 日 波動比&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_formatting = text.format_bold)
+    table.cell(tb, 1, 5, str.tostring(expR, &quot;#.##&quot;) + (expanding ? &quot; 擴張中 ⚠&quot; : expR &lt;= 0.8 ? &quot; 收縮&quot; : &quot;&quot;), width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = expanding ? #E0705F : color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 6, &quot;相對自身 &quot; + str.tostring(prLen) + &quot; 根百分位&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_formatting = text.format_bold)
+    table.cell(tb, 1, 6, str.tostring(volPr, &quot;#&quot;) + &quot;%&quot; + (squeeze ? &quot; 擠壓 ◆ 擴張前兆&quot; : &quot;&quot;), width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = squeeze ? #E5B15C : color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 7, &quot;樣本回撤率 (指數區間)&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_formatting = text.format_bold)
+    table.cell(tb, 1, 7, grade == 0 ? &quot;≥85：6.5%&quot; : grade == 1 ? &quot;70–85：25%&quot; : grade == 2 ? &quot;55–70：38%&quot; : grade == 3 ? &quot;40–55：51%&quot; : &quot;&lt;40：65%&quot;,
+         width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 0, 8, &quot;高 = 平靜 = 不易大跌&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+    table.cell(tb, 1, 8, &quot;但大漲機會也同步降低&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray, text_formatting = text.format_bold)
+
+alertcondition(grade == 0 and grade[1] != 0, &quot;波動指數進入平靜區&quot;, &quot;{{ticker}} 波動指數進入平靜區 (≥85)：20 日內大幅回撤機會低&quot;)
+alertcondition(grade &gt;= 3 and grade[1] &lt; 3, &quot;波動指數進入高波區&quot;, &quot;{{ticker}} 波動指數跌入高波區 (&lt;55)：大幅回撤機會升高&quot;)
+alertcondition(squeeze and not squeeze[1], &quot;波動擠壓 (擴張前兆)&quot;, &quot;{{ticker}} 波動壓到自身低位：留意波動擴張，不是安全訊號&quot;)
+alertcondition(expanding and not expanding[1], &quot;波動擴張中&quot;, &quot;{{ticker}} 20 日波動 ≥ 1.3 × 60 日波動：波動擴張中&quot;)
+</pre></details>
 <details class="pinebox"><summary><b>ross_momentum_dashboard.pine</b>
       <button class="copybtn" onclick="copyPine(event,'ross_momentum_dashboard.pine')">複製</button></summary>
       <pre id="pine-ross_momentum_dashboard.pine">//@version=5
@@ -9656,6 +9834,163 @@ if showVcp and barstate.islast
 
 alertcondition(vcpGrade == 0 and vcpGrade[1] != 0, &quot;M3 VCP 轉 A 級 (待突破)&quot;, &quot;{{ticker}} VCP 等級轉為 A · VCP 待突破&quot;)
 alertcondition(vcpGrade == 4 and vcpGrade[1] != 4, &quot;M3 VCP 轉 E 級 (延伸)&quot;, &quot;{{ticker}} VCP 等級轉為 E · 突破延伸中，不追高&quot;)
+</pre></details>
+<details class="pinebox"><summary><b>volatility_index.pine</b>
+      <button class="copybtn" onclick="copyPine(event,'volatility_index.pine')">複製</button></summary>
+      <pre id="pine-volatility_index.pine">//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  波動指數 (Volatility Index) r0 —— 下方 pane，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小
+//
+//  為什麼不用 VCP 指數看「會不會大跌」：
+//    在 2,779 檔 × 2026-04 → 09 的日線樣本 (293,860 個交易日) 回測，VCP 指數對「未來 20 日出現 ≥10% 回撤」
+//    的 AUC 只有 0.52 (擲硬幣 = 0.50)；而「絕對波動水準」(ATR14% 與 60 日日波動率) 的 AUC 為 0.71，
+//    十分位單調：最平靜 10% 的交易日只有 2.6% 會在 20 日內回撤 ≥10%，最波動 10% 則有 61%。
+//    注意：相對自身歷史的「收縮百分位」(擠壓) 反而是反向指標 —— 同樣 ATR% 的股票，壓得越緊之後越常大跌
+//    (波動擴張)，這正是 VCP 想抓的突破，也是它不能拿來看下跌風險的原因。
+//
+//  指數 = 100 × (1 − p)，p = 未來 20 日回撤 ≥10% 的機率 (對數邏輯迴歸，用日波動 % 校準)：
+//    volD = ½ ATR14/收盤 % + ½ 60 日對數報酬標準差 %
+//    p    = 1 / (1 + e^-(a + b·ln volD))，a = −3.381、b = 1.892 (樣本校準；40 日 ≥15% 版 a = −3.818、b = 1.788)
+//  校準樣本內的實際回撤率 (20 日 ≥10%)：指數 ≥85 → 6.5%、70–85 → 25%、55–70 → 38%、40–55 → 51%、&lt;40 → 65%。
+//  代價：平靜的股票 20 日內 ≥10% 的「上漲」機會也低 (指數 ≥85 只有 6%)，這是「不大跌」的另一面。
+// ═══════════════════════════════════════════════════════════════════════════
+
+indicator(&quot;波動指數 Volatility Index r0&quot;, shorttitle = &quot;VolIdx&quot;, overlay = false, max_labels_count = 100, max_lines_count = 100)
+
+grpV = &quot;① 波動來源&quot;
+atrLen  = input.int(14, &quot;ATR 長度&quot;, minval = 5, maxval = 50, group = grpV, display = display.none)
+sdLen   = input.int(60, &quot;日波動率長度 (對數報酬標準差)&quot;, minval = 10, maxval = 250, group = grpV, display = display.none)
+wAtr    = input.float(0.5, &quot;ATR% 權重 (其餘給日波動率)&quot;, minval = 0, maxval = 1, step = 0.1, group = grpV, display = display.none)
+calcTF  = input.timeframe(&quot;D&quot;, &quot;計算時間框 (預設日線；日內圖也會用日線算)&quot;, group = grpV, display = display.none)
+
+grpC = &quot;② 校準 (回撤機率 → 指數)&quot;
+horizon = input.string(&quot;20 日 ≥10% 回撤&quot;, &quot;校準目標&quot;, options = [&quot;20 日 ≥10% 回撤&quot;, &quot;40 日 ≥15% 回撤&quot;], group = grpC, display = display.none)
+a20 = input.float(-3.381, &quot;a (20 日)&quot;, step = 0.01, group = grpC, display = display.none)
+b20 = input.float(1.892,  &quot;b (20 日)&quot;, step = 0.01, group = grpC, display = display.none)
+a40 = input.float(-3.818, &quot;a (40 日)&quot;, step = 0.01, group = grpC, display = display.none)
+b40 = input.float(1.788,  &quot;b (40 日)&quot;, step = 0.01, group = grpC, display = display.none)
+
+grpB = &quot;③ 分級與備註&quot;
+lvCalm = input.float(85, &quot;平靜 ≥&quot;, minval = 50, maxval = 99, group = grpB, display = display.none)
+lvLow  = input.float(70, &quot;低波 ≥&quot;, minval = 30, maxval = 95, group = grpB, display = display.none)
+lvMid  = input.float(55, &quot;中等 ≥&quot;, minval = 20, maxval = 90, group = grpB, display = display.none)
+lvHigh = input.float(40, &quot;高波 ≥ (低於此 = 極高波)&quot;, minval = 5, maxval = 80, group = grpB, display = display.none)
+lblHold = input.int(3, &quot;等級備註：新等級需持續幾根才標註 (去雜訊)&quot;, minval = 1, maxval = 20, group = grpB, display = display.none)
+lblMax  = input.int(8, &quot;等級備註：最多保留最近幾個&quot;, minval = 1, maxval = 40, group = grpB, display = display.none)
+lblGap  = input.float(18, &quot;備註框與曲線距離 (0–100 刻度)&quot;, minval = 5, maxval = 40, group = grpB, display = display.none)
+prLen   = input.int(126, &quot;擠壓警示：相對自身百分位回看 (根)&quot;, minval = 20, maxval = 500, group = grpB, display = display.none)
+sqzPct  = input.float(15, &quot;擠壓警示：波動落在自身最低 % 以內&quot;, minval = 1, maxval = 50, group = grpB, display = display.none)
+
+// ── ⑦ 版面（與其他 R7 腳本設同一 boxW，資訊框即等寬、右緣對齊）──
+grpL   = &quot;⑦ 版面 (各 pane 統一)&quot;
+showBox = input.bool(true, &quot;顯示資訊框&quot;, group = grpL, display = display.none)
+boxW   = input.float(18, &quot;資訊框寬度 (% 圖表寬；各支腳本設同值)&quot;, minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
+boxH   = input.float(100, &quot;資訊框高度 (% 本 pane 高；100 = 撐滿)&quot;, minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
+boxPos = input.string(&quot;右中&quot;, &quot;垂直位置 (高度 &lt;100 時才有差別)&quot;, options = [&quot;右上&quot;, &quot;右中&quot;, &quot;右下&quot;], group = grpL, display = display.none)
+f_boxPos(s) =&gt; s == &quot;右上&quot; ? position.top_right : s == &quot;右下&quot; ? position.bottom_right : position.middle_right
+// 備註框：淺色底 + 黑字，與曲線同一座標系，虛線指回被標註的點
+f_note(x, yAnchor, yBox, txt, col, above) =&gt;
+    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
+         color = color.new(col, 88), textcolor = color.black, size = size.small)
+    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
+    [lb, ln]
+
+// ── 波動計算 (在 calcTF 環境執行，日內圖也拿日線值) ──
+f_vol() =&gt;
+    atrP = ta.atr(atrLen) / close * 100
+    lr   = math.log(close / close[1])
+    sdP  = ta.stdev(lr, sdLen) * 100
+    volD = wAtr * atrP + (1 - wAtr) * sdP
+    // 相對自身歷史的百分位 (只作擠壓警示，不進指數)
+    pr   = ta.percentrank(volD, prLen)
+    // 近 20 日相對 60 日：&gt;1.3 = 波動正在擴張
+    sd20 = ta.stdev(lr, 20) * 100
+    expR = sdP &gt; 0 ? sd20 / sdP : 1.0
+    [atrP, sdP, volD, pr, expR]
+
+[atrP, sdP, volD, volPr, expR] = request.security(syminfo.tickerid, calcTF, f_vol(), lookahead = barmerge.lookahead_off)
+
+a = horizon == &quot;20 日 ≥10% 回撤&quot; ? a20 : a40
+b = horizon == &quot;20 日 ≥10% 回撤&quot; ? b20 : b40
+pDrop = volD &gt; 0 ? 1.0 / (1.0 + math.exp(-(a + b * math.log(volD)))) : na
+volIdx = na(pDrop) ? na : 100 * (1 - pDrop)
+// 另一個 horizon 的機率 (資訊框並列)
+pOther = volD &gt; 0 ? 1.0 / (1.0 + math.exp(-((horizon == &quot;20 日 ≥10% 回撤&quot; ? a40 : a20) + (horizon == &quot;20 日 ≥10% 回撤&quot; ? b40 : b20) * math.log(volD)))) : na
+
+// ── 等級：0 平靜 / 1 低波 / 2 中等 / 3 高波 / 4 極高波 ──
+int grade = na(volIdx) ? 2 : volIdx &gt;= lvCalm ? 0 : volIdx &gt;= lvLow ? 1 : volIdx &gt;= lvMid ? 2 : volIdx &gt;= lvHigh ? 3 : 4
+f_gTxt(g) =&gt; g == 0 ? &quot;平靜 · 大跌機會低&quot; : g == 1 ? &quot;低波&quot; : g == 2 ? &quot;中等&quot; : g == 3 ? &quot;高波&quot; : &quot;極高波 · 大跌機會高&quot;
+f_gCol(g) =&gt; g == 0 ? #3FB68B : g == 1 ? #5CA3D6 : g == 2 ? #6B7885 : g == 3 ? #E5B15C : #E0705F
+gCol = f_gCol(grade)
+squeeze = volPr &lt;= sqzPct            // 壓得比自己 prLen 根內 sqzPct% 還緊 → 波動擴張前兆 (不是安全訊號)
+expanding = expR &gt;= 1.3
+
+// ── 曲線 ──
+plot(volIdx, &quot;波動指數 (100 = 最平靜)&quot;, color = color.new(gCol, 0), linewidth = 3, display = display.pane + display.data_window + display.price_scale)
+plot(grade, &quot;波動等級 (0=平靜…4=極高)&quot;, color = color.gray, display = display.data_window)
+hline(85, &quot;85 平靜&quot;, color = color.new(#3FB68B, 45), linestyle = hline.style_dashed)
+hline(70, &quot;70 低波&quot;, color = color.new(#5CA3D6, 55), linestyle = hline.style_dotted)
+hline(55, &quot;55 中等&quot;, color = color.new(#6B7885, 55), linestyle = hline.style_dotted)
+hline(40, &quot;40 高波&quot;, color = color.new(#E0705F, 45), linestyle = hline.style_dashed)
+plotshape(squeeze and not squeeze[1] ? volIdx : na, &quot;擠壓警示 (波動擴張前兆)&quot;, shape.diamond, location.absolute, color.new(#E5B15C, 0), size = size.tiny)
+
+// ── 等級變動備註 (與 R7-C 同一風格) ──
+gradeChangedAgo = ta.barssince(grade != grade[1])
+var int     lastLblGrade = -1
+var label[] gL = array.new_label()
+var line[]  gN = array.new_line()
+gradeEvt = gradeChangedAgo == lblHold - 1 and grade != lastLblGrade
+if gradeEvt
+    lastLblGrade := grade
+    above = grade &lt;= 1 ? volIdx &lt;= 100 - lblGap : volIdx &lt; lblGap
+    [lb, ln] = f_note(bar_index, volIdx, above ? volIdx + lblGap : volIdx - lblGap, f_gTxt(grade), f_gCol(grade), above)
+    array.push(gL, lb)
+    array.push(gN, ln)
+    if array.size(gL) &gt; lblMax
+        label.delete(array.shift(gL))
+        line.delete(array.shift(gN))
+
+// ── 資訊框 ──
+var table tb = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
+     frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
+var bool tInit = false
+if showBox and barstate.islast
+    if not tInit
+        for rj = 0 to 8
+            table.cell(tb, 0, rj, &quot;&quot;)
+            table.cell(tb, 1, rj, &quot;&quot;)
+        tInit := true
+    rh = boxH / 9
+    is20 = horizon == &quot;20 日 ≥10% 回撤&quot;
+    table.cell(tb, 0, 0, &quot;波動指數 &quot; + str.tostring(volIdx, &quot;#.#&quot;), width = boxW * 0.45, height = rh, text_color = color.black,
+         bgcolor = color.new(gCol, 88), text_size = size.small)
+    table.cell(tb, 1, 0, f_gTxt(grade), width = boxW * 0.55, height = rh, text_color = color.black,
+         bgcolor = color.new(gCol, 88), text_size = size.small)
+    table.cell(tb, 0, 1, (is20 ? &quot;20 日內回撤 ≥10%&quot; : &quot;40 日內回撤 ≥15%&quot;) + &quot; 機率&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 1, str.tostring(pDrop * 100, &quot;#.#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = pDrop &lt;= 0.15 ? #3FB68B : pDrop &gt;= 0.45 ? #E0705F : color.gray)
+    table.cell(tb, 0, 2, (is20 ? &quot;40 日內回撤 ≥15%&quot; : &quot;20 日內回撤 ≥10%&quot;) + &quot; 機率&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 2, str.tostring(pOther * 100, &quot;#.#&quot;) + &quot;%&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 3, &quot;ATR&quot; + str.tostring(atrLen) + &quot; / 收盤&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 3, str.tostring(atrP, &quot;#.##&quot;) + &quot;%&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 4, str.tostring(sdLen) + &quot; 日日波動率&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 4, str.tostring(sdP, &quot;#.##&quot;) + &quot;%  (年化 &quot; + str.tostring(sdP * math.sqrt(252), &quot;#&quot;) + &quot;%)&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 5, &quot;20 日 / &quot; + str.tostring(sdLen) + &quot; 日 波動比&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 5, str.tostring(expR, &quot;#.##&quot;) + (expanding ? &quot; 擴張中 ⚠&quot; : expR &lt;= 0.8 ? &quot; 收縮&quot; : &quot;&quot;), width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = expanding ? #E0705F : color.gray)
+    table.cell(tb, 0, 6, &quot;相對自身 &quot; + str.tostring(prLen) + &quot; 根百分位&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 6, str.tostring(volPr, &quot;#&quot;) + &quot;%&quot; + (squeeze ? &quot; 擠壓 ◆ 擴張前兆&quot; : &quot;&quot;), width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = squeeze ? #E5B15C : color.gray)
+    table.cell(tb, 0, 7, &quot;樣本回撤率 (指數區間)&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 7, grade == 0 ? &quot;≥85：6.5%&quot; : grade == 1 ? &quot;70–85：25%&quot; : grade == 2 ? &quot;55–70：38%&quot; : grade == 3 ? &quot;40–55：51%&quot; : &quot;&lt;40：65%&quot;,
+         width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 8, &quot;高 = 平靜 = 不易大跌&quot;, width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 1, 8, &quot;但大漲機會也同步降低&quot;, width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+
+alertcondition(grade == 0 and grade[1] != 0, &quot;波動指數進入平靜區&quot;, &quot;{{ticker}} 波動指數進入平靜區 (≥85)：20 日內大幅回撤機會低&quot;)
+alertcondition(grade &gt;= 3 and grade[1] &lt; 3, &quot;波動指數進入高波區&quot;, &quot;{{ticker}} 波動指數跌入高波區 (&lt;55)：大幅回撤機會升高&quot;)
+alertcondition(squeeze and not squeeze[1], &quot;波動擠壓 (擴張前兆)&quot;, &quot;{{ticker}} 波動壓到自身低位：留意波動擴張，不是安全訊號&quot;)
+alertcondition(expanding and not expanding[1], &quot;波動擴張中&quot;, &quot;{{ticker}} 20 日波動 ≥ 1.3 × 60 日波動：波動擴張中&quot;)
 </pre></details>
 </section>
 

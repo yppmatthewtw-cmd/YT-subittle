@@ -46,7 +46,9 @@ trading-signal-analysis/
 │   ├── r7f_force(mm.dd_hh.mm).pine       ← R7-F 下方 pane：買賣力度
 │   ├── r7g_livermore(mm.dd_hh.mm).pine   ← R7-G 主圖：Livermore 最低阻力線（樞紐點結構 + Market Key 六欄 + 放量/跟進濾網）
 │   ├── livermore_least_resistance.pine ← R7-G 的原始版 (r0)
-│   ├── build_r7.py                     ← 由最新 R6 四件套 + maojie 兩支 + Livermore 產生 R7 七件套
+│   ├── r7h_volidx(mm.dd_hh.mm).pine      ← R7-H 下方 pane：波動指數 0–100（高 = 平靜 = 未來 20/40 日大幅回撤機率低；取代 VCP 看下跌風險）
+│   ├── volatility_index.pine           ← R7-H 的原始版 (r0)
+│   ├── build_r7.py                     ← 由最新 R6 四件套 + maojie 兩支 + Livermore + 波動指數產生 R7 八件套
 ├── maojie/                             ← XTrader 猫姐「第二維度」推論：價格重心 / 買賣力度
 │   ├── README.md                       ← 公開線索整理、參數猜測、Pine 重建可行性、來源
 │   └── pine/
@@ -58,6 +60,7 @@ trading-signal-analysis/
 │   ├── scan_r7.py                      ← R7 A–G 六項條件掃描（r7e 重心 / EMA21 / MA20 / r7c VCP / r7b 時鐘與淺紅 / r7g 最低阻力線）
 │   ├── build_r7_scan_html.py           ← 掃描結果 → HTML 列表（六項全中 / ⑤ 放寬 / 五中一 / 全表可篩選）
 │   ├── R7_six_criteria_scan_r2 (mm_dd; hh.mm).html / .csv ← 掃描輸出（附件 4 份榜單去重 738 檔；r1 = 首版六項嚴格版）
+│   ├── volatility_index_eval.md / eval_volidx.py ← 波動指數 vs VCP 指數回測（2,779 檔 × 29 萬交易日；R7-H 的依據）
 │   ├── scan_clock2.py / build_rank_html2.py ← MACD 轉勢點時鐘排名 R1
 │   └── macd_clock_rank.html / .csv     ← 排名輸出
 └── charts/

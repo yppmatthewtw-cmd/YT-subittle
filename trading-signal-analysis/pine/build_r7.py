@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-R7 七件套：由最新的 R6 四件套 + maojie 兩支原型重新整併、統一命名。
+R7 八件套：由最新的 R6 四件套 + maojie 兩支原型 + Livermore + 波動指數重新整併、統一命名。
 
     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板     ← R6-A 原樣（策略與價格重心分開）
     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底   ← R6-B 原樣
@@ -9,8 +9,9 @@ R7 七件套：由最新的 R6 四件套 + maojie 兩支原型重新整併、統
     R7-E  主圖 (overlay)   價格重心：VWAP / 錨定 / 滾動 / POC 重心 + 成本帶 + 訊號   ← maojie_price_gravity_r1
     R7-F  下方 pane ④      買賣力度：1 分鐘近似主動買賣 → 力度 / 累積力度 / 結構低點    ← maojie_buy_sell_force
     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key + 放量/跟進     ← livermore_least_resistance
+    R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜)   ← volatility_index
 
-用法：python3 build_r7.py   → r7a_main(mm.dd_hh.mm).pine … r7f_force(mm.dd_hh.mm).pine
+用法：python3 build_r7.py   → r7a_main(mm.dd_hh.mm).pine … r7h_volidx(mm.dd_hh.mm).pine
 """
 import re, pathlib, datetime, zoneinfo, glob
 
@@ -37,10 +38,11 @@ SPEC = [
     ("e", f"r7e_gravity({TS_FILE}).pine",    MJ / "maojie_price_gravity_r1.pine",              "R7-E Price Gravity",         "R7-E Gravity"),
     ("f", f"r7f_force({TS_FILE}).pine",      MJ / "maojie_buy_sell_force.pine",                "R7-F Buy/Sell Force",        "R7-F Force"),
     ("g", f"r7g_livermore({TS_FILE}).pine",  P / "livermore_least_resistance.pine",            "R7-G Livermore Least-Resistance", "R7-G Livermore"),
+    ("h", f"r7h_volidx({TS_FILE}).pine",     P / "volatility_index.pine",                      "R7-H Volatility Index",      "R7-H VolIdx"),
 ]
 NEWNAMES = {k: out for k, out, *_ in SPEC}
 
-HEADER_TABLE = f'''//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
+HEADER_TABLE = f'''//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
 //     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                {NEWNAMES["a"]}
 //     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  {NEWNAMES["b"]}
 //     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         {NEWNAMES["c"]}
@@ -48,6 +50,7 @@ HEADER_TABLE = f'''//  R7 七件套 —— 每支各佔一個 pane；策略 (A) 
 //     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  {NEWNAMES["e"]}
 //     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   {NEWNAMES["f"]}
 //     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  {NEWNAMES["g"]}
+//     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  {NEWNAMES["h"]}
 //  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
 '''
 
@@ -80,7 +83,7 @@ def convert_r6(src, new_title, new_short):
     # 檔頭的四件套說明 → 七件套
     src = re.sub(r"//  R6 套件 —— [^\n]*\n(?://     R6-[ABCD][^\n]*\n){4}//  四支的計算邏輯與 R4 逐字相同[^\n]*\n",
                  HEADER_TABLE, src, count=1)
-    assert "R7 七件套" in src, "檔頭未替換"
+    assert "R7 八件套" in src, "檔頭未替換"
     src = src.replace("R6-A", "R7-A").replace("R6-B", "R7-B").replace("R6-C", "R7-C").replace("R6-D", "R7-D")
     src = src.replace("四支 R6 腳本", "六支 R7 腳本").replace("R6 預設", "R7 預設").replace("R6：", "R7：").replace("（R6 預設關閉）", "（R7 預設關閉）")
     return src
@@ -104,6 +107,14 @@ def convert_g(src):
     src = retitle(src, r"Livermore Least-Resistance r\d", "R7-G Livermore Least-Resistance", "R7-G Livermore")
     src = src.replace("//  Livermore 最低阻力線 (Line of Least Resistance) r1 —— 主圖 overlay，中短線版：只畫「一條線」",
                       f"//  版本 r7({TS_TITLE})\n//  R7-G  主圖：Livermore 最低阻力線 (Line of Least Resistance)\n//\n" + HEADER_TABLE + "//")
+    return src
+
+
+def convert_h(src):
+    src = retitle(src, r"波動指數 Volatility Index r\d", "R7-H Volatility Index", "R7-H VolIdx")
+    src = src.replace("//  波動指數 (Volatility Index) r0 —— 下方 pane，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小",
+                      f"//  版本 r7({TS_TITLE})\n//  R7-H  下方 pane：波動指數 (Volatility Index)，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小\n//\n" + HEADER_TABLE + "//")
+    assert "R7 八件套" in src, "H 檔頭未替換"
     return src
 
 
@@ -193,6 +204,8 @@ for key, out, srcfile, title, short in SPEC:
         s = convert_e(s)
     elif key == "g":
         s = convert_g(s)
+    elif key == "h":
+        s = convert_h(s)
     else:
         s = convert_f(s)
     s = soften_boxes(s)
