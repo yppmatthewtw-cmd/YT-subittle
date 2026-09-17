@@ -20,6 +20,8 @@ COLS = [  # (csv 欄, Excel 標題, 格式)
     ("c6", "⑥ 貼近重心線", "tick"), ("dist_grav_pct", "距重心 %", "num2"), ("dist_grav_atr", "距重心 (ATR)", "num2"),
     ("vcp", "VCP 指數 (參考)", "num1"), ("vcp_grade", "VCP 等級", "txt"), ("struct", "結構", "txt"), ("mk", "Market Key", "txt"), ("lr_line", "最低阻力線", "num2"), ("dist_lr_pct", "距阻力線 %", "num2"),
 ]
+if "ai_group" in d.columns:   # AI Sector watchlist 版：加小群組欄
+    COLS[2:2] = [("ai_cat", "AI 大分類", "txt"), ("ai_group", "AI 小群組", "txt"), ("ai_rank", "小群組資金流排名", "int"), ("ai_flow5", "個股 5 日資金流向", "txt")]
 d["c5_cat"] = d.apply(lambda r: ("第 %d 根" % (int(r.c5_days) + 1)) if (pd.notna(r.c5_days) and r.still_light) else ("已中斷" if pd.notna(r.c5_days) else "—"), axis=1)
 FMT = {"num1": "0.0", "num2": "0.00", "num3": "0.000", "int": "0"}
 HEAD_FILL = PatternFill("solid", fgColor="EEF1ED"); OK = Font(color="16A34A", bold=True); NO = Font(color="DC2626", bold=True)
@@ -47,7 +49,7 @@ def sheet(wb, name, df, note=None):
     ws.freeze_panes = ws.cell(r0 + 1, 2)
     ws.auto_filter.ref = f"A{r0}:{get_column_letter(len(COLS))}{max(r0 + 1, r0 + len(df))}"
     for j, (k, h, f) in enumerate(COLS, 1):
-        ws.column_dimensions[get_column_letter(j)].width = 9 if f in ("tick", "num1", "num2", "num3", "int") else max(8, min(26, len(h) * 1.6 + 2))
+        ws.column_dimensions[get_column_letter(j)].width = 9 if f in ("tick", "num1", "num2", "num3", "int") else (34 if k == "ai_group" else max(8, min(26, len(h) * 1.6 + 2)))
     ws.row_dimensions[r0].height = 32
     return ws
 
@@ -62,6 +64,8 @@ five["fail"] = five.apply(lambda r: [c for c in ("c1", "c2", "c3", "c4", "c5", "
 five = five.sort_values(["fail", "volidx"], ascending=[True, False])
 sheet(wb, "差一項", five, "五中一 %d 檔；按缺少的條件分組（看 ✗ 在哪一欄）。" % len(five))
 sheet(wb, "全部", d.sort_values(["score", "c5_days", "volidx"], ascending=[False, True, False]), "全部 %d 檔；用「命中 /6」欄篩選。" % len(d))
+if "ai_group" in d.columns:
+    sheet(wb, "按 AI 小群組", d.sort_values(["ai_rank", "score", "volidx"], ascending=[True, False, False]), "依 AI 小群組資金流排名 → 命中數 → 波動指數排列。")
 ws = wb.create_sheet("說明")
 for i, t in enumerate([
     "R7 A–H 六項條件掃描 r3 — 日線，數據基準 2026-09-16 收盤（vcp-watchlist repo Yahoo 日線鏡像）",
@@ -76,5 +80,5 @@ for i, t in enumerate([
 ], 1):
     ws.cell(i, 1, t).font = Font(bold=(i == 1))
 ws.column_dimensions["A"].width = 110
-out = src[:-4] + ".xlsx"
+out = sys.argv[2] if len(sys.argv) > 2 else src[:-4] + ".xlsx"
 wb.save(out); print(out)
