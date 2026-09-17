@@ -54,6 +54,12 @@ trading-signal-analysis/
 │       └── maojie_buy_sell_force.pine  ← 下方 pane：1 分鐘近似主動買賣 → 淨力度/累積力度 + 結構/無結構低點 + 防守位
 │   ├── cert7_indicator.pine            ← 指標 3-A 確定性 7 項（獨立版，副圖）
 │   └── vcp_score_indicator.pine        ← 指標 3-B VCP 分數/等級 A–E（獨立版，副圖）
+├── watchlist/                          ← 以 Python 重現 Pine 規則的日線掃描
+│   ├── scan_r7.py                      ← R7 A–G 六項條件掃描（r7e 重心 / EMA21 / MA20 / r7c VCP / r7b 時鐘與淺紅 / r7g 最低阻力線）
+│   ├── build_r7_scan_html.py           ← 掃描結果 → HTML 列表（六項全中 / ⑤ 放寬 / 五中一 / 全表可篩選）
+│   ├── R7_six_criteria_scan_r1(mm.dd_hh.mm).html / .csv ← 掃描輸出（附件 4 份榜單去重 738 檔）
+│   ├── scan_clock2.py / build_rank_html2.py ← MACD 轉勢點時鐘排名 R1
+│   └── macd_clock_rank.html / .csv     ← 排名輸出
 └── charts/
     ├── generate_chart.py         ← 圖表產生腳本
     └── ross_entry_exit_chart.png ← 典型交易日入市/賣出點標註圖
