@@ -112,8 +112,8 @@ def convert_g(src):
 
 def convert_h(src):
     src = retitle(src, r"波動指數 Volatility Index r\d", "R7-H Volatility Index", "R7-H VolIdx")
-    src = src.replace("//  波動指數 (Volatility Index) r0 —— 下方 pane，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小",
-                      f"//  版本 r7({TS_TITLE})\n//  R7-H  下方 pane：波動指數 (Volatility Index)，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小\n//\n" + HEADER_TABLE + "//")
+    src = re.sub(r"//  波動指數 \(Volatility Index\) r\d —— 下方 pane，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小",
+                 lambda m: f"//  版本 r7({TS_TITLE})\n//  R7-H  下方 pane：波動指數 (Volatility Index)，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小\n//\n" + HEADER_TABLE + "//", src, count=1)
     assert "R7 八件套" in src, "H 檔頭未替換"
     return src
 
