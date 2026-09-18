@@ -1,0 +1,374 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  COMBO : Daily MACD Cycle Clock  +  EMA9 Band Width Strategy
+//
+//  本檔由兩個獨立腳本合併而成，程式碼以 MODULE 註解區塊分隔存檔 (archive)：
+//
+//     MODULE 1 : macd_cycle_clock_daily   (r0-D)  — 日線 MACD 柱狀圖升跌週期 + 時鐘
+//     MODULE 2 : ema9_bandwidth_strategy          — EMA9 中線 + 帶寬擠壓 中短線策略
+//
+//  合併說明：
+//   • Pine 一個檔案只能有一個宣告，故整體以「策略模式、overlay = true」執行；
+//     Module 2 的通道 / 交易記號畫在主圖，Module 1 的時鐘 (table)、週期背景、
+//     切換標籤同樣顯示在主圖；日線 MACD 柱狀圖數值改放「資料視窗」(主圖價格軸無法畫柱狀圖)。
+//   • 兩個模組的參數各自分組，邏輯與原檔一致；變數名稱衝突處已加前綴 (m2_)。
+//   • 新增「⑥ 模組整合」開關 (預設關閉)：開啟後 Module 2 只在日線上昇周期做多、
+//     下跌周期做空 —— 「日線定方向、EMA9 帶寬找進場」。
+// ═══════════════════════════════════════════════════════════════════════════
+strategy("Cycle Clock (D) + EMA9 Band Width", shorttitle = "Clock+EMA9-BW",
+     overlay = true, initial_capital = 10000,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
+     commission_type = strategy.commission.percent, commission_value = 0.05,
+     slippage = 1, pyramiding = 0, process_orders_on_close = true,
+     max_labels_count = 500)
+
+
+// ╔═══════════════════════════════════════════════════════════════════════════╗
+// ║  MODULE 1 : macd_cycle_clock_daily  (r0-D)                                ║
+// ║                                                                           ║
+// ║  1) 週期定義 (日線)：MACD Histogram ≥ 0 = 上昇周期；< 0 = 下跌周期           ║
+// ║     柱狀圖穿越零軸 = 週期切換，記錄每段長度 (交易日)，                       ║
+// ║     以最近 N 段同類週期平均長度估算本段預期長度                              ║
+// ║  2) 時鐘：上半圓 = 上昇周期 (綠)，下半圓 = 下跌周期 (紅)，指針順時針          ║
+// ║       9 → 12 → 3 點 = 上昇周期 (起→中→尾)； 3 → 6 → 9 點 = 下跌周期        ║
+// ║     指針位置 = 已走交易日 ÷ 預期長度 (超過時停在 97% 並提示「超時」)          ║
+// ║     圓心顯示日期，上方一行週期狀態，下方一行統計                             ║
+// ║  3) 週期引擎在 request.security 的日線環境執行，可疊加於任何時間框圖表        ║
+// ╚═══════════════════════════════════════════════════════════════════════════╝
+
+// ── M1 參數 ──
+grpM = "M1 ① MACD (日線)"
+m1src = input.source(close, "價格來源", group = grpM)
+fast  = input.int(12, "快線 EMA", minval = 2, group = grpM)
+slow  = input.int(26, "慢線 EMA", minval = 3, group = grpM)
+sigL  = input.int(9,  "訊號線", minval = 2, group = grpM)
+cycTF = input.timeframe("D", "週期計算時間框 (預設日線)", group = grpM)
+
+grpC = "M1 ② 週期估算"
+lookN  = input.int(8,  "平均週期長度取最近幾段", minval = 2, maxval = 50, group = grpC)
+defLen = input.int(12, "尚無歷史時的預設週期長度 (日)", minval = 2, group = grpC)
+lateAt = input.float(75, "進入尾段門檻 % (警報用)", minval = 50, maxval = 95, group = grpC)
+
+grpK = "M1 ③ 時鐘外觀"
+showClock = input.bool(true, "顯示時鐘", group = grpK)
+posOpt = input.string("左上", "位置", options = ["左上", "右上", "左下", "右下"], group = grpK)
+grid   = input.int(13, "解析度 (格數, 建議奇數 11–17)", minval = 9, maxval = 21, group = grpK)
+cellW  = input.float(0.9, "格寬 (% 圖表寬)", minval = 0.3, step = 0.1, group = grpK)
+cellH  = input.float(1.7, "格高 (% 圖表高)", minval = 0.5, step = 0.1, group = grpK)
+tz     = input.string("America/New_York", "日期時區", group = grpK)
+cUp    = input.color(color.new(#16a34a, 0),  "上昇周期色", group = grpK)
+cDn    = input.color(color.new(#dc2626, 0),  "下跌周期色", group = grpK)
+cHand  = input.color(color.new(#facc15, 0),  "指針色", group = grpK)
+showBg  = input.bool(true, "主圖週期背景著色", group = grpK)
+showLbl = input.bool(true, "在切換處標註上一段週期長度", group = grpK)
+
+// ── M1 日線週期引擎 (在 security 的日線環境中執行) ──
+f_cycle() =>
+    [m, s, h] = ta.macd(m1src, fast, slow, sigL)
+    u  = h >= 0
+    fl = bar_index > 0 and u != u[1]
+    rs = h > h[1]
+    var int   cs = 0
+    var float ll = na
+    var ul = array.new_float()
+    var dl = array.new_float()
+    if fl
+        L = bar_index - cs
+        ll := L
+        a = u[1] ? ul : dl                 // 剛結束的是哪一種週期
+        array.push(a, L)
+        if array.size(a) > lookN
+            array.shift(a)
+        cs := bar_index
+    el = bar_index - cs + 1
+    au = array.size(ul) > 0 ? array.avg(ul) : defLen
+    ad = array.size(dl) > 0 ? array.avg(dl) : defLen
+    [m, s, h, u, fl, rs, el, au, ad, ll]
+
+[macdL, sigLine, hist, up, flip, rising, elapsed, avgUp, avgDn, lastLen] =
+     request.security(syminfo.tickerid, cycTF, f_cycle(), lookahead = barmerge.lookahead_off)
+
+newDay  = timeframe.change(cycTF)          // 日線圖上每根都為 true；日內圖上每日第一根為 true
+flipEvt = flip and newDay                  // 每個交易日最多觸發一次
+
+expected = up ? avgUp : avgDn
+progRaw  = elapsed / expected
+prog     = math.min(progRaw, 0.97)
+overdue  = progRaw > 1.0
+late     = progRaw * 100 >= lateAt
+lateEvt  = late and not late[1] and newDay
+
+theta = up ? 270 + 180 * prog : 90 + 180 * prog        // 順時針、12 點鐘 = 0°
+theta := theta >= 360 ? theta - 360 : theta
+
+phaseTxt = up ? (rising ? "▲ 日線上昇周期 · 動能加速" : "▲ 日線上昇周期 · 動能減速")
+              : (rising ? "▼ 日線下跌周期 · 跌勢減弱" : "▼ 日線下跌周期 · 跌勢加速")
+
+// ── M1 主圖繪製 ──
+bgcolor(showBg ? (up ? color.new(cUp, 94) : color.new(cDn, 94)) : na, title = "M1 日線週期背景")
+plot(hist,    "M1 日線 MACD Hist",   color = up ? cUp : cDn, display = display.data_window)
+plot(macdL,   "M1 日線 MACD",        color = color.blue,   display = display.data_window)
+plot(sigLine, "M1 日線 Signal",      color = color.orange, display = display.data_window)
+
+if showLbl and flipEvt
+    // 上一段是上昇周期 → 標在 K 線上方；上一段是下跌周期 → 標在下方
+    label.new(bar_index, na, str.tostring(lastLen, "#") + "日",
+         yloc = up[1] ? yloc.abovebar : yloc.belowbar,
+         style = up[1] ? label.style_label_down : label.style_label_up,
+         color = up[1] ? color.new(cUp, 20) : color.new(cDn, 20),
+         textcolor = color.white, size = size.tiny)
+
+// ── M1 時鐘 (table) ──
+tpos = posOpt == "左上" ? position.top_left : posOpt == "右上" ? position.top_right :
+       posOpt == "左下" ? position.bottom_left : position.bottom_right
+
+var table clk = table.new(tpos, grid, grid + 2, bgcolor = color.new(color.black, 100), frame_width = 0)
+var bool merged = false
+
+if showClock and barstate.islast
+    if not merged
+        table.merge_cells(clk, 0, 0, grid - 1, 0)                 // 上方狀態列
+        table.merge_cells(clk, 0, grid + 1, grid - 1, grid + 1)   // 下方統計列
+        merged := true
+
+    activeCol = up ? cUp : cDn
+    table.cell(clk, 0, 0, phaseTxt, text_color = color.white, bgcolor = color.new(activeCol, 10),
+         text_size = size.small, text_halign = text.align_center)
+
+    c  = (grid - 1) / 2.0            // 圓心索引
+    r  = c - 0.5                     // 圓環半徑
+    th = math.toradians(theta)
+    ux = math.sin(th)                // 指針方向單位向量 (x 向右, y 向下)
+    uy = -math.cos(th)
+    dateTxt = str.format_time(time, "MM/dd", tz)
+
+    for i = 0 to grid - 1            // 欄 (x)
+        for j = 0 to grid - 1        // 列 (y)
+            dx = i - c
+            dy = j - c
+            d  = math.sqrt(dx * dx + dy * dy)
+            isRing   = math.abs(d - r) <= 0.55
+            topHalf  = dy < 0 or (dy == 0 and dx < 0)     // 9 點鐘 → 12 → 3 點鐘(不含) 為上半
+            along    = dx * ux + dy * uy
+            perp     = math.abs(dx * uy - dy * ux)
+            onHand   = along >= 0 and along <= r - 0.9 and perp <= 0.5
+            isCenter = d < 0.6
+
+            cellBg = color.new(color.black, 100)
+            cellTx = ""
+            if isCenter
+                cellBg := color.new(color.gray, 20)
+                cellTx := dateTxt
+            else if onHand
+                cellBg := cHand
+            else if isRing
+                cellBg := topHalf ? color.new(cUp, up ? 0 : 75) : color.new(cDn, up ? 75 : 0)
+
+            table.cell(clk, i, j + 1, cellTx, width = cellW, height = cellH,
+                 bgcolor = cellBg, text_color = color.white, text_size = size.tiny,
+                 text_halign = text.align_center, text_valign = text.align_center)
+
+    statTxt = "第 " + str.tostring(elapsed) + " / 預期 " + str.tostring(expected, "#.#") + " 日 · " +
+         str.tostring(progRaw * 100, "#") + "%" + (overdue ? " ⚠超時" : late ? " ·尾段" : "") +
+         "\n均升 " + str.tostring(avgUp, "#.#") + " 日 · 均跌 " + str.tostring(avgDn, "#.#") + " 日" +
+         (timeframe.period != cycTF ? "\n(日線週期 疊加於 " + timeframe.period + " 圖)" : "")
+    table.cell(clk, 0, grid + 1, statTxt, text_color = color.white,
+         bgcolor = color.new(color.gray, 30), text_size = size.tiny, text_halign = text.align_center)
+
+// ── M1 警報 ──
+alertcondition(flipEvt and up,     "M1 日線轉入上昇周期", "{{ticker}} 日線 MACD 柱狀圖轉正 — 進入上昇周期 (9 點鐘)")
+alertcondition(flipEvt and not up, "M1 日線轉入下跌周期", "{{ticker}} 日線 MACD 柱狀圖轉負 — 進入下跌周期 (3 點鐘)")
+alertcondition(lateEvt and up,     "M1 日線上昇周期進入尾段", "{{ticker}} 日線上昇周期已走 >75%，留意轉折 (接近 3 點鐘)")
+alertcondition(lateEvt and not up, "M1 日線下跌周期進入尾段", "{{ticker}} 日線下跌周期已走 >75%，留意反轉 (接近 9 點鐘)")
+
+// ═══════════════════════════  END OF MODULE 1  ═══════════════════════════════
+
+
+
+// ╔═══════════════════════════════════════════════════════════════════════════╗
+// ║  MODULE 2 : ema9_bandwidth_strategy  — 中短線波段策略                        ║
+// ║                                                                           ║
+// ║  概念：Bollinger Band = 20 SMA ± 2σ；此處中線改為 9 EMA                      ║
+// ║        上下軌 = EMA9 ± 倍數 × 標準差(9) [或 ATR 倍數]                        ║
+// ║        Band Width = (上軌 − 下軌) / 中線 × 100%；收縮至 N 期最低 = 擠壓       ║
+// ║  進場：A) 擠壓後放量突破上軌   B) EMA9 上升中回踩後站回                        ║
+// ║  過濾：MACD > 0 / 價 > EMA21 / 量 > 均量 × 倍數  (+ 可選：日線週期方向)        ║
+// ║  出場：初始止損 = 進場K下軌/低點；止盈 R 倍數；收盤跌破 EMA9 移動出場            ║
+// ║  倉位：每筆風險 % ÷ 止損距離 = 股數                                          ║
+// ╚═══════════════════════════════════════════════════════════════════════════╝
+
+// ── M2 參數 ──
+grpB = "M2 ① 帶狀通道"
+src      = input.source(close, "價格來源", group = grpB)
+len      = input.int(9, "EMA 週期 (中線)", minval = 2, group = grpB)
+bandMode = input.string("StdDev", "帶寬計算方式", options = ["StdDev", "ATR"], group = grpB)
+mult     = input.float(2.0, "StdDev 倍數", step = 0.1, minval = 0.5, group = grpB)
+atrMult  = input.float(1.5, "ATR 倍數", step = 0.1, minval = 0.5, group = grpB)
+
+grpS = "M2 ② 擠壓 (Squeeze) 偵測"
+bwLook = input.int(60, "Band Width 回看期 (找 N 期最低)", minval = 10, group = grpS)
+sqzTol = input.float(15, "擠壓容忍度 % (BW ≤ 最低 × (1+tol))", step = 1, minval = 0, group = grpS)
+sqzWin = input.int(8, "擠壓後幾根 K 內突破才有效", minval = 1, group = grpS)
+
+grpE = "M2 ③ 進場"
+useBreak   = input.bool(true, "A) 擠壓後突破上軌", group = grpE)
+usePull    = input.bool(true, "B) 順勢回踩 EMA9 站回", group = grpE)
+allowShort = input.bool(false, "允許做空 (鏡像規則)", group = grpE)
+useVol     = input.bool(true, "量能過濾：量 > 20日均量 ×", inline = "v", group = grpE)
+volX       = input.float(1.5, "", step = 0.1, minval = 0.5, inline = "v", group = grpE)
+useMacd    = input.bool(true, "MACD 過濾 (多: MACD>0 / 空: MACD<0)", group = grpE)
+useTrend   = input.bool(true, "大趨勢過濾 (多: 價>EMA21 / 空: 價<EMA21)", group = grpE)
+
+grpX = "M2 ④ 出場 / 風控"
+rr          = input.float(2.0, "止盈 R 倍數 (0 = 不設止盈)", step = 0.5, minval = 0, group = grpX)
+midExit     = input.bool(true, "收盤跌破/站回中線即出場 (移動出場)", group = grpX)
+midBars     = input.int(1, "需連續幾根 K 收在中線另一側", minval = 1, group = grpX)
+useRiskSize = input.bool(true, "依風險 % 計算股數 (關閉 = 用預設 % 權益)", group = grpX)
+riskPct     = input.float(1.0, "每筆風險 % 帳戶", step = 0.25, minval = 0.1, group = grpX)
+
+grpD = "M2 ⑤ 回測區間"
+startT  = input.time(timestamp("2023-01-01T00:00:00"), "開始", group = grpD)
+endT    = input.time(timestamp("2030-12-31T00:00:00"), "結束", group = grpD)
+inRange = time >= startT and time <= endT
+
+grpI = "⑥ 模組整合 (M1 → M2)"
+useDailyCycle = input.bool(false, "依日線週期過濾：多單只在日線上昇周期 / 空單只在下跌周期", group = grpI)
+avoidLate     = input.bool(false, "日線週期已進入尾段 (>門檻%) 時不再新開倉", group = grpI)
+
+// ── M2 指標 ──
+basis = ta.ema(src, len)
+dev   = bandMode == "StdDev" ? mult * ta.stdev(src, len) : atrMult * ta.atr(len)
+upper = basis + dev
+lower = basis - dev
+bw    = (upper - lower) / basis * 100            // Band Width %
+bwLow = ta.lowest(bw, bwLook)
+
+squeeze   = bw <= bwLow * (1 + sqzTol / 100)     // 帶寬處於 N 期最低附近
+sinceSqz  = ta.barssince(squeeze)
+recentSqz = not na(sinceSqz) and sinceSqz <= sqzWin
+expanding = bw > bw[1]                           // 帶寬開始擴張
+
+volAvg = ta.sma(volume, 20)
+volOK  = not useVol or volume > volAvg * volX
+
+[m2_macd, m2_sig, m2_hist] = ta.macd(close, 12, 26, 9)   // M2 自己的 (圖表時間框) MACD
+macdLongOK  = not useMacd or m2_macd > 0
+macdShortOK = not useMacd or m2_macd < 0
+
+ema21        = ta.ema(close, 21)
+trendLongOK  = not useTrend or close > ema21
+trendShortOK = not useTrend or close < ema21
+
+basisUp = basis > basis[2]
+basisDn = basis < basis[2]
+
+// 交叉判斷提到全域計算 (避免 CW10002：ta.* 在條件式內可能不每根執行)
+crossUp = ta.crossover(close, upper)
+crossDn = ta.crossunder(close, lower)
+
+// 模組整合：日線週期方向 / 尾段過濾 (預設關閉，關閉時恆為 true)
+dailyLongOK  = not useDailyCycle or up
+dailyShortOK = not useDailyCycle or not up
+notLateOK    = not avoidLate or not late
+
+// ── M2 訊號 ──
+flat = strategy.position_size == 0
+
+longBreak = useBreak and recentSqz and crossUp and expanding
+longPull  = usePull and basisUp and low <= basis and close > basis and close > open and close > close[1]
+longSig   = inRange and flat and (longBreak or longPull) and volOK and macdLongOK and trendLongOK and dailyLongOK and notLateOK
+
+shortBreak = useBreak and recentSqz and crossDn and expanding
+shortPull  = usePull and basisDn and high >= basis and close < basis and close < open and close < close[1]
+shortSig   = allowShort and inRange and flat and (shortBreak or shortPull) and volOK and macdShortOK and trendShortOK and dailyShortOK and notLateOK
+
+// ── M2 倉位 / 止損 / 止盈 ──
+var float stopPx = na
+var float tpPx   = na
+
+qtyByRisk(entryPx, stopPrice) =>
+    perShare = math.abs(entryPx - stopPrice)
+    riskCash = strategy.equity * riskPct / 100
+    perShare > 0 ? math.max(1, math.floor(riskCash / perShare)) : 1
+
+if longSig
+    stopPx := math.min(lower, low)                       // 下軌與本 K 低點取低者
+    tpPx   := rr > 0 ? close + rr * (close - stopPx) : na
+    cmt = longBreak ? "L 擠壓突破" : "L 回踩EMA9"
+    if useRiskSize
+        strategy.entry("L", strategy.long, qty = qtyByRisk(close, stopPx), comment = cmt)
+    else
+        strategy.entry("L", strategy.long, comment = cmt)
+    alert("EMA9-BW 做多 " + syminfo.ticker + " @" + str.tostring(close, format.mintick) +
+         "  止損 " + str.tostring(stopPx, format.mintick) +
+         (rr > 0 ? "  止盈 " + str.tostring(tpPx, format.mintick) : ""), alert.freq_once_per_bar_close)
+
+if shortSig
+    stopPx := math.max(upper, high)
+    tpPx   := rr > 0 ? close - rr * (stopPx - close) : na
+    cmt = shortBreak ? "S 擠壓跌破" : "S 反彈EMA9"
+    if useRiskSize
+        strategy.entry("S", strategy.short, qty = qtyByRisk(close, stopPx), comment = cmt)
+    else
+        strategy.entry("S", strategy.short, comment = cmt)
+    alert("EMA9-BW 做空 " + syminfo.ticker + " @" + str.tostring(close, format.mintick) +
+         "  止損 " + str.tostring(stopPx, format.mintick), alert.freq_once_per_bar_close)
+
+// 固定止損 + 止盈 (OCO)
+if strategy.position_size > 0
+    strategy.exit("L-exit", from_entry = "L", stop = stopPx, limit = tpPx)
+if strategy.position_size < 0
+    strategy.exit("S-exit", from_entry = "S", stop = stopPx, limit = tpPx)
+
+// 移動出場：收盤跌破 (多) / 站回 (空) 中線
+var int belowCnt = 0
+var int aboveCnt = 0
+belowCnt := close < basis ? belowCnt + 1 : 0
+aboveCnt := close > basis ? aboveCnt + 1 : 0
+
+if midExit and strategy.position_size > 0 and belowCnt >= midBars
+    strategy.close("L", comment = "跌破EMA9")
+    alert("EMA9-BW 平多 " + syminfo.ticker + " 收盤跌破 EMA9", alert.freq_once_per_bar_close)
+if midExit and strategy.position_size < 0 and aboveCnt >= midBars
+    strategy.close("S", comment = "站回EMA9")
+    alert("EMA9-BW 平空 " + syminfo.ticker + " 收盤站回 EMA9", alert.freq_once_per_bar_close)
+
+// ── M2 繪圖 ──
+pB = plot(basis, "EMA9 中線", color = color.new(color.orange, 0), linewidth = 2)
+pU = plot(upper, "上軌", color = color.new(color.teal, 55), linewidth = 1)
+pL = plot(lower, "下軌", color = color.new(color.teal, 55), linewidth = 1)
+fill(pU, pL, color = squeeze ? color.new(color.yellow, 88) : color.new(color.teal, 96), title = "通道 (黃 = 擠壓)")
+plot(ema21, "EMA21 (趨勢過濾)", color = color.new(color.gray, 20), linewidth = 3)
+plot(bw, "Band Width %", color = color.purple, display = display.data_window)
+plot(bwLow, "Band Width N 期最低", color = color.gray, display = display.data_window)
+
+plotshape(longSig,  "做多訊號", shape.triangleup,   location.belowbar, color.green, size = size.small, text = "多")
+plotshape(shortSig, "做空訊號", shape.triangledown, location.abovebar, color.red,   size = size.small, text = "空")
+plot(strategy.position_size != 0 ? stopPx : na, "止損線", color = color.red,   style = plot.style_linebr, linewidth = 1)
+plot(strategy.position_size != 0 ? tpPx   : na, "止盈線", color = color.green, style = plot.style_linebr, linewidth = 1)
+
+// M2 狀態面板 (右上角；M1 時鐘預設在左上角，互不重疊)
+var tbl = table.new(position.top_right, 2, 7, border_width = 1)
+if barstate.islast
+    table.cell(tbl, 0, 0, "Band Width %", text_size = size.small)
+    table.cell(tbl, 1, 0, str.tostring(bw, "#.##"), text_size = size.small)
+    table.cell(tbl, 0, 1, "N期最低 BW", text_size = size.small)
+    table.cell(tbl, 1, 1, str.tostring(bwLow, "#.##"), text_size = size.small)
+    table.cell(tbl, 0, 2, "擠壓中", text_size = size.small)
+    table.cell(tbl, 1, 2, squeeze ? "是 ⚠" : (recentSqz ? "剛結束" : "否"), text_size = size.small, bgcolor = squeeze ? color.new(color.yellow, 60) : na)
+    table.cell(tbl, 0, 3, "帶寬方向", text_size = size.small)
+    table.cell(tbl, 1, 3, expanding ? "擴張 ↑" : "收縮 ↓", text_size = size.small)
+    table.cell(tbl, 0, 4, "MACD (圖表TF)", text_size = size.small)
+    table.cell(tbl, 1, 4, m2_macd > 0 ? "綠燈" : "紅燈", text_size = size.small, bgcolor = m2_macd > 0 ? color.new(color.green, 70) : color.new(color.red, 70))
+    table.cell(tbl, 0, 5, "EMA9 斜率", text_size = size.small)
+    table.cell(tbl, 1, 5, basisUp ? "上升" : (basisDn ? "下降" : "走平"), text_size = size.small)
+    table.cell(tbl, 0, 6, "日線週期 (M1)", text_size = size.small)
+    table.cell(tbl, 1, 6, (up ? "上昇 " : "下跌 ") + str.tostring(progRaw * 100, "#") + "%" + (useDailyCycle ? " ·過濾中" : ""),
+         text_size = size.small, bgcolor = up ? color.new(cUp, 70) : color.new(cDn, 70))
+
+// ── M2 警報 ──
+alertcondition(longSig,  "M2 EMA9-BW 做多訊號", "{{ticker}} EMA9 帶寬策略做多訊號 @{{close}}")
+alertcondition(shortSig, "M2 EMA9-BW 做空訊號", "{{ticker}} EMA9 帶寬策略做空訊號 @{{close}}")
+alertcondition(squeeze and not squeeze[1], "M2 EMA9-BW 擠壓開始", "{{ticker}} 帶寬進入擠壓，留意突破")
+
+// ═══════════════════════════  END OF MODULE 2  ═══════════════════════════════

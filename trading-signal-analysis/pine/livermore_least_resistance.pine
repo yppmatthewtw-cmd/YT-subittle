@@ -1,0 +1,385 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  Livermore 最低阻力線 (Line of Least Resistance) r1 —— 主圖 overlay，中短線版：只畫「一條線」
+//
+//  Livermore 的最低阻力線不是平滑曲線，而是「市場在樞紐點上自己證明的方向」：
+//    "Prices ... move along the line of least resistance ... wait for the moment when that line defines itself."
+//  這條線 = 目前趨勢「必守的樞紐價位」（他 Market Key 帳上的紅線 / 黑線）：
+//    上升趨勢 → 最近一個回檔低點（跌破即趨勢失效）；下降趨勢 → 最近一個反彈高點。
+//  r1 中短線化（不改邏輯，只縮短「線與 K 線的距離」）：
+//    ① 樞紐點改用 左 3 / 右 2 確認（原 5/3），抓的是中短線的擺動而不是大波段；
+//    ② 線取「最近確認樞紐低」與「Market Key 最近自然回檔低」兩者中較貼近價格者，並且只會向趨勢方向棘輪
+//       （上升趨勢中只升不降，這正是 Livermore 隨趨勢上移停損的做法）；
+//    ③ Market Key 反轉 / 確認門檻 3%/1.5% → 2%/1%（原著 6/3 點是給 $30 以上大波段用的）；
+//    ④ 盤整箱視窗 20 → 10 根。
+//  仍保留：收盤越過樞紐 = 線定義自己（立即翻轉）、突破放量、突破後跟進（否則危險訊號）。
+//  不再畫 EMA21 / SMA50 / AVWAP / 樞紐高低參考線；圖上只有這一條線 + 突破記號。
+//  r2：加入 Livermore 買賣決策點（④），每個標籤的文字就是觸發原因：
+//      買① 升破樞紐·放量、買② MK 回升勢欄、買③ 首穿整數關卡、加碼 首筆有利潤、
+//      賣① 跌破必守樞紐(放量=放空)、賣② 突破無跟進、賣③ 次級反彈失敗、賣④ 放量異常反轉、賣⑤ 一日反轉、
+//      放空② MK 回跌勢欄、回補 跌破無跟進、觀察 升破未放量(不買)。
+// ═══════════════════════════════════════════════════════════════════════════
+indicator("Livermore Least-Resistance r2", shorttitle = "Livermore LR", overlay = true, max_labels_count = 500, max_lines_count = 500)
+
+// ── ① 樞紐點 ──
+grpP = "① 樞紐點 (Pivotal Points) — 中短線"
+lbL    = input.int(3, "轉折左側確認根數", minval = 1, maxval = 20, group = grpP, display = display.none)
+lbR    = input.int(2, "轉折右側確認根數", minval = 1, maxval = 10, group = grpP, display = display.none)
+brkPct = input.float(0.0, "突破樞紐點需超過 % (0 = 收盤越過即算)", minval = 0, maxval = 5, step = 0.25, group = grpP, display = display.none)
+boxLen = input.int(10, "盤整箱視窗 (根)", minval = 5, maxval = 60, group = grpP, display = display.none)
+rangeMult = input.float(2.5, "盤整箱：視窗高低差 < ATR × 此值 → 不表態", minval = 1, maxval = 8, step = 0.5, group = grpP, display = display.none)
+
+// ── ② Market Key ──
+grpM = "② Market Key 六欄 (Livermore 1940) — 中短線門檻"
+mkMode    = input.string("百分比", "門檻單位", options = ["百分比", "ATR 倍數"], group = grpM, display = display.none)
+mkRev     = input.float(2.0, "反轉門檻 %：承認 自然反彈 / 回檔", minval = 0.5, maxval = 15, step = 0.5, group = grpM, display = display.none)
+mkConf    = input.float(1.0, "確認門檻 %：越過樞紐價位", minval = 0.25, maxval = 10, step = 0.25, group = grpM, display = display.none)
+mkRevAtr  = input.float(1.5, "反轉門檻 (ATR 倍數)", minval = 0.5, maxval = 6, step = 0.25, group = grpM, display = display.none)
+mkConfAtr = input.float(0.75, "確認門檻 (ATR 倍數)", minval = 0.25, maxval = 4, step = 0.25, group = grpM, display = display.none)
+atrLen    = input.int(14, "ATR 長度", minval = 5, group = grpM, display = display.none)
+
+// ── ③ 成交量與跟進 ──
+grpV = "③ 成交量確認與跟進"
+volLen     = input.int(50, "均量期數", minval = 5, group = grpV, display = display.none)
+volX       = input.float(1.5, "突破放量門檻 (× 均量)", minval = 1, maxval = 5, step = 0.1, group = grpV, display = display.none)
+followBars = input.int(3, "突破後幾根內必須跟進，否則危險訊號", minval = 1, maxval = 10, group = grpV, display = display.none)
+showMarks  = input.bool(true, "顯示突破 ▲▼ 與備註框", group = grpV, display = display.none)
+
+// ── ⑦ 版面 ──
+grpL   = "⑦ 版面"
+showBox = input.bool(true, "顯示資訊框", group = grpL, display = display.none)
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬)", minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
+boxH   = input.float(35, "資訊框高度 (% pane 高)", minval = 20, maxval = 100, step = 5, group = grpL, display = display.none)
+boxPos = input.string("右下", "位置", options = ["右上", "右中", "右下", "左上", "左中", "左下"], group = grpL, display = display.none)
+f_boxPos(s) => s == "左上" ? position.top_left : s == "左中" ? position.middle_left : s == "左下" ? position.bottom_left :
+     s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
+f_note(x, yAnchor, yBox, txt, col, above) =>
+    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
+         color = color.new(col, 40), textcolor = color.black, size = size.small)
+    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
+    [lb, ln]
+
+// ── 基礎序列 ──
+atr   = ta.atr(atrLen)
+vAvg  = ta.sma(volume, volLen)
+volOK = volume >= vAvg * volX
+volRatio = vAvg > 0 ? volume / vAvg : na
+
+// ── ① 樞紐點：最後兩個已確認的轉折高 / 低 ──
+ph = ta.pivothigh(high, lbL, lbR)
+pl = ta.pivotlow(low, lbL, lbR)
+var float ph1 = na
+var float ph2 = na
+var float pl1 = na
+var float pl2 = na
+if not na(ph)
+    ph2 := ph1
+    ph1 := ph
+if not na(pl)
+    pl2 := pl1
+    pl1 := pl
+hh = ph1 > ph2
+lh = ph1 < ph2
+hl = pl1 > pl2
+ll = pl1 < pl2
+
+// 結構方向：HH+HL = 上升、LH+LL = 下降；收盤越過最後樞紐高 / 低 → 線定義了自己，立即翻轉
+brkUp = ta.crossover(close, ph1 * (1 + brkPct / 100))
+brkDn = ta.crossunder(close, pl1 * (1 - brkPct / 100))
+var int structDir = 0
+if hh and hl
+    structDir := 1
+else if lh and ll
+    structDir := -1
+if brkUp
+    structDir := 1
+if brkDn
+    structDir := -1
+
+// ── ② Market Key 六欄狀態機（只用收盤）──
+//    mk：1 上升趨勢 UT、2 自然反彈、3 次級反彈、-1 下降趨勢 DT、-2 自然回檔、-3 次級回檔
+var int   mk       = 0
+var int   mkTrend  = 0
+var float colExt   = na
+var float lastUT   = na
+var float lastDT   = na
+var float lastNR   = na          // 最近自然反彈高
+var float lastNRe  = na          // 最近自然回檔低
+c = close
+revAmt  = mkMode == "百分比" ? nz(colExt, c) * mkRev / 100 : atr * mkRevAtr
+confAmt = mkMode == "百分比" ? c * mkConf / 100 : atr * mkConfAtr
+if na(colExt)
+    colExt := c
+    mk := 1
+    mkTrend := 1
+else if mk == 1
+    if c > colExt
+        colExt := c
+    else if c <= colExt - revAmt
+        lastUT := colExt
+        mk := -2
+        colExt := c
+else if mk == -1
+    if c < colExt
+        colExt := c
+    else if c >= colExt + revAmt
+        lastDT := colExt
+        mk := 2
+        colExt := c
+else if mk == -2
+    if c < colExt
+        colExt := c
+        if (not na(lastDT) and c < lastDT) or (not na(lastNRe) and c < lastNRe - confAmt)
+            mk := -1
+            mkTrend := -1
+    else if c >= colExt + revAmt
+        lastNRe := colExt
+        colExt := c
+        if not na(lastUT) and c > lastUT
+            mk := 1
+            mkTrend := 1
+        else if not na(lastNR) and c < lastNR
+            mk := 3
+        else
+            mk := 2
+else if mk == 2
+    if c > colExt
+        colExt := c
+        if (not na(lastUT) and c > lastUT) or (not na(lastNR) and c > lastNR + confAmt)
+            mk := 1
+            mkTrend := 1
+    else if c <= colExt - revAmt
+        lastNR := colExt
+        colExt := c
+        if not na(lastDT) and c < lastDT
+            mk := -1
+            mkTrend := -1
+        else if not na(lastNRe) and c > lastNRe
+            mk := -3
+        else
+            mk := -2
+else if mk == 3
+    if c > colExt
+        colExt := c
+        if not na(lastUT) and c > lastUT
+            mk := 1
+            mkTrend := 1
+        else if not na(lastNR) and c > lastNR
+            mk := 2
+    else if c <= colExt - revAmt
+        colExt := c
+        mk := not na(lastNRe) and c < lastNRe ? -2 : -3
+else if mk == -3
+    if c < colExt
+        colExt := c
+        if not na(lastDT) and c < lastDT
+            mk := -1
+            mkTrend := -1
+        else if not na(lastNRe) and c < lastNRe
+            mk := -2
+    else if c >= colExt + revAmt
+        colExt := c
+        mk := not na(lastNR) and c > lastNR ? 2 : 3
+f_mkTxt(m) => m == 1 ? "上升趨勢 UT" : m == 2 ? "自然反彈" : m == 3 ? "次級反彈" : m == -1 ? "下降趨勢 DT" : m == -2 ? "自然回檔" : "次級回檔"
+
+// ── 盤整箱 (get-nowhere prices) ──
+inBox = (ta.highest(high, boxLen) - ta.lowest(low, boxLen)) < atr * rangeMult and not brkUp and not brkDn
+
+// ── 這一條線：趨勢必守的樞紐價位，取較貼近價格者，並沿趨勢方向棘輪 ──
+//    上升：max(最近確認樞紐低, Market Key 最近自然回檔低)，兩者都必須在價格之下；只升不降
+//    下降：min(最近確認樞紐高, Market Key 最近自然反彈高)，兩者都必須在價格之上；只降不升
+//    趨勢翻轉時重新定位到新趨勢的第一個樞紐
+var float lrLine = na
+upC1 = not na(pl1) and pl1 < close ? pl1 : na
+upC2 = not na(lastNRe) and lastNRe < close ? lastNRe : na
+upCand = na(upC1) ? upC2 : na(upC2) ? upC1 : math.max(upC1, upC2)
+dnC1 = not na(ph1) and ph1 > close ? ph1 : na
+dnC2 = not na(lastNR) and lastNR > close ? lastNR : na
+dnCand = na(dnC1) ? dnC2 : na(dnC2) ? dnC1 : math.min(dnC1, dnC2)
+if structDir == 1
+    lrLine := structDir[1] != 1 or na(lrLine) ? upCand : na(upCand) ? lrLine : math.max(lrLine, upCand)
+else if structDir == -1
+    lrLine := structDir[1] != -1 or na(lrLine) ? dnCand : na(dnCand) ? lrLine : math.min(lrLine, dnCand)
+lrDir  = inBox ? 0 : structDir == 1 and mkTrend == 1 ? 1 : structDir == -1 and mkTrend == -1 ? -1 : 0
+lrDist = not na(lrLine) ? (close - lrLine) / close * 100 : na
+
+// ── ③ 突破放量與跟進（危險訊號）──
+var int   brkBar   = na
+var float brkClose = na
+var float brkHigh  = na
+var float brkLow   = na
+var int   brkDir   = 0
+if brkUp or brkDn
+    brkBar   := bar_index
+    brkClose := close
+    brkHigh  := high
+    brkLow   := low
+    brkDir   := brkUp ? 1 : -1
+hiF = ta.highest(high, followBars)
+loF = ta.lowest(low, followBars)
+danger = not na(brkBar) and bar_index == brkBar + followBars and
+     ((brkDir == 1 and (close <= brkClose or hiF <= brkHigh)) or (brkDir == -1 and (close >= brkClose or loF >= brkLow)))
+
+// ── ④ Livermore 買賣決策點（每個記號都標明觸發原因）──
+//    買①  升破樞紐高 + 放量            ← "buy when it crosses the Pivotal Point ... unusually large volume"
+//    買②  Market Key 回到上升趨勢欄    ← 自然回檔結束、越過前高 (+確認門檻)：續勢樞紐點
+//    買③  首次穿越整數關卡 + 放量       ← "when a stock crosses 100, 200 or 300 for the first time"
+//    加碼  首筆有利潤且再漲一個確認門檻 ← "don't make a second unless the first shows you a profit" (pyramiding)
+//    賣①  跌破最低阻力線 (趨勢必守樞紐) ← 線失效；放量則同時是放空點
+//    賣②  突破後無跟進                 ← "a danger signal that must be heeded"
+//    賣③  次級反彈失敗轉回檔            ← Market Key 次級欄：反彈不過前高即回落 = 派發警訊
+//    賣④  放量異常反轉 (高潮)           ← "abnormal break ... with great activity" 於創 20 日新高當天
+//    賣⑤  一日反轉                     ← 創新高、收低於昨收、量增 (Livermore 的 one-day reversal)
+//    放空② Market Key 回到下降趨勢欄；回補 = 跌破後無跟進 / 升破樞紐
+grpS = "④ 買賣決策點"
+showSig  = input.bool(true, "顯示買賣決策點與原因", group = grpS, display = display.none)
+showAdd  = input.bool(true, "顯示加碼點 (pyramiding)", group = grpS, display = display.none)
+maxAdds  = input.int(2, "最多加碼次數", minval = 0, maxval = 5, group = grpS, display = display.none)
+climaxX  = input.float(2.0, "高潮反轉：量 ≥ 均量 ×", minval = 1.2, maxval = 5, step = 0.1, group = grpS, display = display.none)
+sigTrans = input.int(88, "決策點底色透明度 (0 = 實色, 100 = 全透明)", minval = 0, maxval = 100, step = 2, group = grpS, display = display.none)
+sigGap   = input.float(1.5, "決策點框與 K 線的距離 (ATR 倍數；框不壓 K 線)", minval = 0.3, maxval = 6, step = 0.1, group = grpS, display = display.none)
+
+// 整數關卡 (依價位分級)
+rn  = close >= 200 ? 100 : close >= 50 ? 50 : close >= 20 ? 10 : 5
+lvl = math.ceil(close[1] / rn) * rn
+hi250 = ta.highest(high, 250)
+crossRound = close[1] < lvl and close >= lvl and hi250[1] < lvl
+
+buyBreak   = brkUp and volOK
+watchBreak = brkUp and not volOK
+buyResume  = mk == 1 and mk[1] != 1 and structDir == 1 and not brkUp
+buyRound   = crossRound and volOK and structDir == 1 and not brkUp
+sellBreak  = brkDn
+sellDanger = danger and brkDir == 1
+coverDanger= danger and brkDir == -1
+sellRallyFail = mk[1] == 3 and (mk == -2 or mk == -3)
+rngPosC = high != low ? (close - low) / (high - low) : 0.5
+hi20 = ta.highest(high, 20)
+sellClimax = structDir == 1 and high >= hi20 and volume >= vAvg * climaxX and close < open and rngPosC < 0.3 and not brkDn
+sellODR    = structDir == 1 and high > high[1] and close < close[1] and volume > volume[1] and not sellClimax and not brkDn
+shortResume= mk == -1 and mk[1] != -1 and structDir == -1 and not brkDn
+
+// 部位狀態 (只為加碼點與資訊框；本指標不下單)
+var bool  inLong  = false
+var float lastPx  = na
+var int   adds    = 0
+var string lastSig = "—"
+buyAdd = false
+if buyBreak or buyResume or buyRound
+    if not inLong
+        inLong := true
+        adds := 0
+    lastPx := close
+if inLong and showAdd and adds < maxAdds and not (buyBreak or buyResume or buyRound) and lrDir == 1 and close >= lastPx + confAmt and close > lastPx
+    buyAdd := true
+    adds += 1
+    lastPx := close
+if sellBreak or sellDanger
+    inLong := false
+    adds := 0
+if buyBreak
+    lastSig := "買① 升破樞紐高·放量"
+else if buyResume
+    lastSig := "買② MK 回到上升趨勢欄"
+else if buyRound
+    lastSig := "買③ 首次穿越整數關卡"
+else if buyAdd
+    lastSig := "加碼 #" + str.tostring(adds) + " 首筆有利潤"
+else if sellBreak
+    lastSig := volOK ? "賣①/放空 跌破樞紐·放量" : "賣① 跌破必守樞紐"
+else if sellDanger
+    lastSig := "賣② 突破後無跟進"
+else if sellRallyFail
+    lastSig := "賣③ 次級反彈失敗"
+else if sellClimax
+    lastSig := "賣④ 放量異常反轉"
+else if sellODR
+    lastSig := "賣⑤ 一日反轉"
+else if shortResume
+    lastSig := "放空② MK 回到下降趨勢欄"
+else if coverDanger
+    lastSig := "回補 跌破後無跟進"
+else if watchBreak
+    lastSig := "觀察 升破未放量·不買"
+
+// ── 繪圖：只有一條線 ──
+lrCol = lrDir == 1 ? color.new(#26a69a, 0) : lrDir == -1 ? color.new(#ef5350, 0) : color.new(#9ca3af, 0)
+plot(lrLine, "Livermore 最低阻力線", color = lrCol, linewidth = 3, style = plot.style_stepline, display = display.pane + display.data_window + display.price_scale)
+plot(structDir, "結構方向 (1/0/-1)", display = display.data_window)
+plot(mk, "Market Key 欄", display = display.data_window)
+plot(ph1, "最後樞紐高 (數值)", display = display.data_window)
+plot(pl1, "最後樞紐低 (數值)", display = display.data_window)
+
+// 突破記號 (▲▼) — 只標線的定義點；文字說明由 ④ 的決策點標籤負責
+plotshape(showMarks and brkUp, "升破樞紐高", shape.triangleup,   location.belowbar, color.new(#26a69a, 0), size = size.tiny)
+plotshape(showMarks and brkDn, "跌破樞紐低", shape.triangledown, location.abovebar, color.new(#ef5350, 0), size = size.tiny)
+
+// ④ 買賣決策點：框放在 K 線外側 sigGap × ATR 處（不壓 K 線），虛線指回 K 線端點；透明底 + 粗體黑字；文字即觸發原因
+//    below = true → 框在 K 線下方 (買 / 加碼 / 回補)；false → 框在 K 線上方 (賣 / 放空)
+f_sig(cond, txt, col, below) =>
+    if cond
+        yA = below ? low : high
+        yB = below ? low - atr * sigGap : high + atr * sigGap
+        label.new(bar_index, yB, txt, style = below ? label.style_label_up : label.style_label_down,
+             color = color.new(col, sigTrans), textcolor = color.black, size = size.small,
+             text_formatting = text.format_bold)
+        line.new(bar_index, yA, bar_index, yB, color = color.new(col, 25), style = line.style_dotted, width = 1)
+f_sig(showSig and buyBreak,      "買① 升破樞紐·放量",   #16a34a, true)
+f_sig(showSig and buyResume,     "買② MK回升勢欄",      #16a34a, true)
+f_sig(showSig and buyRound,      "買③ 首穿整數關卡",    #0ea5e9, true)
+f_sig(showSig and buyAdd,        "加碼 首筆有利潤",     #65a30d, true)
+f_sig(showSig and watchBreak,    "觀察 未放量不買",     #9ca3af, true)
+f_sig(showSig and coverDanger,   "回補 跌破無跟進",     #f59e0b, true)
+f_sig(showSig and sellBreak,     "賣① 跌破必守樞紐",    #dc2626, false)
+f_sig(showSig and sellDanger,    "賣② 突破無跟進",      #f59e0b, false)
+f_sig(showSig and sellRallyFail, "賣③ 次級反彈失敗",    #dc2626, false)
+f_sig(showSig and sellClimax,    "賣④ 放量異常反轉",    #b91c1c, false)
+f_sig(showSig and sellODR,       "賣⑤ 一日反轉",        #dc2626, false)
+f_sig(showSig and shortResume,   "放空② MK回跌勢欄",    #7f1d1d, false)
+
+// ── 資訊框 ──
+var table tb = table.new(f_boxPos(boxPos), 2, 8, bgcolor = color.new(#ffffff, 5),
+     frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
+if showBox and barstate.islast
+    rh = boxH / 8
+    stTxt = lrDir == 1 ? "上升最低阻力 ✓" : lrDir == -1 ? "下降最低阻力 ✓" : inBox ? "盤整箱 · 不表態" : "未定義"
+    stCol = lrDir == 1 ? color.new(#26a69a, 60) : lrDir == -1 ? color.new(#ef5350, 60) : color.new(#9ca3af, 70)
+    table.cell(tb, 0, 0, "Livermore 最低阻力線 (中短線)", width = boxW * 0.55, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
+    table.cell(tb, 1, 0, stTxt, width = boxW * 0.45, height = rh, text_size = size.small, text_color = color.white, bgcolor = color.new(#374151, 10))
+    table.cell(tb, 0, 1, "線位 · 價格距線", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 1, na(lrLine) ? "—" : str.tostring(lrLine, format.mintick) + " (" + str.tostring(lrDist, "+#.#") + "%)", width = boxW * 0.45, height = rh, text_size = size.small,
+         text_color = lrDir == 1 ? #26a69a : lrDir == -1 ? #ef5350 : color.gray, bgcolor = stCol)
+    table.cell(tb, 0, 2, "結構 (樞紐 " + str.tostring(lbL) + "/" + str.tostring(lbR) + ")", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 2, structDir == 1 ? "HH+HL 上升" : structDir == -1 ? "LH+LL 下降" : "混合", width = boxW * 0.45, height = rh, text_size = size.small)
+    table.cell(tb, 0, 3, "Market Key 欄 / 趨勢欄", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 3, f_mkTxt(mk) + " / " + (mkTrend == 1 ? "UT" : "DT"), width = boxW * 0.45, height = rh, text_size = size.small,
+         text_color = mkTrend == 1 ? #26a69a : #ef5350)
+    table.cell(tb, 0, 4, "最後樞紐 高 / 低", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 4, str.tostring(ph1, format.mintick) + " / " + str.tostring(pl1, format.mintick), width = boxW * 0.45, height = rh, text_size = size.small)
+    table.cell(tb, 0, 5, "本根量比 (突破需 ≥" + str.tostring(volX, "#.#") + "×)", width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 5, str.tostring(volRatio, "#.##") + "×" + (volOK ? " 放量" : ""), width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = volOK ? color.new(#f59e0b, 60) : na)
+    sigCol = str.startswith(lastSig, "買") or str.startswith(lastSig, "加碼") or str.startswith(lastSig, "回補") ? color.new(#16a34a, 60) :
+         str.startswith(lastSig, "賣") or str.startswith(lastSig, "放空") ? color.new(#dc2626, 60) : na
+    table.cell(tb, 0, 6, "最近決策點 (原因)" + (inLong ? " · 持多 加碼" + str.tostring(adds) : ""), width = boxW * 0.55, height = rh, text_size = size.small)
+    table.cell(tb, 1, 6, lastSig, width = boxW * 0.45, height = rh, text_size = size.small, bgcolor = sigCol)
+    table.cell(tb, 0, 7, "說明", width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 1, 7, "線 = 趨勢必守樞紐 · 標籤文字 = 觸發原因", width = boxW * 0.45, height = rh, text_size = size.tiny, text_color = color.gray)
+
+// ── 警報 ──
+alertcondition(brkUp, "Livermore 線向上定義 (升破樞紐高)", "{{ticker}} 收盤升破最後樞紐高 — 最低阻力線向上定義，檢查是否放量")
+alertcondition(brkDn, "Livermore 線向下定義 (跌破樞紐低)", "{{ticker}} 收盤跌破最後樞紐低 — 最低阻力線向下定義，檢查是否放量")
+alertcondition(danger, "Livermore 危險訊號 (突破後無跟進)", "{{ticker}} 突破樞紐點後數根內沒有跟進 — Livermore 危險訊號")
+alertcondition(mkTrend == 1 and mkTrend[1] != 1,   "Market Key 轉入上升趨勢欄", "{{ticker}} Market Key 進入上升趨勢欄")
+alertcondition(mkTrend == -1 and mkTrend[1] != -1, "Market Key 轉入下降趨勢欄", "{{ticker}} Market Key 進入下降趨勢欄")
+// ④ 買賣決策點
+alertcondition(buyBreak,   "買① 升破樞紐高·放量",      "{{ticker}} 買①：收盤升破最後樞紐高且放量 — Livermore 樞紐點突破買入")
+alertcondition(buyResume,  "買② MK 回到上升趨勢欄",    "{{ticker}} 買②：自然回檔結束，Market Key 回到上升趨勢欄 — 續勢樞紐點")
+alertcondition(buyRound,   "買③ 首次穿越整數關卡",     "{{ticker}} 買③：首次放量穿越整數關卡")
+alertcondition(buyAdd,     "加碼：首筆有利潤",         "{{ticker}} 加碼：首筆已有利潤且再漲一個確認門檻 (pyramiding)")
+alertcondition(sellBreak,  "賣①/放空 跌破必守樞紐",    "{{ticker}} 賣①：收盤跌破最低阻力線 (趨勢必守樞紐) — 趨勢失效；放量則為放空點")
+alertcondition(sellDanger, "賣② 突破後無跟進",         "{{ticker}} 賣②：突破樞紐後數根內無跟進 — Livermore 危險訊號")
+alertcondition(sellRallyFail, "賣③ 次級反彈失敗",      "{{ticker}} 賣③：次級反彈不過前高即回落 — 派發警訊")
+alertcondition(sellClimax, "賣④ 放量異常反轉",         "{{ticker}} 賣④：創 20 日新高當天放量收黑於區間下緣 — 高潮反轉")
+alertcondition(sellODR,    "賣⑤ 一日反轉",             "{{ticker}} 賣⑤：創新高但收低於昨收且量增 — 一日反轉")
+alertcondition(shortResume,"放空② MK 回到下降趨勢欄",  "{{ticker}} 放空②：自然反彈結束，Market Key 回到下降趨勢欄")
+alertcondition(coverDanger,"回補：跌破後無跟進",       "{{ticker}} 回補：跌破樞紐後數根內無跟進")

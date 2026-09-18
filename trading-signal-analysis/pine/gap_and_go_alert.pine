@@ -1,0 +1,38 @@
+//@version=5
+// Gap & Go 突破警報：破盤前高 + 爆量 + MACD綠燈 (入市① 訊號)
+// 對應規則: #10 Gap&Go / #30 黃金15分鐘 / #68 無量突破不追 / #24 MACD綠燈
+// 用法: 加到 1 分鐘圖 (需開啟盤前數據 Extended Hours)，對觀察清單每隻股各設一個警報
+indicator("Ross Gap & Go Alert", overlay = true)
+
+volMult   = input.float(5.0, "突破量能倍數", minval = 1)
+volAvgLen = input.int(20, "平均量週期")
+onlyGold  = input.bool(true, "只在 9:30–9:45 黃金窗口觸發")
+
+// ---- 盤前高點 (04:00–09:30 ET) ----
+inPre = not session.ismarket
+var float pmHigh = na
+if session.isfirstbar_regular
+    pmHigh := pmHigh                       // 開盤時凍結
+if inPre
+    pmHigh := na(pmHigh) ? high : math.max(pmHigh, high)
+if session.islastbar_regular
+    pmHigh := na                            // 收盤後重置
+
+plot(session.ismarket ? pmHigh : na, "盤前高點", color.gray,
+     2, plot.style_linebr)
+
+// ---- 條件 ----
+[macdLine, _, _] = ta.macd(close, 12, 26, 9)
+rvol    = volume / ta.sma(volume, volAvgLen)
+tGold   = time(timeframe.period, "0930-0945", "America/New_York")
+inGold  = not onlyGold or not na(tGold)
+
+gapGo = session.ismarket and not na(pmHigh) and
+        ta.crossover(close, pmHigh) and
+        rvol >= volMult and macdLine > 0 and inGold
+
+plotshape(gapGo, "GapGo", shape.triangleup, location.belowbar,
+          color.blue, size = size.small, text = "GO")
+
+alertcondition(gapGo, "Gap&Go 突破盤前高",
+     "{{ticker}} 突破盤前高 {{close}}, 爆量+MACD綠燈 — Gap&Go 入場訊號. 止損=突破K線低點")
