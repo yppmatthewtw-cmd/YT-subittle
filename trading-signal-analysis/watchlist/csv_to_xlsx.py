@@ -7,7 +7,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 TV = "https://www.tradingview.com/chart/Q1c5VWwD/?symbol="
-src = sys.argv[1] if len(sys.argv) > 1 else sorted(glob.glob(os.path.join(os.path.dirname(__file__), "R7_six_criteria_scan_r3 (*).csv")))[-1]
+src = sys.argv[1] if len(sys.argv) > 1 else sorted(glob.glob(os.path.join(os.path.dirname(__file__), "R7_six_criteria_scan_r4 (*).csv")))[-1]
 d = pd.read_csv(src)
 NC = 6
 COLS = [  # (csv 欄, Excel 標題, 格式)
@@ -70,7 +70,7 @@ if "ai_group" in d.columns:
     sheet(wb, "按 AI 小群組", d.sort_values(["ai_rank", "score", "volidx"], ascending=[True, False, False]), "依 AI 小群組資金流排名 → 命中數 → 波動指數排列。")
 ws = wb.create_sheet("說明")
 for i, t in enumerate([
-    "R7 A–H 六項條件掃描 r3 — 日線，數據基準 2026-09-16 收盤（vcp-watchlist repo Yahoo 日線鏡像）",
+    "R7 A–H 六項條件掃描 r4 — 日線，數據基準 2026-09-16 收盤（vcp-watchlist repo Yahoo 日線鏡像；09-17 只抓到 199/2,980 檔，整天不採用）",
     "① 重心線向上：r7e_gravity（滾動 VWAP 30，hlc3）最新一根斜率 > 0",
     "② 波動指數向上：r7h_volidx（0–100，高 = 平靜）最新一根斜率 > 0",
     "③ 波動指數 ≥ 75",
@@ -79,6 +79,7 @@ for i, t in enumerate([
     "⑥ 貼近重心線：收盤距重心線 ≤ 1.0 × ATR14 或 ≤ 3%",
     "VCP / 結構 / 最低阻力線 只作參考，不計分。MA20 與 EMA21 已刪除。",
     "Ticker 欄為 TradingView 圖表超連結（Q1c5VWwD 版面）。",
+    "來源：AI Sector R13（111）· SubSector flow R12（490）· Combined R22（274）· 10MA uptrend R20（107），去重 756 檔。",
 ], 1):
     ws.cell(i, 1, t).font = Font(bold=(i == 1))
 ws.column_dimensions["A"].width = 110
