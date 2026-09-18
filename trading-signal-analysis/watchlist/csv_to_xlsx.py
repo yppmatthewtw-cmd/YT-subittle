@@ -22,6 +22,8 @@ COLS = [  # (csv 欄, Excel 標題, 格式)
 ]
 if "ai_group" in d.columns:   # AI Sector watchlist 版：加小群組欄
     COLS[2:2] = [("ai_cat", "AI 大分類", "txt"), ("ai_group", "AI 小群組", "txt"), ("ai_rank", "小群組資金流排名", "int"), ("ai_flow5", "個股 5 日資金流向", "txt")]
+    if "ai_chg5" in d.columns:
+        COLS[6:6] = [("ai_chg5", "個股 5 日漲跌 %", "num2")]
 d["c5_cat"] = d.apply(lambda r: ("第 %d 根" % (int(r.c5_days) + 1)) if (pd.notna(r.c5_days) and r.still_light) else ("已中斷" if pd.notna(r.c5_days) else "—"), axis=1)
 FMT = {"num1": "0.0", "num2": "0.00", "num3": "0.000", "int": "0"}
 HEAD_FILL = PatternFill("solid", fgColor="EEF1ED"); OK = Font(color="16A34A", bold=True); NO = Font(color="DC2626", bold=True)

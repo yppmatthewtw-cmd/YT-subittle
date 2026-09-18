@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 R7 A–G 六條件掃描（日線）— 以 Python 重現 r7a/b/c/e/g 的預設參數計算。
-資料：vcp-watchlist repo 的 Yahoo 日線鏡像（至 2026-09-16 收盤）。
+資料：vcp-watchlist repo 的 Yahoo 日線鏡像（最新至 2026-09-17 收盤）。
 """
 import json, glob, math, sys
 import numpy as np, pandas as pd
@@ -10,7 +10,9 @@ S = "/tmp/claude-0/-home-user-YT-subittle/0bd65ef0-0bef-5829-9a6f-f0a46d2d96cd/s
 FILES = [f"{S}/eod/eod_2025-09-01_2026-09-09.csv.gz",
          f"{S}/eod/eod_2026-09-01_2026-09-15.csv.gz",
          f"{S}/eod/eod_2026-09-02_2026-09-17.csv.gz",
-         f"{S}/eod/eod_2026-09-04_2026-09-17.csv.gz"]
+         f"{S}/eod/eod_2026-09-04_2026-09-17.csv.gz",
+         f"{S}/eod/eod_2026-09-05_2026-09-18.csv.gz",
+         f"{S}/eod/eod_2026-09-07_2026-09-18.csv.gz"]
 NEAR_ATR = 1.0          # criteria 6：|close − line| ≤ 1.0 × ATR14 算「附近」
 NEAR_PCT = 3.0          # 或 ≤ 3%（兩者取其一即可）
 VOL_MIN = 75.0          # criteria 3：R7-H 波動指數 ≥ 75
@@ -221,6 +223,14 @@ def load():
     fr = [pd.read_csv(f) for f in FILES]
     d = pd.concat(fr).drop_duplicates(["symbol", "date"], keep="last")
     d["date"] = pd.to_datetime(d["date"])
+    # 鏡像最後一天常常只有部分標的（盤後仍在抓）→ 覆蓋率 < 50% 的交易日整天丟棄，
+    # 讓所有標的站在同一個收盤基準上比較。
+    cov = d.groupby("date").symbol.nunique()
+    full = cov[cov >= 0.5 * cov.max()].index
+    dropped = sorted(str(x.date()) for x in cov.index.difference(full))
+    if dropped:
+        print("partial sessions dropped:", dropped, dict((str(k.date()), int(v)) for k, v in cov.items() if k not in full))
+    d = d[d.date.isin(full)]
     return d.sort_values(["symbol", "date"])
 
 def scan_one(sym, df):
