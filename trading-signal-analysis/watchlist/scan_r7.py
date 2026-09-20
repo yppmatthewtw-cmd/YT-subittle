@@ -304,6 +304,7 @@ def scan_one(sym, df):
         c6=bool(near(dE)), dist_grav_pct=round(dE / c.iloc[i] * 100, 2), dist_grav_atr=round(dE / A, 2) if A > 0 else np.nan,
         lr_line=round(lr[i], 2) if not np.isnan(lr[i]) else np.nan,
         dist_lr_pct=round(dG / c.iloc[i] * 100, 2) if not np.isnan(dG) else np.nan, dist_lr_atr=round(dG / A, 2) if (A > 0 and not np.isnan(dG)) else np.nan,
+        turnover20_m=round(float(c.iloc[i] * df.volume.tail(20).mean() / 1e6), 1),
         lr_dir={1: "↑", -1: "↓", 0: "—"}[int(lrDir[i])], struct={1: "HH/HL", -1: "LH/LL", 0: "—"}[int(st[i])], mk=MK[int(mk[i])], inBox=bool(inBox[i]),
         bars=len(df),
     )
@@ -319,18 +320,34 @@ if __name__ == "__main__":
     d = load()
     d["symbol"] = d["symbol"].str.upper()
     have = set(d.symbol.unique())
-    alt = {t: t.replace(".", "-") for t in universe}
+    # 代號寫法對齊：鏡像裡同時存在 BRK/A、BRK/B、BRK.B、BF/A、BF.B、MOG.A 等寫法，
+    # watchlist 可能寫成 BRK-B / BRK.B。逐一試點、槓、斜線三種分隔，取「資料最長」的那個。
+    counts = d.groupby("symbol").size()
+
+    def resolve(t):
+        cands = {t}
+        for a in ".-/":
+            for b in ".-/":
+                if a in t:
+                    cands.add(t.replace(a, b))
+        cands = [c for c in cands if c in have]
+        return max(cands, key=lambda c: counts[c]) if cands else None
+
     rows = []; missing = []
     for t in universe:
-        s = t if t in have else (alt[t] if alt[t] in have else None)
+        s = resolve(t)
         if s is None: missing.append(t); continue
         df = d[d.symbol == s]
         r = scan_one(t, df)
         if r is None: missing.append(t); continue
+        r["symbol_used"] = s
         r["lists"] = "+".join(src[t]); rows.append(r)
     out = pd.DataFrame(rows).sort_values(["score", "c5_days", "theta"], ascending=[False, True, False])
     out.to_csv(f"{S}/scan_r7_result.csv", index=False, encoding="utf-8-sig")
     json.dump({"missing": missing, "n": len(rows), "lastday": str(d.date.max().date())}, open(f"{S}/scan_r7_meta.json", "w"))
     print("scanned", len(rows), "missing", len(missing), missing[:30])
+    remap = [(r["ticker"], r["symbol_used"]) for r in rows if r["ticker"] != r["symbol_used"]]
+    if remap: print("symbol remapped:", remap)
+    assert len(missing) + len(rows) == len(universe), "有 ticker 既沒掃到也沒列進 missing"
     print(out.score.value_counts().sort_index())
     print(out[out.score >= 5].head(40).to_string())

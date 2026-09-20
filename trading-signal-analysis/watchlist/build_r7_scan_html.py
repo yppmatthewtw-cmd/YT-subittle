@@ -58,7 +58,7 @@ def row(r, i, mark=None):
         f'<td class="cr">{tick(r.c4)}<span class="sub"><b>{esc(r.clock)}</b> {esc(r.cycle)}周期 第 {int(r.cyc_days)} 日<br>進度 {int(r.cyc_prog)}%</span></td>',
         f'<td class="cr">{tick(r.c5)}<span class="sub">{lrday(r)}<br>Hist {f2(r["hist"], 3)} ← {f2(r["hist_prev"], 3)}</span></td>',
         f'<td class="cr">{tick(r.c6)}<span class="sub">距重心 {sgn(r.dist_grav_pct, 2, "%")}<br>({sgn(r.dist_grav_atr, 2)} ATR)</span></td>',
-        f'<td class="mut sm">VCP {f2(r.vcp, 1)} {esc(r.vcp_grade)}<br>{esc(r.struct)} · {esc(r.mk)} · 阻力線 {f2(r.lr_line)} ({sgn(r.dist_lr_pct, 1, "%")})</td>',
+        f'<td class="mut sm">20 日均額 {f2(r.turnover20_m, 1)}M · {int(r.bars)} 根<br>VCP {f2(r.vcp, 1)} {esc(r.vcp_grade)}<br>{esc(r.struct)} · {esc(r.mk)} · 阻力線 {f2(r.lr_line)} ({sgn(r.dist_lr_pct, 1, "%")})</td>',
     ]
     return f'<tr data-score="{int(r.score)}" data-tk="{esc(r.ticker)}">' + "".join(cells) + "</tr>"
 

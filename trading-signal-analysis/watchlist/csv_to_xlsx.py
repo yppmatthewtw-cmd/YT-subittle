@@ -19,6 +19,7 @@ COLS = [  # (csv 欄, Excel 標題, 格式)
     ("c4", "④ 時鐘 6–10 點", "tick"), ("clock", "時鐘", "txt"), ("theta", "角度°", "num1"), ("cycle", "周期", "txt"), ("cyc_days", "周期第 N 日", "int"), ("cyc_prog", "周期進度 %", "int"),
     ("c5", "⑤ 淺紅第 1–3 根", "tick"), ("c5_cat", "淺紅第幾根", "txt"), ("hist", "Hist 今日", "num3"), ("hist_prev", "Hist 昨日", "num3"), ("hist_trough", "Hist 谷底", "num3"),
     ("c6", "⑥ 貼近重心線", "tick"), ("dist_grav_pct", "距重心 %", "num2"), ("dist_grav_atr", "距重心 (ATR)", "num2"),
+    ("turnover20_m", "20 日均額 (百萬)", "num1"), ("bars", "歷史根數", "int"),
     ("vcp", "VCP 指數 (參考)", "num1"), ("vcp_grade", "VCP 等級", "txt"), ("struct", "結構", "txt"), ("mk", "Market Key", "txt"), ("lr_line", "最低阻力線", "num2"), ("dist_lr_pct", "距阻力線 %", "num2"),
 ]
 if "ai_group" in d.columns:   # AI Sector watchlist 版：加小群組欄
@@ -105,8 +106,9 @@ for i, t in enumerate([
     "⑥ 貼近重心線：收盤距重心線 ≤ 1.0 × ATR14 或 ≤ 3%",
     "VCP / 結構 / 最低阻力線 只作參考，不計分。MA20 與 EMA21 已刪除。",
     "Ticker 欄為 TradingView 圖表超連結（Q1c5VWwD 版面）。",
-    "10MA R20 的 109 檔 = 89 檔在榜 + 20 檔本版跌出（新上榜同跌出 分頁），兩者都掃。BRK-A / BRK-B 無鏡像資料，未計入。",
-    "「全市場 六項全中」分頁：合併面板中收盤 ≥ $2、60 日均量 ≥ 10 萬股、歷史 ≥ 80 根的 2,826 檔全掃一次的結果，含 watchlist 以外的名字。",
+    "10MA R20 的 109 檔 = 89 檔在榜 + 20 檔本版跌出（新上榜同跌出 分頁），兩者都掃；758 檔全部掃到，0 檔缺資料。",
+    "「全市場 六項全中」分頁：合併面板中收盤 ≥ $2、20 日均額 ≥ 300 萬美元、歷史 ≥ 80 根的 2,584 檔全掃一次的結果，含 watchlist 以外的名字。",
+    "代號對齊：鏡像用 BRK/A、BRK/B、BF/B 等斜線寫法，watchlist 用 BRK-A、BF.B；掃描會自動試點/槓/斜線並取資料最長者（本次 3 檔重對應）。",
     SRC_NOTE,
 ], 1):
     ws.cell(i, 1, t).font = Font(bold=(i == 1))
