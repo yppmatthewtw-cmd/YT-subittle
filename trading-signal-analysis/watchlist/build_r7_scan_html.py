@@ -78,6 +78,13 @@ allrows = d.sort_values(["score", "c5_days", "theta"], ascending=[False, True, F
 missing = meta["missing"]
 stale = d[d.date < meta["lastday"]].ticker.tolist()
 n_src = json.load(open(f"{S}/scan_tickers.json"))
+import os
+UNI = os.environ.get("UNIVERSE_CSV", "")
+udf = pd.read_csv(UNI) if (UNI and os.path.exists(UNI)) else None
+uhit = None
+if udf is not None:
+    uhit = udf[(udf.score == NC) & (~udf.ticker.isin(set(d.ticker)))].sort_values(["c5_days", "volidx"], ascending=[True, False]).copy()
+    uhit["lists"] = "watchlist 外"
 
 crit_html = "".join(f'<li><b>{esc(t)}</b><span>{esc(dsc)}</span></li>' for _, t, dsc in CRIT)
 src_html = " · ".join(f"{esc(k)} {len(v)} 檔" for k, v in n_src.items())
@@ -131,6 +138,8 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 
 <h2>差一項 <span class="n">{NC - 1}/{NC} · {len(five)} 檔 · 按缺少的條件分組</span></h2>
 {table(five)}
+
+{f'<h2>全市場加掃：watchlist 以外的六項全中 <span class="n">{len(uhit)} 檔 · 合併面板 {len(udf)} 檔流動性達標股票中</span></h2>' + table(uhit) if uhit is not None else ''}
 
 <h2>全部 {len(d)} 檔 <span class="n">按命中數排序 · 可篩選</span></h2>
 <div class="filters"><span class="mut">命中 ≥</span>{"".join(f'<button data-min="{k}" class="{"on" if k == 0 else ""}">{k}</button>' for k in range(0, NC + 1))}
