@@ -60,7 +60,9 @@ trading-signal-analysis/
 │   ├── scan_r7.py                      ← R7 A–H 六項條件掃描（r3：r7e 重心斜率與距離 / r7h 波動指數斜率與 ≥75 / r7b 時鐘與淺紅第 1–3 根）
 │   ├── build_r7_scan_html.py           ← 掃描結果 → HTML 列表（六項全中按淺紅第 1/2/3 根分類 / 差一項 / 全表可篩選）
 │   ├── extract_tickers.py              ← 由各份 watchlist 工作簿抽出全部 ticker → JSON
-│   ├── R7_six_criteria_scan_r4 (mm_dd; hh.mm).xlsx / .html / .csv ← 掃描輸出（AI R13 · SubSector R12 · Combined R22 · 10MA R20，去重 756 檔）
+│   ├── assemble_universe.py            ← 合併各來源 ticker → scan_tickers.json（分榜單標籤）
+│   ├── scan_universe.py                ← 不限 watchlist：合併面板中所有流動性達標股票全掃一次
+│   ├── R7_six_criteria_scan_r5 (mm_dd; hh.mm).xlsx / .html / .csv ← 掃描輸出（三個 session 的最新成品去重 758 檔 + 全市場 2,826 檔）
 │   ├── scan_ai_watchlist.py            ← 以 r3 六項條件掃描 AI Sector Watchlist 成分股（附小群組 / 資金流欄）
 │   ├── csv_to_xlsx.py                  ← 掃描 CSV → Excel（Ticker 帶 TradingView 超連結、多分頁）
 │   ├── volatility_index_eval.md / eval_volidx.py ← 波動指數 vs VCP 指數回測（2,779 檔 × 29 萬交易日；R7-H 的依據）

@@ -7,9 +7,10 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 TV = "https://www.tradingview.com/chart/Q1c5VWwD/?symbol="
-src = sys.argv[1] if len(sys.argv) > 1 else sorted(glob.glob(os.path.join(os.path.dirname(__file__), "R7_six_criteria_scan_r4 (*).csv")))[-1]
+src = sys.argv[1] if len(sys.argv) > 1 else sorted(glob.glob(os.path.join(os.path.dirname(__file__), "R7_six_criteria_scan_r5 (*).csv")))[-1]
 d = pd.read_csv(src)
 NC = 6
+SRC_NOTE = os.environ.get("SRC_NOTE", "來源：三個 watchlist repo 的最新成品。")
 COLS = [  # (csv 欄, Excel 標題, 格式)
     ("ticker", "Ticker", "link"), ("lists", "來源榜單", "txt"), ("date", "數據日", "txt"), ("close", "收盤", "num2"), ("score", "命中 /6", "int"),
     ("c1", "① 重心線向上", "tick"), ("grav", "重心線", "num2"), ("grav_slope", "重心斜率", "num3"), ("grav_shift5atr", "重心 5 根位移 (ATR)", "num2"),
@@ -68,9 +69,34 @@ sheet(wb, "差一項", five, "五中一 %d 檔；按缺少的條件分組（看 
 sheet(wb, "全部", d.sort_values(["score", "c5_days", "volidx"], ascending=[False, True, False]), "全部 %d 檔；用「命中 /6」欄篩選。" % len(d))
 if "ai_group" in d.columns:
     sheet(wb, "按 AI 小群組", d.sort_values(["ai_rank", "score", "volidx"], ascending=[True, False, False]), "依 AI 小群組資金流排名 → 命中數 → 波動指數排列。")
+# 全市場（可選）：把合併面板裡所有流動性達標的股票也跑一次，找出 watchlist 以外的命中
+UNI = os.environ.get("UNIVERSE_CSV", "")
+if UNI and os.path.exists(UNI):
+    u = pd.read_csv(UNI)
+    u["c5_cat"] = u.apply(lambda r: ("第 %d 根" % (int(r.c5_days) + 1)) if (pd.notna(r.c5_days) and r.still_light) else ("已中斷" if pd.notna(r.c5_days) else "—"), axis=1)
+    inwl = set(d.ticker)
+    uf = u[u.score == NC].copy()
+    uf["lists"] = uf.ticker.map(lambda t: "watchlist 內" if t in inwl else "watchlist 外")
+    uf = uf.sort_values(["c5_days", "volidx"], ascending=[True, False])
+    sheet(wb, "全市場 六項全中", uf, "合併面板 %d 檔流動性達標股票中，六項全中 %d 檔（其中 %d 檔不在三個 watchlist 內）。" % (len(u), len(uf), (uf.lists == "watchlist 外").sum()))
+
+# 來源分頁（可選）：三個 session 的最新成品出處
+SRC_ROWS = os.environ.get("SRC_ROWS", "")
+if SRC_ROWS and os.path.exists(SRC_ROWS):
+    srcs = pd.read_csv(SRC_ROWS)
+    wsx = wb.create_sheet("來源")
+    hdr = list(srcs.columns)
+    for j, h in enumerate(hdr, 1):
+        c = wsx.cell(1, j, h); c.font = Font(bold=True); c.fill = HEAD_FILL
+    for i, (_, r) in enumerate(srcs.iterrows(), 2):
+        for j, h in enumerate(hdr, 1):
+            wsx.cell(i, j, "" if pd.isna(r[h]) else (int(r[h]) if h.endswith("檔數") else str(r[h])))
+    for j, h in enumerate(hdr, 1):
+        wsx.column_dimensions[get_column_letter(j)].width = 14 if h.endswith(("檔數", "基準日")) else 46
+
 ws = wb.create_sheet("說明")
 for i, t in enumerate([
-    "R7 A–H 六項條件掃描 r4 — 日線，數據基準 2026-09-16 收盤（vcp-watchlist repo Yahoo 日線鏡像；09-17 只抓到 199/2,980 檔，整天不採用）",
+    "R7 A–H 六項條件掃描 r5 — 日線，數據基準 2026-09-16 官方收盤（10MA / VCP / SubSector 三個 repo 的 Yahoo 鏡像合併，3,097 檔；09-17 官方收盤只有 202 檔、其餘為盤中快照，整天不採用；09-18 三個鏡像都沒有）",
     "① 重心線向上：r7e_gravity（滾動 VWAP 30，hlc3）最新一根斜率 > 0",
     "② 波動指數向上：r7h_volidx（0–100，高 = 平靜）最新一根斜率 > 0",
     "③ 波動指數 ≥ 75",
@@ -79,7 +105,9 @@ for i, t in enumerate([
     "⑥ 貼近重心線：收盤距重心線 ≤ 1.0 × ATR14 或 ≤ 3%",
     "VCP / 結構 / 最低阻力線 只作參考，不計分。MA20 與 EMA21 已刪除。",
     "Ticker 欄為 TradingView 圖表超連結（Q1c5VWwD 版面）。",
-    "來源：AI Sector R13（111）· SubSector flow R12（490）· Combined R22（274）· 10MA uptrend R20（107），去重 756 檔。",
+    "10MA R20 的 109 檔 = 89 檔在榜 + 20 檔本版跌出（新上榜同跌出 分頁），兩者都掃。BRK-A / BRK-B 無鏡像資料，未計入。",
+    "「全市場 六項全中」分頁：合併面板中收盤 ≥ $2、60 日均量 ≥ 10 萬股、歷史 ≥ 80 根的 2,826 檔全掃一次的結果，含 watchlist 以外的名字。",
+    SRC_NOTE,
 ], 1):
     ws.cell(i, 1, t).font = Font(bold=(i == 1))
 ws.column_dimensions["A"].width = 110

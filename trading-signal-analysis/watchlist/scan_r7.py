@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 R7 A–G 六條件掃描（日線）— 以 Python 重現 r7a/b/c/e/g 的預設參數計算。
-資料：vcp-watchlist repo 的 Yahoo 日線鏡像（最新至 2026-09-17 收盤）。
+資料：三個 watchlist repo 的 Yahoo 日線鏡像合併面板
+      vcp-watchlist / 10ma-watchlist / 20mawarchlist 的 data/yahoo/*.csv.gz 全部併入，
+      同一 symbol×date 以「官方 EOD 檔」優先，tail/hourly 盤中快照最後（且預設整天丟棄）。
 """
-import json, glob, math, sys
+import json, glob, math, sys, os
 import numpy as np, pandas as pd
 
 S = "/tmp/claude-0/-home-user-YT-subittle/0bd65ef0-0bef-5829-9a6f-f0a46d2d96cd/scratchpad"
-FILES = [f"{S}/eod/eod_2025-09-01_2026-09-09.csv.gz",
-         f"{S}/eod/eod_2026-09-01_2026-09-15.csv.gz",
-         f"{S}/eod/eod_2026-09-02_2026-09-17.csv.gz",
-         f"{S}/eod/eod_2026-09-04_2026-09-17.csv.gz",
-         f"{S}/eod/eod_2026-09-05_2026-09-18.csv.gz",
-         f"{S}/eod/eod_2026-09-07_2026-09-18.csv.gz"]
+EOD_DIRS = [f"{S}/eod2", f"{S}/eod"]          # 依序搜尋，找到第一個有檔案的就用
 NEAR_ATR = 1.0          # criteria 6：|close − line| ≤ 1.0 × ATR14 算「附近」
 NEAR_PCT = 3.0          # 或 ≤ 3%（兩者取其一即可）
 VOL_MIN = 75.0          # criteria 3：R7-H 波動指數 ≥ 75
@@ -213,25 +210,55 @@ def vol_index(df, atrLen=14, sdLen=60, wAtr=0.5, a=VA, b=VB):
     c = df.close
     atrP = atr(df, atrLen) / c * 100
     lr = np.log(c / c.shift())
-    sdP = lr.rolling(sdLen).std(ddof=1) * 100          # ta.stdev 亦為樣本標準差
+    sdP = lr.rolling(sdLen).std(ddof=0) * 100          # Pine ta.stdev 預設 biased=true → 母體標準差（除以 N）
     volD = wAtr * atrP + (1 - wAtr) * sdP
     p = 1 / (1 + np.exp(-(a + b * np.log(volD))))
     return 100 * (1 - p), atrP, sdP, volD
 
 # ───────────────────────── 主掃描 ─────────────────────────
-def load():
-    fr = [pd.read_csv(f) for f in FILES]
-    d = pd.concat(fr).drop_duplicates(["symbol", "date"], keep="last")
+def _files():
+    for d in EOD_DIRS:
+        fs = sorted(glob.glob(f"{d}/*.csv.gz"))
+        if fs:
+            return fs
+    raise SystemExit("找不到日線鏡像 csv.gz")
+
+
+def load(verbose=True):
+    """合併所有鏡像檔；同一 symbol×date 取優先度最高的來源。
+    prio 0 = 官方 EOD 檔，2 = tail/hourly 盤中快照（route 欄註明）。"""
+    frames = []
+    for f in _files():
+        b = os.path.basename(f)
+        d = pd.read_csv(f)
+        d.columns = [c.strip() for c in d.columns]
+        route = d["route"].astype(str) if "route" in d.columns else pd.Series(["eod"] * len(d))
+        keep = [c for c in ("symbol", "date", "open", "high", "low", "close", "adj_close", "volume") if c in d.columns]
+        d = d[keep].copy()
+        d["route"] = route.values
+        d["prio"] = 0
+        d.loc[d["route"].str.contains("hourly|intraday|quote", case=False, na=False), "prio"] = 2
+        if "tail" in b:
+            d.loc[d["prio"] == 0, "prio"] = 1
+        frames.append(d)
+    d = pd.concat(frames, ignore_index=True)
+    d["symbol"] = d["symbol"].astype(str).str.upper().str.strip()
     d["date"] = pd.to_datetime(d["date"])
-    # 鏡像最後一天常常只有部分標的（盤後仍在抓）→ 覆蓋率 < 50% 的交易日整天丟棄，
-    # 讓所有標的站在同一個收盤基準上比較。
-    cov = d.groupby("date").symbol.nunique()
+    d = d.dropna(subset=["close"])
+    d = d.sort_values(["symbol", "date", "prio"]).drop_duplicates(["symbol", "date"], keep="first")
+    # 只保留「官方收盤」列來決定覆蓋率：盤中快照不算一個完整交易日
+    off = d[d.prio == 0]
+    cov = off.groupby("date").symbol.nunique()
     full = cov[cov >= 0.5 * cov.max()].index
-    dropped = sorted(str(x.date()) for x in cov.index.difference(full))
-    if dropped:
-        print("partial sessions dropped:", dropped, dict((str(k.date()), int(v)) for k, v in cov.items() if k not in full))
+    dropped = sorted(str(x.date()) for x in d.date.unique() if pd.Timestamp(x) not in set(full))
+    if dropped and verbose:
+        det = {str(k.date()): int(v) for k, v in cov.items() if k not in full}
+        print("partial sessions dropped:", dropped, "official-close rows:", det)
     d = d[d.date.isin(full)]
+    if verbose:
+        print(f"panel: {len(d):,} rows  {d.symbol.nunique():,} symbols  {d.date.min().date()} .. {d.date.max().date()}")
     return d.sort_values(["symbol", "date"])
+
 
 def scan_one(sym, df):
     df = df.reset_index(drop=True)

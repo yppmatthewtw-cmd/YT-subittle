@@ -84,7 +84,7 @@ src_html = " · ".join(f"{esc(k)} {len(v)} 檔" for k, v in n_src.items())
 
 doc = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>R7_six_criteria_scan_r4 ({stamp_t})</title>
+<title>R7_six_criteria_scan_r5 ({stamp_t})</title>
 <style>
 :root{{color-scheme:light dark;--bg:#f6f7f5;--panel:#fff;--ink:#16202b;--mut:#64748b;--line:#e2e6e3;--head:#eef1ed;--hover:#f2f5f1;
  --up:#16a34a;--dn:#dc2626;--warn:#b45309;--acc:#b07b24;--accs:#f6ecd8;--okbg:#e8f6ee;}}
@@ -119,12 +119,12 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 .tags{{display:flex;flex-wrap:wrap;gap:4px;font-size:12px}} .tags span{{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 6px}}
 @media (max-width:720px){{.sub{{white-space:normal}} th,td{{padding:5px 5px}}}}
 </style></head><body><div class="wrap">
-<header><h1>R7 A–H <em>六項條件掃描</em> r4 ({stamp_t})</h1>
+<header><h1>R7 A–H <em>六項條件掃描</em> r5 ({stamp_t})</h1>
 <div class="sw"><button data-t="light">☀️ 淺色</button><button data-t="dark">🌙 深色</button></div>
-<div class="meta">日線 · 數據基準 <b>{esc(meta["lastday"])} 收盤</b>（vcp-watchlist repo Yahoo 日線鏡像；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
+<div class="meta">日線 · 數據基準 <b>{esc(meta["lastday"])} 收盤</b>（三個 repo 的 Yahoo 鏡像合併；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
-<div class="note">r4：條件與 r3 相同，改用 2026-09-18 送出的四份最新榜單（AI R13 · SubSector R12 · Combined R22 · 10MA R20，去重 756 檔）。r3 條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
+<div class="note">r5：條件與 r3/r4 相同，但 ticker 直接取自三個 watchlist repo 的最新成品（10MA R20 · Combined R22 · SubSector R12 + AI R13），價格面板由三個 repo 的 Yahoo 鏡像合併（3,097 檔）。條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
 
 <h2>六項全中 <span class="n">{len(strict)} 檔 · 按 ⑤ 淺紅根數分三類，類內依波動指數由高至低</span></h2>
 {"".join(f'<h3>淺紅第 {k + 1} 根 <span class="n">{len(g)} 檔</span></h3>{table(g)}' for k, g in cats)}
@@ -152,7 +152,7 @@ document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{{minS=+b.
 document.getElementById('q').oninput=e=>{{q=e.target.value.trim().toUpperCase();apply()}};
 </script></body></html>"""
 
-out = f"{OUT_DIR}/R7_six_criteria_scan_r4 ({stamp}).html"
+out = f"{OUT_DIR}/R7_six_criteria_scan_r5 ({stamp}).html"
 open(out, "w", encoding="utf-8").write(doc)
-d.to_csv(f"{OUT_DIR}/R7_six_criteria_scan_r4 ({stamp}).csv", index=False, encoding="utf-8-sig")
+d.to_csv(f"{OUT_DIR}/R7_six_criteria_scan_r5 ({stamp}).csv", index=False, encoding="utf-8-sig")
 print(out, len(doc))
