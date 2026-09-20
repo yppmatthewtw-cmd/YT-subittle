@@ -10,17 +10,60 @@ import numpy as np, pandas as pd
 
 S = "/tmp/claude-0/-home-user-YT-subittle/0bd65ef0-0bef-5829-9a6f-f0a46d2d96cd/scratchpad"
 EOD_DIRS = [f"{S}/eod2", f"{S}/eod"]          # 依序搜尋，找到第一個有檔案的就用
+# Nasdaq screener 收盤快照（只有收盤價與成交量，沒有盤中高低）。OHLC 鏡像還沒補到的交易日用它補。
+SNAP_DIR = os.environ.get("SNAP_DIR", "/home/user/yppmatthewtw-cmd/10ma-watchlist/data/snapshots")
+USE_SNAP = os.environ.get("USE_SNAP", "1") != "0"
 NEAR_ATR = 1.0          # criteria 6：|close − line| ≤ 1.0 × ATR14 算「附近」
 NEAR_PCT = 3.0          # 或 ≤ 3%（兩者取其一即可）
 VOL_MIN = 75.0          # criteria 3：R7-H 波動指數 ≥ 75
 VA, VB = -3.381, 1.892  # R7-H 校準係數（20 日 ≥10% 回撤）
 
 # ───────────────────────── Pine 等價工具 ─────────────────────────
-def ema(s, n):  return s.ewm(span=n, adjust=False).mean()
+# Pine 的 ta.ema / ta.rma 都以「前 n 根的 SMA」作種子，種子形成前回傳 na。
+# pandas 的 ewm 從第 0 根就有值 → 暖機段會有假訊號，所以這裡自己實作。
+def _seeded(x, n, k, k1):
+    v = np.asarray(x, dtype=float)
+    out = np.full(len(v), np.nan)
+    if len(v) < n or np.isnan(v[:n]).any():
+        # 前面可能有 na（例如 MACD 線本身），從第一個連續 n 個非 na 開始
+        ok = np.where(np.isfinite(v))[0]
+        if len(ok) < n:
+            return out
+        st = ok[0]
+    else:
+        st = 0
+    seed = v[st:st + n]
+    if np.isnan(seed).any():
+        return out
+    out[st + n - 1] = seed.mean()
+    for i in range(st + n, len(v)):
+        out[i] = v[i] * k + out[i - 1] * k1 if np.isfinite(v[i]) else out[i - 1]
+    return out
+
+
+def pine_ema(x, n):
+    k = 2.0 / (n + 1)
+    return _seeded(x, n, k, 1 - k)
+
+
+def pine_rma(x, n):
+    k = 1.0 / n
+    return _seeded(x, n, k, 1 - k)
+
+
+def ema(s, n):  return pd.Series(pine_ema(np.asarray(s, dtype=float), n), index=getattr(s, "index", None))
 def sma(s, n):  return s.rolling(n).mean()
-def rma(s, n):  return s.ewm(alpha=1 / n, adjust=False).mean()
+def rma(s, n):  return pd.Series(pine_rma(np.asarray(s, dtype=float), n), index=getattr(s, "index", None))
 def atr(df, n=14):
+    """ta.atr = ta.rma(ta.tr, n)。
+    只有收盤價的快照棒（O=H=L=C）沒有盤中高低，真實波幅會被系統性低估 → ATR 被壓低 →
+    波動指數被抬高、斜率假性轉正。這種棒一律不更新 ATR（沿用前一根），而不是餵它一個偏低的 TR。"""
     tr = pd.concat([df.high - df.low, (df.high - df.close.shift()).abs(), (df.low - df.close.shift()).abs()], axis=1).max(axis=1)
+    if "route" in df.columns:
+        synth = df["route"].astype(str).eq("snapshot-close").values
+    else:
+        synth = ((df.high == df.low) & (df.low == df.close)).values
+    tr = tr.mask(pd.Series(synth, index=tr.index))
     return rma(tr, n)
 
 def pivot_high(x, L, R):
@@ -45,17 +88,30 @@ def pivot_low(x, L, R):
     return out
 
 # ───────────────────────── R7-B MACD 時鐘 ─────────────────────────
-def macd_clock(close, fast=12, slow=26, sig=9, lookN=8, defLen=12):
-    m = ema(close, fast) - ema(close, slow); s = ema(m, sig); h = (m - s).values
+def macd_clock(close, fast=12, slow=26, sig=9, lookN=8, defLen=12, drop_first_cycle=True):
+    """r7b_macd_clock 的週期時鐘。
+    ema() 已是 Pine 式（SMA 種子、種子前回 na），所以柱狀圖在前 (slow-1)+(sig-1) 根自然是 na，
+    r7b 的 fl (翻轉偵測) 在那段期間不會記錄任何週期。若改用 pandas ewm，暖機段會在零軸上下亂穿、
+    把假週期推進 ul/dl，污染平均週期長度 → 進度 → 指針角度。
+    另外丟掉每個方向的第一段（它是從資料視窗第一根量起的，不是真正的一段週期）。"""
+    m = ema(close, fast) - ema(close, slow); s_ = ema(m, sig); h = (m - s_).values.astype(float)
     n = len(h); up = h >= 0
-    cs = 0; ul = []; dl = []
+    valid = np.isfinite(h)
+    cs = int(np.argmax(valid)) if valid.any() else 0
+    ul = []; dl = []; seen_up = False; seen_dn = False
     theta = np.full(n, np.nan); prog = np.full(n, np.nan); elapsed = np.zeros(n, int)
     for i in range(n):
-        if i > 0 and up[i] != up[i - 1]:
+        if not valid[i]:
+            continue
+        if valid[i - 1] and up[i] != up[i - 1]:
             L = i - cs
             a = ul if up[i - 1] else dl
-            a.append(L)
-            if len(a) > lookN: a.pop(0)
+            first = (not seen_up) if up[i - 1] else (not seen_dn)
+            if up[i - 1]: seen_up = True
+            else: seen_dn = True
+            if not (drop_first_cycle and first):   # 第一段是視窗邊界造成的，不算
+                a.append(L)
+                if len(a) > lookN: a.pop(0)
             cs = i
         el = i - cs + 1
         au = np.mean(ul) if ul else defLen
@@ -65,7 +121,8 @@ def macd_clock(close, fast=12, slow=26, sig=9, lookN=8, defLen=12):
         t = (270 + 180 * p) if up[i] else (90 + 180 * p)
         theta[i] = t - 360 if t >= 360 else t
         prog[i] = el / exp_; elapsed[i] = el
-    return m.values, s.values, h, up, theta, prog, elapsed
+    return m.values, s_.values, h, up, theta, prog, elapsed
+
 
 def clock_txt(theta):
     hrs = theta / 30.0
@@ -212,7 +269,9 @@ def vol_index(df, atrLen=14, sdLen=60, wAtr=0.5, a=VA, b=VB):
     lr = np.log(c / c.shift())
     sdP = lr.rolling(sdLen).std(ddof=0) * 100          # Pine ta.stdev 預設 biased=true → 母體標準差（除以 N）
     volD = wAtr * atrP + (1 - wAtr) * sdP
-    p = 1 / (1 + np.exp(-(a + b * np.log(volD))))
+    # Pine: volD > 0 ? logistic : na（完全停牌/零波動的標的回 na，不會被當成 100 分）
+    pos = volD.where(volD > 0)
+    p = 1 / (1 + np.exp(-(a + b * np.log(pos))))
     return 100 * (1 - p), atrP, sdP, volD
 
 # ───────────────────────── 主掃描 ─────────────────────────
@@ -226,7 +285,9 @@ def _files():
 
 def load(verbose=True):
     """合併所有鏡像檔；同一 symbol×date 取優先度最高的來源。
-    prio 0 = 官方 EOD 檔，2 = tail/hourly 盤中快照（route 欄註明）。"""
+    prio 0 = 官方 EOD（有 OHLC）
+    prio 1 = Nasdaq 收盤快照（只有收盤與成交量；O=H=L=C，當日真實波幅會略為低估）
+    prio 2 = tail / hourly 盤中快照（不是收盤，永遠只作墊底）"""
     frames = []
     for f in _files():
         b = os.path.basename(f)
@@ -239,24 +300,62 @@ def load(verbose=True):
         d["prio"] = 0
         d.loc[d["route"].str.contains("hourly|intraday|quote", case=False, na=False), "prio"] = 2
         if "tail" in b:
-            d.loc[d["prio"] == 0, "prio"] = 1
+            d.loc[d["prio"] == 0, "prio"] = 2
         frames.append(d)
+    d0 = pd.concat(frames, ignore_index=True)
+    d0["symbol"] = d0["symbol"].astype(str).str.upper().str.strip()
+    d0["date"] = pd.to_datetime(d0["date"])
+    d0 = d0.dropna(subset=["close"])
+    # OHLC 鏡像的最後一個「完整」交易日：之後的日子才用收盤快照補，且只補鏡像本來就有的標的，
+    # 否則快照那 7,100 檔的寬universe 會把覆蓋率基準抬高、反而把歷史交易日判成不完整。
+    ohlc = d0[d0.prio == 0]
+    cov0 = ohlc.groupby("date").symbol.nunique()
+    last_full = cov0[cov0 >= 0.5 * cov0.max()].index.max() if len(cov0) else None
+    known = set(ohlc.symbol.unique())
+    if USE_SNAP and os.path.isdir(SNAP_DIR) and last_full is not None:
+        snaps = []
+        for f in sorted(glob.glob(f"{SNAP_DIR}/*.csv")):
+            dt = pd.Timestamp(os.path.basename(f)[:-4])
+            if dt <= last_full:
+                continue
+            try:
+                sn = pd.read_csv(f)
+            except Exception:
+                continue
+            if "symbol" not in sn.columns or "lastsale" not in sn.columns:
+                continue
+            px = pd.to_numeric(sn["lastsale"].astype(str).str.replace(r"[$,]", "", regex=True), errors="coerce")
+            vol = pd.to_numeric(sn.get("volume"), errors="coerce")
+            sn = pd.DataFrame({"symbol": sn["symbol"].astype(str).str.upper().str.strip(), "date": dt,
+                               "open": px, "high": px, "low": px, "close": px, "adj_close": px, "volume": vol})
+            sn = sn[sn.symbol.isin(known)].dropna(subset=["close"])
+            sn["route"] = "snapshot-close"
+            sn["prio"] = 1
+            snaps.append(sn)
+            if verbose:
+                print(f"snapshot {dt.date()}: +{len(sn)} 檔收盤（無盤中高低）")
+        if snaps:
+            d0 = pd.concat([d0] + snaps, ignore_index=True)
+    frames = [d0]
     d = pd.concat(frames, ignore_index=True)
     d["symbol"] = d["symbol"].astype(str).str.upper().str.strip()
     d["date"] = pd.to_datetime(d["date"])
     d = d.dropna(subset=["close"])
     d = d.sort_values(["symbol", "date", "prio"]).drop_duplicates(["symbol", "date"], keep="first")
-    # 只保留「官方收盤」列來決定覆蓋率：盤中快照不算一個完整交易日
-    off = d[d.prio == 0]
+    # 覆蓋率只算「收盤級」資料（prio 0/1）；盤中快照不能算一個完整交易日
+    off = d[d.prio <= 1]
     cov = off.groupby("date").symbol.nunique()
     full = cov[cov >= 0.5 * cov.max()].index
-    dropped = sorted(str(x.date()) for x in d.date.unique() if pd.Timestamp(x) not in set(full))
+    dropped = sorted(str(pd.Timestamp(x).date()) for x in d.date.unique() if pd.Timestamp(x) not in set(full))
     if dropped and verbose:
         det = {str(k.date()): int(v) for k, v in cov.items() if k not in full}
-        print("partial sessions dropped:", dropped, "official-close rows:", det)
+        print("partial sessions dropped:", dropped, "close-grade rows:", det)
     d = d[d.date.isin(full)]
     if verbose:
-        print(f"panel: {len(d):,} rows  {d.symbol.nunique():,} symbols  {d.date.min().date()} .. {d.date.max().date()}")
+        last = d.date.max()
+        mix = d[d.date == last].prio.value_counts().to_dict()
+        print(f"panel: {len(d):,} rows  {d.symbol.nunique():,} symbols  {d.date.min().date()} .. {last.date()}  "
+              f"(最後一根來源 prio 分佈 {mix}；1 = 收盤快照，無盤中高低)")
     return d.sort_values(["symbol", "date"])
 
 
@@ -305,6 +404,7 @@ def scan_one(sym, df):
         lr_line=round(lr[i], 2) if not np.isnan(lr[i]) else np.nan,
         dist_lr_pct=round(dG / c.iloc[i] * 100, 2) if not np.isnan(dG) else np.nan, dist_lr_atr=round(dG / A, 2) if (A > 0 and not np.isnan(dG)) else np.nan,
         turnover20_m=round(float(c.iloc[i] * df.volume.tail(20).mean() / 1e6), 1),
+        bar_src=("收盤快照" if ("prio" in df.columns and int(df.prio.iloc[i]) == 1) else "OHLC"),
         lr_dir={1: "↑", -1: "↓", 0: "—"}[int(lrDir[i])], struct={1: "HH/HL", -1: "LH/LL", 0: "—"}[int(st[i])], mk=MK[int(mk[i])], inBox=bool(inBox[i]),
         bars=len(df),
     )

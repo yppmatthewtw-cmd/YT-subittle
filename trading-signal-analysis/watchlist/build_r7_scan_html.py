@@ -76,6 +76,7 @@ five["fail"] = five.apply(lambda r: [k for k in CK if not r[k]][0], axis=1)
 five = five.sort_values(["fail", "theta"], ascending=[True, False])
 allrows = d.sort_values(["score", "c5_days", "theta"], ascending=[False, True, False])
 missing = meta["missing"]
+meta["lastday"] = str(d.date.max())          # 以本表自己的最後收盤日為準
 stale = d[d.date < meta["lastday"]].ticker.tolist()
 n_src = json.load(open(f"{S}/scan_tickers.json"))
 import os
@@ -84,7 +85,24 @@ udf = pd.read_csv(UNI) if (UNI and os.path.exists(UNI)) else None
 uhit = None
 if udf is not None:
     uhit = udf[(udf.score == NC) & (~udf.ticker.isin(set(d.ticker)))].sort_values(["c5_days", "volidx"], ascending=[True, False]).copy()
-    uhit["lists"] = "watchlist 外"
+    uhit["lists"] = "榜外"
+UPD = os.environ.get("UPDATE_CSV", "")
+mupd = pd.read_csv(UPD) if (UPD and os.path.exists(UPD)) else None
+
+def _row_names(df):
+    return " · ".join(df.ticker.astype(str))
+
+upd_html = ""
+if mupd is not None:
+    still = mupd[(mupd.score == NC) & mupd.four_17]
+    lost  = mupd[(mupd.score == NC) & (~mupd.four_17)]
+    fresh = mupd[(mupd.score != NC) & mupd.four_17 & mupd.c2 & mupd.c3].sort_values("volidx", ascending=False)
+    upd_html = (
+        '<h2>09-17 收盤更新 <span class="n">09-16 六項全中 %d 檔中，%d 檔在 09-17 收盤下 ①④⑤⑥ 仍成立</span></h2>' % (len(still) + len(lost), len(still))
+        + '<div class="note">09-17 只有 Nasdaq 收盤快照（沒有盤中高低），②③ 波動指數無法重算，所以這一段只看 ①④⑤⑥。<br>'
+        + '<b>仍成立（%d）</b>：%s<br>' % (len(still), _row_names(still))
+        + '<b>已失效（%d，多數是 ⑤ 淺紅中斷）</b>：%s<br>' % (len(lost), _row_names(lost))
+        + '<b>09-17 新符合（%d，①④⑤⑥ 成立且 09-16 的 ②③ 也過）</b>：%s</div>' % (len(fresh), _row_names(fresh)))
 
 crit_html = "".join(f'<li><b>{esc(t)}</b><span>{esc(dsc)}</span></li>' for _, t, dsc in CRIT)
 src_html = " · ".join(f"{esc(k)} {len(v)} 檔" for k, v in n_src.items())
@@ -128,12 +146,14 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 </style></head><body><div class="wrap">
 <header><h1>R7 A–H <em>六項條件掃描</em> r5 ({stamp_t})</h1>
 <div class="sw"><button data-t="light">☀️ 淺色</button><button data-t="dark">🌙 深色</button></div>
-<div class="meta">日線 · 數據基準 <b>{esc(meta["lastday"])} 收盤</b>（三個 repo 的 Yahoo 鏡像合併；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
+<div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b> · 另以 <b>09-17 Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）· 09-18 收盤三個 repo 都未鏡像（三個 repo 的 Yahoo 鏡像合併；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
-<div class="note">r5：條件與 r3/r4 相同，但 ticker 直接取自三個 watchlist repo 的最新成品（10MA R20 · Combined R22 · SubSector R12 + AI R13），價格面板由三個 repo 的 Yahoo 鏡像合併（3,097 檔）。條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
+<div class="note">r5：條件與 r3/r4 相同。ticker 取自三個 session 的最新成品（10MA R20 · Combined R22 · SubSector R12 · AI R13 · RateHike R2），價格面板由三個 repo 的 Yahoo 鏡像合併（3,097 檔）。六項條件算到 09-16 官方收盤；09-17 只有 Nasdaq 收盤快照，另列於上方。條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
 
-<h2>六項全中 <span class="n">{len(strict)} 檔 · 按 ⑤ 淺紅根數分三類，類內依波動指數由高至低</span></h2>
+{upd_html}
+
+<h2>六項全中（09-16 基準） <span class="n">{len(strict)} 檔 · 按 ⑤ 淺紅根數分三類，類內依波動指數由高至低</span></h2>
 {"".join(f'<h3>淺紅第 {k + 1} 根 <span class="n">{len(g)} 檔</span></h3>{table(g)}' for k, g in cats)}
 
 <h2>差一項 <span class="n">{NC - 1}/{NC} · {len(five)} 檔 · 按缺少的條件分組</span></h2>
