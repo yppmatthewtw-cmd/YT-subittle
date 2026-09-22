@@ -12,6 +12,8 @@ now = datetime.datetime.now(ZoneInfo("Asia/Taipei"))
 stamp = now.strftime("%m_%d; %H.%M")     # 檔名（冒號不能用於檔名 → 點）
 stamp_t = now.strftime("%m_%d; %H:%M")   # 標題
 TV = "https://www.tradingview.com/chart/Q1c5VWwD/?symbol="
+import os
+VER = os.environ.get("VER", "r6")
 
 CRIT = [
     ("c1", "① 重心線向上", "r7e_gravity 線（滾動 VWAP 30，hlc3）最新一根斜率 > 0"),
@@ -79,7 +81,6 @@ missing = meta["missing"]
 meta["lastday"] = str(d.date.max())          # 以本表自己的最後收盤日為準
 stale = d[d.date < meta["lastday"]].ticker.tolist()
 n_src = json.load(open(f"{S}/scan_tickers.json"))
-import os
 UNI = os.environ.get("UNIVERSE_CSV", "")
 udf = pd.read_csv(UNI) if (UNI and os.path.exists(UNI)) else None
 uhit = None
@@ -104,12 +105,50 @@ if mupd is not None:
         + '<b>已失效（%d，多數是 ⑤ 淺紅中斷）</b>：%s<br>' % (len(lost), _row_names(lost))
         + '<b>09-17 新符合（%d，①④⑤⑥ 成立且 09-16 的 ②③ 也過）</b>：%s</div>' % (len(fresh), _row_names(fresh)))
 
+CH = os.environ.get("CHATHITS_CSV", "")
+chd = pd.read_csv(CH) if (CH and os.path.exists(CH)) else None
+chat_html = ""
+if chd is not None:
+    SHORT = {"chat1 Combined R22": "C1", "chat2 SubSector R12": "C2", "chat2 AI Sector R13": "AI", "chat3 10MA R20": "10MA", "chat3 加息 R2": "加息"}
+
+    def chrow(r):
+        tags = "".join(f'<em class="src">{esc(SHORT.get(x.strip(), x.strip()))}</em>' for x in str(r.hits).split("｜"))
+        warn = ' <em class="warn">⚠ 迴避</em>' if str(r.avoid).strip() not in ("", "nan") else ""
+        return ('<tr data-n="%d" data-s="%d" data-tk="%s"><td><a href="%s%s" target="_blank">%s</a>%s</td>'
+                '<td class="c">%d</td><td>%s</td><td class="c">%d/6</td><td class="miss">%s</td>'
+                '<td class="c">%s</td><td class="c">%s</td><td class="c">%s</td><td class="c">%s</td><td class="d">%s</td></tr>') % (
+            int(r.n_hit), int(r.score), esc(r.ticker), TV, esc(r.ticker), esc(r.ticker), warn,
+            int(r.n_hit), tags, int(r.score), esc(r["miss"]),
+            f2(r.volidx, 1), esc(r.clock), esc(r.c5_cat), f2(r.dist_grav_pct), esc(str(r.detail))[:180])
+
+    n3, n2, n1 = [int((chd.n_hit == k).sum()) for k in (3, 2, 1)]
+    chat_html = (
+        '<h2>Chat 1–3 命中、六項未全中 <span class="n">%d 檔</span></h2>' % len(chd)
+        + '<div class="note">三個 session 的成品各自用自己那套準則選中、但本掃描六項條件未全中的名字。'
+          '命中規則一律採用來源成品自己寫明的通過標記：<br>'
+          '<b>C1</b> Combined R22：線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）→ 75/274 檔　'
+          '<b>C2</b> SubSector R12：所屬子板塊 5 日分 ≥70 且斜率 &gt;0 → 22/111 個子板塊　'
+          '<b>AI</b> AI Sector R13：所屬小群組 5 日分 ≥70 且個股 5 日強度 &gt;0 → 26 檔　'
+          '<b>10MA</b> R20：在總表（本版跌出 20 檔不算）→ 89 檔　'
+          '<b>加息</b> R2：受惠名單 19 檔（迴避名單不算命中，另標 ⚠）<br>'
+          'chat 1–3 合共命中 %d 檔，其中 6 檔同時六項全中（MRK · JNJ · DHR · LH · NWSA · RNR），餘下 %d 檔列於下表；'
+          '本掃描六項全中的 17 檔裡有 11 檔是 chat 準則沒有選中的。'
+          '同時命中 3 套 %d 檔、2 套 %d 檔、1 套 %d 檔。</div>' % (len(chd) + 6, len(chd), n3, n2, n1)
+        + '<div class="filters"><span class="mut">命中系統 ≥</span>'
+        + "".join('<button data-cn="%d" class="%s">%d</button>' % (k, "on" if k == 1 else "", k) for k in (1, 2, 3))
+        + '<span class="mut" style="margin-left:14px">六項 ≥</span>'
+        + "".join('<button data-cs="%d" class="%s">%d</button>' % (k, "on" if k == 0 else "", k) for k in range(0, 6))
+        + '<input id="chq" placeholder="搜 Ticker…" size="14"></div>'
+        + '<div id="chat"><table><thead><tr><th>Ticker</th><th>套數</th><th>命中哪幾套</th><th>六項</th><th>欠缺</th>'
+          '<th>波動指數</th><th>時鐘</th><th>淺紅</th><th>距重心 %</th><th>命中內容（來源原話）</th></tr></thead><tbody>'
+        + "".join(chrow(r) for _, r in chd.iterrows()) + '</tbody></table></div>')
+
 crit_html = "".join(f'<li><b>{esc(t)}</b><span>{esc(dsc)}</span></li>' for _, t, dsc in CRIT)
 src_html = " · ".join(f"{esc(k)} {len(v)} 檔" for k, v in n_src.items())
 
 doc = f"""<!DOCTYPE html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>R7_six_criteria_scan_r5 ({stamp_t})</title>
+<title>R7_six_criteria_scan_{VER} ({stamp_t})</title>
 <style>
 :root{{color-scheme:light dark;--bg:#f6f7f5;--panel:#fff;--ink:#16202b;--mut:#64748b;--line:#e2e6e3;--head:#eef1ed;--hover:#f2f5f1;
  --up:#16a34a;--dn:#dc2626;--warn:#b45309;--acc:#b07b24;--accs:#f6ecd8;--okbg:#e8f6ee;}}
@@ -117,6 +156,9 @@ doc = f"""<!DOCTYPE html>
  --up:#3fb68b;--dn:#e0705f;--warn:#e5b15c;--acc:#e5b15c;--accs:#2b2417;--okbg:#14261d;}}}}
 :root[data-theme=dark]{{--bg:#0d1218;--panel:#141c24;--ink:#e3e9ee;--mut:#8b98a5;--line:#25313c;--head:#1a232c;--hover:#1b242e;
  --up:#3fb68b;--dn:#e0705f;--warn:#e5b15c;--acc:#e5b15c;--accs:#2b2417;--okbg:#14261d;}}
+em.src{{font-style:normal;font-size:11px;background:var(--head);border:1px solid var(--line);border-radius:4px;padding:1px 5px;margin-right:3px;color:var(--mut)}}
+em.warn{{font-style:normal;font-size:11px;color:var(--dn);font-weight:700}}
+td.miss{{letter-spacing:1px;color:var(--dn);font-weight:700}} td.d{{font-size:12px;color:var(--mut);max-width:520px}}
 *{{box-sizing:border-box}} body{{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Avenir Next","Segoe UI","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}}
 .wrap{{max-width:1680px;margin:0 auto;padding:20px 16px 60px}}
 header{{border-bottom:3px solid var(--ink);padding-bottom:10px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}}
@@ -144,12 +186,12 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 .tags{{display:flex;flex-wrap:wrap;gap:4px;font-size:12px}} .tags span{{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 6px}}
 @media (max-width:720px){{.sub{{white-space:normal}} th,td{{padding:5px 5px}}}}
 </style></head><body><div class="wrap">
-<header><h1>R7 A–H <em>六項條件掃描</em> r5 ({stamp_t})</h1>
+<header><h1>R7 A–H <em>六項條件掃描</em> {VER} ({stamp_t})</h1>
 <div class="sw"><button data-t="light">☀️ 淺色</button><button data-t="dark">🌙 深色</button></div>
 <div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b> · 另以 <b>09-17 Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）· 09-18 收盤三個 repo 都未鏡像（三個 repo 的 Yahoo 鏡像合併；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
-<div class="note">r5：條件與 r3/r4 相同。ticker 取自三個 session 的最新成品（10MA R20 · Combined R22 · SubSector R12 · AI R13 · RateHike R2），價格面板由三個 repo 的 Yahoo 鏡像合併（3,097 檔）。六項條件算到 09-16 官方收盤；09-17 只有 Nasdaq 收盤快照，另列於上方。條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
+<div class="note">r6：條件與 r3/r4/r5 相同，新增「Chat 1–3 命中、六項未全中」一段（Excel 亦有對應分頁）。價格資料自 r5 起未變 —— 三個 repo 的鏡像最後一次更新是 09-18 01–04 UTC，最新完整 OHLC 收盤仍是 09-16，09-17 仍只有收盤快照，09-18／09-21 收盤三個 repo 都還沒有，本機對外財經資料源仍被 proxy 擋住。ticker 取自三個 session 的最新成品（10MA R20 · Combined R22 · SubSector R12 · AI R13 · RateHike R2），價格面板由三個 repo 的 Yahoo 鏡像合併（3,097 檔）。六項條件算到 09-16 官方收盤；09-17 只有 Nasdaq 收盤快照，另列於上方。條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
 
 {upd_html}
 
@@ -166,6 +208,8 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 <input id="q" placeholder="搜 Ticker…" size="14"></div>
 <div id="all">{table(allrows)}</div>
 
+{chat_html}
+
 <h2>無法計算 <span class="n">{len(missing)} 檔無日線鏡像（多為 ADR／外國掛牌／.B 股）· {len(stale)} 檔鏡像停在 09-14</span></h2>
 <div class="tags">{"".join(f"<span>{esc(t)}</span>" for t in missing)}</div>
 <p class="mut" style="font-size:12px">鏡像停在 09-14（表中標「舊」）：{" · ".join(stale)}</p>
@@ -179,9 +223,17 @@ let minS=0,q='';const rows=[...document.querySelectorAll('#all tbody tr')];
 function apply(){{rows.forEach(r=>{{r.style.display=(+r.dataset.score>=minS&&r.dataset.tk.includes(q))?'':'none'}})}}
 document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{{minS=+b.dataset.min;document.querySelectorAll('.filters button').forEach(x=>x.classList.toggle('on',x===b));apply()}});
 document.getElementById('q').oninput=e=>{{q=e.target.value.trim().toUpperCase();apply()}};
+const chBox=document.getElementById('chat');
+if(chBox){{
+ let cn=1,cs=0,cq='';const crows=[...chBox.querySelectorAll('tbody tr')];
+ const capply=()=>crows.forEach(r=>{{r.style.display=(+r.dataset.n>=cn&&+r.dataset.s>=cs&&r.dataset.tk.includes(cq))?'':'none'}});
+ document.querySelectorAll('button[data-cn]').forEach(b=>b.onclick=()=>{{cn=+b.dataset.cn;document.querySelectorAll('button[data-cn]').forEach(x=>x.classList.toggle('on',x===b));capply()}});
+ document.querySelectorAll('button[data-cs]').forEach(b=>b.onclick=()=>{{cs=+b.dataset.cs;document.querySelectorAll('button[data-cs]').forEach(x=>x.classList.toggle('on',x===b));capply()}});
+ document.getElementById('chq').oninput=e=>{{cq=e.target.value.trim().toUpperCase();capply()}};
+}}
 </script></body></html>"""
 
-out = f"{OUT_DIR}/R7_six_criteria_scan_r5 ({stamp}).html"
+out = f"{OUT_DIR}/R7_six_criteria_scan_{VER} ({stamp}).html"
 open(out, "w", encoding="utf-8").write(doc)
-d.to_csv(f"{OUT_DIR}/R7_six_criteria_scan_r5 ({stamp}).csv", index=False, encoding="utf-8-sig")
+d.to_csv(f"{OUT_DIR}/R7_six_criteria_scan_{VER} ({stamp}).csv", index=False, encoding="utf-8-sig")
 print(out, len(doc))
