@@ -13,7 +13,9 @@ stamp = now.strftime("%m_%d; %H.%M")     # 檔名（冒號不能用於檔名 →
 stamp_t = now.strftime("%m_%d; %H:%M")   # 標題
 TV = "https://www.tradingview.com/chart/Q1c5VWwD/?symbol="
 import os
-VER = os.environ.get("VER", "r6")
+VER = os.environ.get("VER", "r7")
+BD = os.environ.get("BASE_DAY", "09-16")   # 六項條件基準日（最新完整 OHLC）
+SD = os.environ.get("SNAP_DAY", "09-17")   # 收盤快照日（只重算 ①④⑤⑥）
 
 CRIT = [
     ("c1", "① 重心線向上", "r7e_gravity 線（滾動 VWAP 30，hlc3）最新一根斜率 > 0"),
@@ -99,11 +101,11 @@ if mupd is not None:
     lost  = mupd[(mupd.score == NC) & (~mupd.four_17)]
     fresh = mupd[(mupd.score != NC) & mupd.four_17 & mupd.c2 & mupd.c3].sort_values("volidx", ascending=False)
     upd_html = (
-        '<h2>09-17 收盤更新 <span class="n">09-16 六項全中 %d 檔中，%d 檔在 09-17 收盤下 ①④⑤⑥ 仍成立</span></h2>' % (len(still) + len(lost), len(still))
-        + '<div class="note">09-17 只有 Nasdaq 收盤快照（沒有盤中高低），②③ 波動指數無法重算，所以這一段只看 ①④⑤⑥。<br>'
+        f'<h2>{SD} 收盤更新 <span class="n">{BD} 六項全中 {len(still) + len(lost)} 檔中，{len(still)} 檔在 {SD} 收盤下 ①④⑤⑥ 仍成立</span></h2>'
+        + f'<div class="note">{SD} 只有 Nasdaq 收盤快照（沒有盤中高低），②③ 波動指數無法重算，所以這一段只看 ①④⑤⑥。<br>'
         + '<b>仍成立（%d）</b>：%s<br>' % (len(still), _row_names(still))
         + '<b>已失效（%d，多數是 ⑤ 淺紅中斷）</b>：%s<br>' % (len(lost), _row_names(lost))
-        + '<b>09-17 新符合（%d，①④⑤⑥ 成立且 09-16 的 ②③ 也過）</b>：%s</div>' % (len(fresh), _row_names(fresh)))
+        + f'<b>{SD} 新符合（{len(fresh)}，①④⑤⑥ 成立且 {BD} 的 ②③ 也過）</b>：{_row_names(fresh)}</div>')
 
 CH = os.environ.get("CHATHITS_CSV", "")
 chd = pd.read_csv(CH) if (CH and os.path.exists(CH)) else None
@@ -188,14 +190,14 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 </style></head><body><div class="wrap">
 <header><h1>R7 A–H <em>六項條件掃描</em> {VER} ({stamp_t})</h1>
 <div class="sw"><button data-t="light">☀️ 淺色</button><button data-t="dark">🌙 深色</button></div>
-<div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b> · 另以 <b>09-17 Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）· 09-18 收盤三個 repo 都未鏡像（三個 repo 的 Yahoo 鏡像合併；Yahoo 直連在本機被封鎖）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
+<div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b> · 另以 <b>{SD} Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）· 價格面板為三個 repo 的 Yahoo 鏡像合併（Yahoo 直連在本機被 proxy 封鎖，鏡像由各 repo 的 GitHub Actions 抓取）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
-<div class="note">r6：條件與 r3/r4/r5 相同，新增「Chat 1–3 命中、六項未全中」一段（Excel 亦有對應分頁）。價格資料自 r5 起未變 —— 三個 repo 的鏡像最後一次更新是 09-18 01–04 UTC，最新完整 OHLC 收盤仍是 09-16，09-17 仍只有收盤快照，09-18／09-21 收盤三個 repo 都還沒有，本機對外財經資料源仍被 proxy 擋住。ticker 取自三個 session 的最新成品（10MA R20 · Combined R22 · SubSector R12 · AI R13 · RateHike R2），價格面板由三個 repo 的 Yahoo 鏡像合併（3,097 檔）。六項條件算到 09-16 官方收盤；09-17 只有 Nasdaq 收盤快照，另列於上方。條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
+<div class="note">r7：條件與 r3–r6 相同，資料換成最新 —— 本次先觸發三個 repo 自己的 GitHub Actions（fetch_yahoo_eod / fetch_eod_snapshot）補抓，鏡像由 09-17 推進到 <b>09-21 完整 OHLC</b>（09-17、09-18、09-21 三個交易日全部補齊，各 2,978 檔），再加 <b>09-22 Nasdaq 收盤快照</b>。09-22 的 Yahoo 日線只有 194 檔，未達覆蓋門檻，已整日丟棄。ticker 取自三個 session 的最新成品（10MA R20 · Combined R22 · SubSector R12 · AI R13 · RateHike R2），價格面板由三個 repo 的 Yahoo 鏡像合併（3,097 檔）。六項條件算到 {BD} 官方收盤；{SD} 只有 Nasdaq 收盤快照，另列於上方。條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
 
 {upd_html}
 
-<h2>六項全中（09-16 基準） <span class="n">{len(strict)} 檔 · 按 ⑤ 淺紅根數分三類，類內依波動指數由高至低</span></h2>
+<h2>六項全中（{BD} 基準） <span class="n">{len(strict)} 檔 · 按 ⑤ 淺紅根數分三類，類內依波動指數由高至低</span></h2>
 {"".join(f'<h3>淺紅第 {k + 1} 根 <span class="n">{len(g)} 檔</span></h3>{table(g)}' for k, g in cats)}
 
 <h2>差一項 <span class="n">{NC - 1}/{NC} · {len(five)} 檔 · 按缺少的條件分組</span></h2>

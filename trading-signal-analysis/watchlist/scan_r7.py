@@ -276,11 +276,19 @@ def vol_index(df, atrLen=14, sdLen=60, wAtr=0.5, a=VA, b=VB):
 
 # ───────────────────────── 主掃描 ─────────────────────────
 def _files():
+    """三個鏡像目錄全部讀，不是只讀第一個有檔案的。
+    同名檔（同一份鏡像被複製到兩個目錄）只取一次；同一 symbol×date 的重複由 load() 依 prio 去重。"""
+    seen, out = set(), []
     for d in EOD_DIRS:
-        fs = sorted(glob.glob(f"{d}/*.csv.gz"))
-        if fs:
-            return fs
-    raise SystemExit("找不到日線鏡像 csv.gz")
+        for f in sorted(glob.glob(f"{d}/*.csv.gz")):
+            b = os.path.basename(f)
+            if b in seen:
+                continue
+            seen.add(b)
+            out.append(f)
+    if not out:
+        raise SystemExit("找不到日線鏡像 csv.gz")
+    return out
 
 
 def load(verbose=True):

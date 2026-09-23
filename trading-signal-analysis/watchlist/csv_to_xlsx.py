@@ -11,6 +11,9 @@ src = sys.argv[1] if len(sys.argv) > 1 else sorted(glob.glob(os.path.join(os.pat
 d = pd.read_csv(src)
 NC = 6
 SRC_NOTE = os.environ.get("SRC_NOTE", "來源：三個 watchlist repo 的最新成品。")
+BD = os.environ.get("BASE_DAY", "09-16")   # 六項條件的基準日（最新完整 OHLC 收盤）
+SD = os.environ.get("SNAP_DAY", "09-17")   # 收盤快照日（只重算 ①④⑤⑥）
+PANEL_N = os.environ.get("PANEL_N", "3,097")
 COLS = [  # (csv 欄, Excel 標題, 格式)
     ("ticker", "Ticker", "link"), ("lists", "來源榜單", "txt"), ("date", "數據日", "txt"), ("close", "收盤", "num2"), ("score", "命中 /6", "int"),
     ("c1", "① 重心線向上", "tick"), ("grav", "重心線", "num2"), ("grav_slope", "重心斜率", "num3"), ("grav_shift5atr", "重心 5 根位移 (ATR)", "num2"),
@@ -81,7 +84,7 @@ if UNI and os.path.exists(UNI):
     uf = u[u.score == NC].copy()
     uf["lists"] = uf.ticker.map(lambda t: "榜內" if t in inwl else "榜外")
     uf = uf.sort_values(["c5_days", "volidx"], ascending=[True, False])
-    sheet(wb, "加掃 六項全中", uf, "三鏡像併集 3,097 檔中、收盤 ≥ $2 且 20 日均額 ≥ 300 萬美元的 %d 檔，六項全中 %d 檔（其中 %d 檔不在四張榜單內）。這不是全市場：10MA 自己的漏斗算出美股可報價名單約 5,065 檔。" % (len(u), len(uf), (uf.lists == "榜外").sum()))
+    sheet(wb, "加掃 六項全中", uf, f"三鏡像併集 {PANEL_N} 檔中、收盤 ≥ $2 且 20 日均額 ≥ 300 萬美元的 %d 檔，六項全中 %d 檔（其中 %d 檔不在四張榜單內）。這不是全市場：10MA 自己的漏斗算出美股可報價名單約 5,065 檔。" % (len(u), len(uf), (uf.lists == "榜外").sum()))
 
 # chat 1–3 命中但未過六項（可選）：三個 session 各自用自己那套準則選中、但六項條件未全中的名字
 CH = os.environ.get("CHATHITS_CSV", "")
@@ -91,7 +94,7 @@ if CH and os.path.exists(CH):
               ("n_hit", "命中系統數", "int"), ("hits", "命中哪幾套", "txt"), ("detail", "命中內容（來源原話）", "txt"),
               ("avoid", "反向標註", "txt"), ("catalyst", "催化", "txt"),
               ("score", "六項命中 /6", "int"), ("miss", "欠缺條件", "txt"),
-              ("close", "09-16 收盤", "num2"), ("volidx", "波動指數", "num1"), ("volidx_slope", "指數斜率", "num2"),
+              ("close", f"{BD} 收盤", "num2"), ("volidx", "波動指數", "num1"), ("volidx_slope", "指數斜率", "num2"),
               ("grav_slope", "重心斜率", "num3"), ("clock", "時鐘", "txt"), ("c5_cat", "淺紅第幾根", "txt"),
               ("dist_grav_pct", "距重心 %", "num2"),
               ("c1_grade", "chat1 VCP/Wein/Pre", "txt"), ("c1_up", "chat1 上升分數", "num1"), ("c1_sure", "chat1 確定性", "num1"),
@@ -99,7 +102,7 @@ if CH and os.path.exists(CH):
               ("ai_group", "chat2 AI 小群組", "txt"), ("ai_rank", "AI 群組名次", "int"), ("ai_tf5", "AI 個股 5 日強度", "num3"),
               ("ma_rank", "chat3 10MA 排名", "int"), ("ma_tf", "通過時間框", "int"), ("ma_vcp", "10MA VCP 分", "num1"),
               ("ma_flag", "10MA 審視標記", "txt"), ("rh", "加息 R2", "txt"),
-              ("four_17", "09-17 ①④⑤⑥", "tick"), ("close_17", "09-17 收盤", "num2"), ("chg1d_pct", "當日 %", "num2"),
+              ("four_17", f"{SD} ①④⑤⑥", "tick"), ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", "當日 %", "num2"),
               ("turnover20_m", "20 日均額 (百萬)", "num1"), ("bars", "歷史根數", "int"), ("hist_ok", "歷史足夠 ≥250", "tick"),
               ("vcp", "VCP 指數 (參考)", "num1"), ("struct", "結構", "txt"), ("lists", "來源榜單", "txt")]
 
@@ -144,15 +147,15 @@ if CH and os.path.exists(CH):
         if len(g):
             chsheet(f"Chat 命中 {k} 套", g, f"同時命中 {k} 套 chat 準則、但六項未全中：{len(g)} 檔。")
 
-# 09-17 收盤快照更新（可選）：快照沒有盤中高低，②③（波動指數）不可信，只看 ①④⑤⑥
+# 收盤快照更新（可選）：快照沒有盤中高低，②③（波動指數）不可信，只看 ①④⑤⑥
 UPD = os.environ.get("UPDATE_CSV", "")
 if UPD and os.path.exists(UPD):
     m = pd.read_csv(UPD)
-    UCOLS = [("ticker", "Ticker", "link"), ("lists", "來源榜單", "txt"), ("close_16", "09-16 收盤", "num2"),
-             ("close_17", "09-17 收盤", "num2"), ("chg1d_pct", "當日 %", "num2"),
+    UCOLS = [("ticker", "Ticker", "link"), ("lists", "來源榜單", "txt"), ("close_16", f"{BD} 收盤", "num2"),
+             ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", "當日 %", "num2"),
              ("c1_17", "① 重心線向上", "tick"), ("c4_17", "④ 時鐘 6–10 點", "tick"), ("c5_17", "⑤ 淺紅 1–3 根", "tick"),
-             ("c6_17", "⑥ 貼近重心線", "tick"), ("clock_17", "09-17 時鐘", "txt"), ("dist_grav_pct", "距重心 %", "num2"),
-             ("volidx", "波動指數 (09-16)", "num1"), ("c2", "② 09-16 指數向上", "tick"), ("c3", "③ 09-16 ≥75", "tick")]
+             ("c6_17", "⑥ 貼近重心線", "tick"), ("clock_17", f"{SD} 時鐘", "txt"), ("dist_grav_pct", "距重心 %", "num2"),
+             ("volidx", f"波動指數 ({BD})", "num1"), ("c2", f"② {BD} 指數向上", "tick"), ("c3", f"③ {BD} ≥75", "tick")]
 
     def usheet(name, df, note):
         ws2 = wb.create_sheet(name)
@@ -181,9 +184,9 @@ if UPD and os.path.exists(UPD):
     still = m[(m.score == NC) & m.four_17]
     lost = m[(m.score == NC) & (~m.four_17)]
     fresh = m[(m.score != NC) & m.four_17 & m.c2 & m.c3].sort_values("volidx", ascending=False)
-    usheet("09-17 仍成立", still, "09-16 六項全中、且在 09-17 收盤下 ①④⑤⑥ 仍全部成立：%d / %d 檔。" % (len(still), len(still) + len(lost)))
-    usheet("09-17 已失效", lost, "09-16 六項全中、但 09-17 收盤已有一項不成立（多數是 ⑤ 淺紅中斷）：%d 檔。" % len(lost))
-    usheet("09-17 新符合", fresh, "09-17 收盤下 ①④⑤⑥ 成立、且 09-16 的 ②③（波動指數）也通過的候補：%d 檔。快照無盤中高低，②③ 用 09-16 值。" % len(fresh))
+    usheet(f"{SD} 仍成立", still, f"{BD} 六項全中、且在 {SD} 收盤下 ①④⑤⑥ 仍全部成立：{len(still)} / {len(still) + len(lost)} 檔。")
+    usheet(f"{SD} 已失效", lost, f"{BD} 六項全中、但 {SD} 收盤已有一項不成立（多數是 ⑤ 淺紅中斷）：{len(lost)} 檔。")
+    usheet(f"{SD} 新符合", fresh, f"{SD} 收盤下 ①④⑤⑥ 成立、且 {BD} 的 ②③（波動指數）也通過的候補：{len(fresh)} 檔。快照無盤中高低，②③ 用 {BD} 值。")
 
 # 來源分頁（可選）：三個 session 的最新成品出處
 SRC_ROWS = os.environ.get("SRC_ROWS", "")
@@ -206,7 +209,8 @@ if SRC_ROWS and os.path.exists(SRC_ROWS):
 
 ws = wb.create_sheet("說明")
 for i, t in enumerate([
-    "R7 A–H 六項條件掃描 r6 — 六項條件的基準是 2026-09-16 官方收盤（完整 OHLC，三個 repo 的 Yahoo 鏡像合併 3,097 檔）。另有三個 09-17 分頁，用 10MA repo 的 Nasdaq 收盤快照（753/758 檔）更新 ①④⑤⑥；快照沒有盤中高低，②③（波動指數）不能重算，沿用 09-16 值。09-18／09-21 收盤三個 repo 都還沒有：三個鏡像最後一次更新是 09-18 01–04 UTC，本次已重新 fetch 確認無新 commit，掃描結果與 r5 逐格相同。本版新增「Chat1-3 命中 未過六項」分頁。",
+    f"R7 A–H 六項條件掃描 r7 — 六項條件的基準是 2026-{BD} 官方收盤（完整 OHLC，三個 repo 的 Yahoo 鏡像合併 {PANEL_N} 檔）。另有三個 {SD} 分頁，用 10MA repo 的 Nasdaq 收盤快照更新 ①④⑤⑥；快照沒有盤中高低，②③（波動指數）不能重算，沿用 {BD} 值。",
+    f"本版的資料是新抓的：r5/r6 時三個鏡像都停在 09-17，本次先觸發各 repo 自己的 GitHub Actions（fetch_yahoo_eod、fetch_eod_snapshot）補抓，補回 09-17／09-18／09-21 三個完整交易日（各 2,978 檔）與 09-22 收盤快照。09-22 的 Yahoo 日線當時只有 194 檔，未達 50% 覆蓋門檻，整日丟棄。本機直連 Yahoo／Stooq／Nasdaq／Alpha Vantage 仍全部被 proxy 以 403 擋住，所以資料只能經各 repo 的 runner 取得。",
     "① 重心線向上：r7e_gravity（滾動 VWAP 30，hlc3）最新一根斜率 > 0",
     "② 波動指數向上：r7h_volidx（0–100，高 = 平靜）最新一根斜率 > 0",
     "③ 波動指數 ≥ 75",
@@ -216,10 +220,10 @@ for i, t in enumerate([
     "VCP / 結構 / 最低阻力線 只作參考，不計分。MA20 與 EMA21 已刪除。",
     "Ticker 欄為 TradingView 圖表超連結（Q1c5VWwD 版面）。",
     "來源榜單欄會標明名字的身分：10MA_R20（在榜 89）· 10MA_R20_跌出（本版被剔除 20）· RateHike_R2_受惠 / _迴避（同一 session 09-18 的加息與地緣政治 3 日清單）。六項全中裡若出現「跌出」或「迴避」標籤，代表原榜單本身不推薦，請自行判斷。",
-    "歷史足夠 ≥250：鏡像只給 42 檔 75 根（2026-06-01 起），這些名字的 60 日波動與週期平均值樣本太短，時鐘與波動指數不可靠。",
-    "10MA R20 的 109 檔 = 89 檔在榜 + 20 檔本版跌出（新上榜同跌出 分頁），兩者都掃；758 檔全部掃到，0 檔缺資料。",
-    "「Chat1-3 命中 未過六項」分頁：三個 session 各自的成品用自己那套準則選中、但本掃描六項未全中的名字，另按命中 1 / 2 / 3 套拆成子分頁。命中規則寫在該分頁第一行。六項全中的 17 檔裡有 6 檔同時是 chat 命中（MRK、JNJ、DHR、LH、NWSA、RNR），其餘 11 檔是本掃描獨有。",
-    "「全市場 六項全中」分頁：合併面板中收盤 ≥ $2、20 日均額 ≥ 300 萬美元、歷史 ≥ 80 根的 2,584 檔全掃一次的結果，含 watchlist 以外的名字。",
+    "歷史足夠 ≥250：本版三個鏡像全部重抓後，760 檔的最後一根全部落在基準日，沒有一檔停在舊日期（r6 有 45 檔停在 09-17，包括當時的六項全中 TECK）。原因是掃描的 _files() 只讀第一個有檔案的鏡像目錄，本版已改為三個目錄全讀。",
+    "10MA R20 的 109 檔 = 89 檔在榜 + 20 檔本版跌出（新上榜同跌出 分頁），兩者都掃；760 檔全部掃到，0 檔缺資料。",
+    "「Chat1-3 命中 未過六項」分頁：三個 session 各自的成品用自己那套準則選中、但本掃描六項未全中的名字，另按命中 1 / 2 / 3 套拆成子分頁。命中規則寫在該分頁第一行。本版六項全中 20 檔裡有 10 檔同時是 chat 命中（V、DFIN、TRGP、NEM、REGN、RGLD、RPRX、TECK、TGT、PFE），其餘 10 檔是本掃描獨有。",
+    "「加掃 六項全中」分頁：合併面板中收盤 ≥ $2、20 日均額 ≥ 300 萬美元、歷史 ≥ 80 根的 2,644 檔全掃一次的結果，含 watchlist 以外的名字。",
     "① 用的是「重心線 1 根斜率 > 0」（六項條件的原文）。R7-E 自己把線塗綠的條件較嚴：5 根位移 ≥ 0.8 ATR；表中已附「重心 5 根位移 (ATR)」欄，可自行加嚴。",
     "③ 門檻用 75（六項條件原文）。R7-H 圖上那條綠色分隔線預設在 80，所以有些通過 ③ 的名字在圖上仍在線下。",
     "④ 時鐘：MACD 柱狀圖在 Pine 的前 33 根是 na（EMA 要等 SMA 種子），本掃描已照做並丟掉每個方向的第一段，避免暖機假週期污染平均週期長度。歷史根數 < 150 的名字，時鐘與進度仍不夠可靠，請以「歷史根數」欄判斷。",
