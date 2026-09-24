@@ -63,15 +63,28 @@ upre = pd.read_csv(f"{S}/r8pre/universe_r8.csv")
 u6, p6 = set(u[u.score == 6].ticker), set(upre[upre.score == 6].ticker)
 off = u[(u.score == 6) & (~u.ticker.isin(set(b.ticker)))]
 warn = b[b.data_warn.fillna("") != ""]
+CN = {"c1": "①", "c2": "②", "c3": "③", "c4": "④", "c5": "⑤", "c6": "⑥"}
+def _why(t, gone):
+    """加掃六項全中名單變動的原因：進出流動性門檻，或哪一項翻轉。"""
+    a, z = (upre, u) if gone else (upre, u)
+    if gone and t not in set(u.ticker):
+        r = upre[upre.ticker == t].iloc[0]
+        return f"{t}（20 日均額改正後不足 300 萬美元）" if r.turnover20_m < 3.2 else f"{t}（已不在加掃範圍）"
+    if not gone and t not in set(upre.ticker):
+        return f"{t}（改正均額後才進入加掃範圍）"
+    o = upre[upre.ticker == t].iloc[0]; n = u[u.ticker == t].iloc[0]
+    fl = "".join(CN[c] for c in CN if bool(o[c]) != bool(n[c]))
+    return f"{t}（{fl} 翻轉，θ {o.theta:.1f}° → {n.theta:.1f}°）" if "④" in fl else f"{t}（{fl} 翻轉）"
 
 panel = ("面板規則：同一檔同一天在多份鏡像都有資料時，取抓取窗口較新的那份（r7 以前取檔名排序在前的舊檔）。"
          f"760 檔最後一根全部落在 09-21，0 檔停在舊日期。"
          + (f"資料警示：{'、'.join(f'{r.ticker}（{r.data_warn}）' for r in warn.itertuples())}，指標值不可信；皆未進入任何命中名單。" if len(warn) else ""))
 fix = ("r8 同時修正的問題（獨立驗證發現）："
-       "(1) chat 編號：chat 1 = 10MA R20、chat 2 = Combined R22（VCP / Stage 2A / Pre-breakout）、chat 3 = SubSector R12 + AI Sector R13 + 加息 R2，依三個 session 連結順序與各 repo commit 的 Claude-Session 尾註；r6、r7 把 chat 1 與 chat 3 標反，命中規則與名單不受影響。"
+       "(1) chat 編號：chat 1 = 10MA R20、chat 2 = Combined R22（VCP / Stage 2A / Pre-breakout）、chat 3 = SubSector R12 + AI Sector R13 + 加息 R2，依三個 session 連結順序與各 repo commit 的 Claude-Session 尾註核對；r6、r7 標錯了（把 Combined 標成 chat 1、SubSector / AI 標成 chat 2、10MA 與加息標成 chat 3），命中規則與名單不受影響。"
        "(2) 20 日均額改為最近 20 根 (收盤 × 成交量) 的平均（原為最後收盤 × 20 日均量），加掃另剔除最後一根不在 09-21 的名字、並把同一證券的不同寫法（BF.B / BF/B）合併；"
-       f"加掃由 {len(upre):,} 檔變為 {len(u):,} 檔，六項全中 {len(p6)} → {len(u6)} 檔"
-       + (f"（移除 {'、'.join(sorted(p6 - u6))}）" if p6 - u6 else "") + (f"（新增 {'、'.join(sorted(u6 - p6))}）" if u6 - p6 else "") + "。"
+       f"加掃由 {len(upre):,} 檔變為 {len(u):,} 檔；加掃六項全中 {len(p6)} → {len(u6)} 檔"
+       + (f"，移出 {'、'.join(_why(t, True) for t in sorted(p6 - u6))}" if p6 - u6 else "")
+       + (f"，加入 {'、'.join(_why(t, False) for t in sorted(u6 - p6))}" if u6 - p6 else "") + "。"
        f"(3) MACD 時鐘只丟被視窗起點截斷的第一段（原本兩個方向各丟一段，多丟了一段完整週期）：{len(th2)} 檔指針角度變動 >2°，"
        f"④ 翻轉 {len(c4f)} 檔（{'、'.join(f'{r.ticker} {r.score_o}→{r.score}' for r in c4f.itertuples()) or '無'}），六項全中與差一項名單"
        + ("不變" if len(sc[(sc.score >= 5) | (sc.score_o >= 5)]) == 0 else "有變動") + "。"
