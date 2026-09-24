@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """R7_six_criteria_scan CSV → Excel：Ticker 帶 TradingView 超連結；分頁：六項全中(淺紅 1/2/3 根) / 差一項 / 全部 / 說明。"""
-import sys, glob, os
+import sys, glob, os, json
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -14,6 +14,10 @@ SRC_NOTE = os.environ.get("SRC_NOTE", "來源：三個 watchlist repo 的最新�
 BD = os.environ.get("BASE_DAY", "09-16")   # 六項條件的基準日（最新完整 OHLC 收盤）
 SD = os.environ.get("SNAP_DAY", "09-17")   # 收盤快照日（只重算 ①④⑤⑥）
 PANEL_N = os.environ.get("PANEL_N", "3,097")
+VER = os.environ.get("VER", "r7")
+# 版本說明（資料來源敘述、面板健康度）由呼叫端帶入，避免每版手改程式
+DATA_NOTE = os.environ.get("DATA_NOTE", "")
+PANEL_NOTE = os.environ.get("PANEL_NOTE", "")
 COLS = [  # (csv 欄, Excel 標題, 格式)
     ("ticker", "Ticker", "link"), ("lists", "來源榜單", "txt"), ("date", "數據日", "txt"), ("close", "收盤", "num2"), ("score", "命中 /6", "int"),
     ("c1", "① 重心線向上", "tick"), ("grav", "重心線", "num2"), ("grav_slope", "重心斜率", "num3"), ("grav_shift5atr", "重心 5 根位移 (ATR)", "num2"),
@@ -102,7 +106,7 @@ if CH and os.path.exists(CH):
               ("ai_group", "chat2 AI 小群組", "txt"), ("ai_rank", "AI 群組名次", "int"), ("ai_tf5", "AI 個股 5 日強度", "num3"),
               ("ma_rank", "chat3 10MA 排名", "int"), ("ma_tf", "通過時間框", "int"), ("ma_vcp", "10MA VCP 分", "num1"),
               ("ma_flag", "10MA 審視標記", "txt"), ("rh", "加息 R2", "txt"),
-              ("four_17", f"{SD} ①④⑤⑥", "tick"), ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", "當日 %", "num2"),
+              ("four_17", f"{SD} ①④⑤⑥", "tick"), ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", f"{BD}→{SD} %", "num2"),
               ("turnover20_m", "20 日均額 (百萬)", "num1"), ("bars", "歷史根數", "int"), ("hist_ok", "歷史足夠 ≥250", "tick"),
               ("vcp", "VCP 指數 (參考)", "num1"), ("struct", "結構", "txt"), ("lists", "來源榜單", "txt")]
 
@@ -152,7 +156,7 @@ UPD = os.environ.get("UPDATE_CSV", "")
 if UPD and os.path.exists(UPD):
     m = pd.read_csv(UPD)
     UCOLS = [("ticker", "Ticker", "link"), ("lists", "來源榜單", "txt"), ("close_16", f"{BD} 收盤", "num2"),
-             ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", "當日 %", "num2"),
+             ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", f"{BD}→{SD} %", "num2"),
              ("c1_17", "① 重心線向上", "tick"), ("c4_17", "④ 時鐘 6–10 點", "tick"), ("c5_17", "⑤ 淺紅 1–3 根", "tick"),
              ("c6_17", "⑥ 貼近重心線", "tick"), ("clock_17", f"{SD} 時鐘", "txt"), ("dist_grav_pct", "距重心 %", "num2"),
              ("volidx", f"波動指數 ({BD})", "num1"), ("c2", f"② {BD} 指數向上", "tick"), ("c3", f"③ {BD} ≥75", "tick")]
@@ -207,10 +211,20 @@ if SRC_ROWS and os.path.exists(SRC_ROWS):
     for j, h in enumerate(hdr, 1):
         wsx.column_dimensions[get_column_letter(j)].width = 14 if h.endswith(("檔數", "基準日")) else 46
 
+CH_NOTE = UNI_NOTE = ""
+if CH and os.path.exists(CH):
+    _bj = CH[:-4] + "_both.json"          # chat_hits.py 另寫的「同時六項全中」名單
+    _ch_all = set(json.load(open(_bj))["both"]) if os.path.exists(_bj) else None
+    _ov = [t for t in full.ticker if _ch_all is not None and t in _ch_all]
+    CH_NOTE = ("「Chat1-3 命中 未過六項」分頁：三個 session 各自的成品用自己那套準則選中、但本掃描六項未全中的名字，另按命中 1 / 2 / 3 套拆成子分頁。命中規則寫在該分頁第一行。"
+               + (f"本版六項全中 {len(full)} 檔裡有 {len(_ov)} 檔同時是 chat 命中（{'、'.join(_ov)}），其餘 {len(full) - len(_ov)} 檔是本掃描獨有。" if _ch_all is not None else ""))
+if UNI and os.path.exists(UNI):
+    UNI_NOTE = f"「加掃 六項全中」分頁：合併面板中收盤 ≥ $2、20 日均額 ≥ 300 萬美元、歷史 ≥ 80 根的 {len(u):,} 檔全掃一次的結果（六項全中 {len(uf)} 檔，其中 {(uf.lists == '榜外').sum()} 檔不在四張榜單內），含 watchlist 以外的名字。"
+
 ws = wb.create_sheet("說明")
-for i, t in enumerate([
-    f"R7 A–H 六項條件掃描 r7 — 六項條件的基準是 2026-{BD} 官方收盤（完整 OHLC，三個 repo 的 Yahoo 鏡像合併 {PANEL_N} 檔）。另有三個 {SD} 分頁，用 10MA repo 的 Nasdaq 收盤快照更新 ①④⑤⑥；快照沒有盤中高低，②③（波動指數）不能重算，沿用 {BD} 值。",
-    f"本版的資料是新抓的：r5/r6 時三個鏡像都停在 09-17，本次先觸發各 repo 自己的 GitHub Actions（fetch_yahoo_eod、fetch_eod_snapshot）補抓，補回 09-17／09-18／09-21 三個完整交易日（各 2,978 檔）與 09-22 收盤快照。09-22 的 Yahoo 日線當時只有 194 檔，未達 50% 覆蓋門檻，整日丟棄。本機直連 Yahoo／Stooq／Nasdaq／Alpha Vantage 仍全部被 proxy 以 403 擋住，所以資料只能經各 repo 的 runner 取得。",
+for i, t in enumerate([t for t in [
+    f"R7 A–H 六項條件掃描 {VER} — 六項條件的基準是 2026-{BD} 官方收盤（完整 OHLC，三個 repo 的 Yahoo 鏡像合併 {PANEL_N} 檔）。另有三個 {SD} 分頁，用 10MA repo 的 Nasdaq 收盤快照更新 ①④⑤⑥；快照沒有盤中高低，②③（波動指數）不能重算，沿用 {BD} 值。",
+    DATA_NOTE,
     "① 重心線向上：r7e_gravity（滾動 VWAP 30，hlc3）最新一根斜率 > 0",
     "② 波動指數向上：r7h_volidx（0–100，高 = 平靜）最新一根斜率 > 0",
     "③ 波動指數 ≥ 75",
@@ -220,16 +234,16 @@ for i, t in enumerate([
     "VCP / 結構 / 最低阻力線 只作參考，不計分。MA20 與 EMA21 已刪除。",
     "Ticker 欄為 TradingView 圖表超連結（Q1c5VWwD 版面）。",
     "來源榜單欄會標明名字的身分：10MA_R20（在榜 89）· 10MA_R20_跌出（本版被剔除 20）· RateHike_R2_受惠 / _迴避（同一 session 09-18 的加息與地緣政治 3 日清單）。六項全中裡若出現「跌出」或「迴避」標籤，代表原榜單本身不推薦，請自行判斷。",
-    "歷史足夠 ≥250：本版三個鏡像全部重抓後，760 檔的最後一根全部落在基準日，沒有一檔停在舊日期（r6 有 45 檔停在 09-17，包括當時的六項全中 TECK）。原因是掃描的 _files() 只讀第一個有檔案的鏡像目錄，本版已改為三個目錄全讀。",
-    "10MA R20 的 109 檔 = 89 檔在榜 + 20 檔本版跌出（新上榜同跌出 分頁），兩者都掃；760 檔全部掃到，0 檔缺資料。",
-    "「Chat1-3 命中 未過六項」分頁：三個 session 各自的成品用自己那套準則選中、但本掃描六項未全中的名字，另按命中 1 / 2 / 3 套拆成子分頁。命中規則寫在該分頁第一行。本版六項全中 20 檔裡有 10 檔同時是 chat 命中（V、DFIN、TRGP、NEM、REGN、RGLD、RPRX、TECK、TGT、PFE），其餘 10 檔是本掃描獨有。",
-    "「加掃 六項全中」分頁：合併面板中收盤 ≥ $2、20 日均額 ≥ 300 萬美元、歷史 ≥ 80 根的 2,644 檔全掃一次的結果，含 watchlist 以外的名字。",
+    PANEL_NOTE,
+    f"10MA R20 的 109 檔 = 89 檔在榜 + 20 檔本版跌出（新上榜同跌出 分頁），兩者都掃；{len(d)} 檔全部掃到，0 檔缺資料。",
+    CH_NOTE,
+    UNI_NOTE,
     "① 用的是「重心線 1 根斜率 > 0」（六項條件的原文）。R7-E 自己把線塗綠的條件較嚴：5 根位移 ≥ 0.8 ATR；表中已附「重心 5 根位移 (ATR)」欄，可自行加嚴。",
     "③ 門檻用 75（六項條件原文）。R7-H 圖上那條綠色分隔線預設在 80，所以有些通過 ③ 的名字在圖上仍在線下。",
     "④ 時鐘：MACD 柱狀圖在 Pine 的前 33 根是 na（EMA 要等 SMA 種子），本掃描已照做並丟掉每個方向的第一段，避免暖機假週期污染平均週期長度。歷史根數 < 150 的名字，時鐘與進度仍不夠可靠，請以「歷史根數」欄判斷。",
-    "代號對齊：鏡像用 BRK/A、BRK/B、BF/B 等斜線寫法，watchlist 用 BRK-A、BF.B；掃描會自動試點/槓/斜線並取資料最長者（本次 3 檔重對應）。",
+    "代號對齊：鏡像用 BRK/A、BRK/B、BF/B 等斜線寫法，watchlist 用 BRK-A、BF.B；掃描會自動試點/槓/斜線並取資料最長者（本次 " + os.environ.get("REMAP_NOTE", "3 檔重對應") + "）。",
     SRC_NOTE,
-], 1):
+] if t], 1):
     ws.cell(i, 1, t).font = Font(bold=(i == 1))
 ws.column_dimensions["A"].width = 110
 out = sys.argv[2] if len(sys.argv) > 2 else src[:-4] + ".xlsx"

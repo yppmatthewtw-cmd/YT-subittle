@@ -192,6 +192,7 @@ for _, r in d.iterrows():
 o = pd.DataFrame(rows).sort_values(["score", "n_hit", "volidx"], ascending=[False, False, False])
 o.to_csv(out_csv, index=False, encoding="utf-8-sig")
 both = [r.ticker for _, r in d.iterrows() if r["score"] == NC and r["key"] in hit]
+json.dump({"both": both, "n_chat_only": len(o)}, open(out_csv[:-4] + "_both.json", "w"), ensure_ascii=False)   # 給報表寫「同時六項全中」一句
 print(f"\nchat 1–3 命中合共 {len(o) + len(both)} 檔，其中 {len(both)} 檔同時六項全中（{'、'.join(both)}）")
 print(f"六項全中 {int((d.score == NC).sum())} 檔已排除；chat 1–3 命中但未過六項：{len(o)} 檔")
 print("  命中系統數分佈:", o.n_hit.value_counts().sort_index().to_dict())

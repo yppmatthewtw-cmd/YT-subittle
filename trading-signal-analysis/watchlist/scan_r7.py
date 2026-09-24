@@ -5,7 +5,7 @@ R7 A–G 六條件掃描（日線）— 以 Python 重現 r7a/b/c/e/g 的預設�
       vcp-watchlist / 10ma-watchlist / 20mawarchlist 的 data/yahoo/*.csv.gz 全部併入，
       同一 symbol×date 以「官方 EOD 檔」優先，tail/hourly 盤中快照最後（且預設整天丟棄）。
 """
-import json, glob, math, sys, os
+import re, json, glob, math, sys, os
 import numpy as np, pandas as pd
 
 S = "/tmp/claude-0/-home-user-YT-subittle/0bd65ef0-0bef-5829-9a6f-f0a46d2d96cd/scratchpad"
@@ -305,6 +305,10 @@ def load(verbose=True):
         keep = [c for c in ("symbol", "date", "open", "high", "low", "close", "adj_close", "volume") if c in d.columns]
         d = d[keep].copy()
         d["route"] = route.values
+        # 鏡像檔名的最後一個日期 = 抓取窗口的終點；同一 symbol×date 同優先度時取較新的檔
+        # （舊檔裡的「當日」可能是收盤前抓到的半日值，新檔才是正式收盤）
+        _ds = re.findall(r"\d{4}-\d{2}-\d{2}", b)
+        d["fend"] = _ds[-1] if _ds else "0000-00-00"
         d["prio"] = 0
         d.loc[d["route"].str.contains("hourly|intraday|quote", case=False, na=False), "prio"] = 2
         if "tail" in b:
@@ -339,6 +343,7 @@ def load(verbose=True):
             sn = sn[sn.symbol.isin(known)].dropna(subset=["close"])
             sn["route"] = "snapshot-close"
             sn["prio"] = 1
+            sn["fend"] = str(dt.date())
             snaps.append(sn)
             if verbose:
                 print(f"snapshot {dt.date()}: +{len(sn)} 檔收盤（無盤中高低）")
@@ -349,7 +354,8 @@ def load(verbose=True):
     d["symbol"] = d["symbol"].astype(str).str.upper().str.strip()
     d["date"] = pd.to_datetime(d["date"])
     d = d.dropna(subset=["close"])
-    d = d.sort_values(["symbol", "date", "prio"]).drop_duplicates(["symbol", "date"], keep="first")
+    d = (d.sort_values(["symbol", "date", "prio", "fend"], ascending=[True, True, True, False], kind="mergesort")
+          .drop_duplicates(["symbol", "date"], keep="first"))
     # 覆蓋率只算「收盤級」資料（prio 0/1）；盤中快照不能算一個完整交易日
     off = d[d.prio <= 1]
     cov = off.groupby("date").symbol.nunique()

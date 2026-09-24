@@ -16,6 +16,7 @@ import os
 VER = os.environ.get("VER", "r7")
 BD = os.environ.get("BASE_DAY", "09-16")   # 六項條件基準日（最新完整 OHLC）
 SD = os.environ.get("SNAP_DAY", "09-17")   # 收盤快照日（只重算 ①④⑤⑥）
+HTML_NOTE = os.environ.get("HTML_NOTE", "")   # 本版資料敘述（每版由呼叫端帶入）
 
 CRIT = [
     ("c1", "① 重心線向上", "r7e_gravity 線（滾動 VWAP 30，hlc3）最新一根斜率 > 0"),
@@ -124,6 +125,10 @@ if chd is not None:
             f2(r.volidx, 1), esc(r.clock), esc(r.c5_cat), f2(r.dist_grav_pct), esc(str(r.detail))[:180])
 
     n3, n2, n1 = [int((chd.n_hit == k).sum()) for k in (3, 2, 1)]
+    _bj = CH[:-4] + "_both.json"         # chat_hits.py 另寫的「同時六項全中」名單
+    both = json.load(open(_bj))["both"] if os.path.exists(_bj) else []
+    _six = set(strict.ticker)
+    both = [t for t in strict.ticker if t in set(both)] + [t for t in both if t not in _six]
     chat_html = (
         '<h2>Chat 1–3 命中、六項未全中 <span class="n">%d 檔</span></h2>' % len(chd)
         + '<div class="note">三個 session 的成品各自用自己那套準則選中、但本掃描六項條件未全中的名字。'
@@ -133,9 +138,11 @@ if chd is not None:
           '<b>AI</b> AI Sector R13：所屬小群組 5 日分 ≥70 且個股 5 日強度 &gt;0 → 26 檔　'
           '<b>10MA</b> R20：在總表（本版跌出 20 檔不算）→ 89 檔　'
           '<b>加息</b> R2：受惠名單 19 檔（迴避名單不算命中，另標 ⚠）<br>'
-          'chat 1–3 合共命中 %d 檔，其中 6 檔同時六項全中（MRK · JNJ · DHR · LH · NWSA · RNR），餘下 %d 檔列於下表；'
-          '本掃描六項全中的 17 檔裡有 11 檔是 chat 準則沒有選中的。'
-          '同時命中 3 套 %d 檔、2 套 %d 檔、1 套 %d 檔。</div>' % (len(chd) + 6, len(chd), n3, n2, n1)
+          'chat 1–3 合共命中 %d 檔，其中 %d 檔同時六項全中（%s），餘下 %d 檔列於下表；'
+          '本掃描六項全中的 %d 檔裡有 %d 檔是 chat 準則沒有選中的。'
+          '同時命中 3 套 %d 檔、2 套 %d 檔、1 套 %d 檔。</div>' % (
+              len(chd) + len(both), len(both), " · ".join(both) or "—", len(chd),
+              len(strict), len(strict) - len(both), n3, n2, n1)
         + '<div class="filters"><span class="mut">命中系統 ≥</span>'
         + "".join('<button data-cn="%d" class="%s">%d</button>' % (k, "on" if k == 1 else "", k) for k in (1, 2, 3))
         + '<span class="mut" style="margin-left:14px">六項 ≥</span>'
@@ -193,7 +200,7 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 <div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b> · 另以 <b>{SD} Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）· 價格面板為三個 repo 的 Yahoo 鏡像合併（Yahoo 直連在本機被 proxy 封鎖，鏡像由各 repo 的 GitHub Actions 抓取）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
-<div class="note">r7：條件與 r3–r6 相同，資料換成最新 —— 本次先觸發三個 repo 自己的 GitHub Actions（fetch_yahoo_eod / fetch_eod_snapshot）補抓，鏡像由 09-17 推進到 <b>09-21 完整 OHLC</b>（09-17、09-18、09-21 三個交易日全部補齊，各 2,978 檔），再加 <b>09-22 Nasdaq 收盤快照</b>。09-22 的 Yahoo 日線只有 194 檔，未達覆蓋門檻，已整日丟棄。ticker 取自三個 session 的最新成品（10MA R20 · Combined R22 · SubSector R12 · AI R13 · RateHike R2），價格面板由三個 repo 的 Yahoo 鏡像合併（3,097 檔）。六項條件算到 {BD} 官方收盤；{SD} 只有 Nasdaq 收盤快照，另列於上方。條件：① 只看重心線；② ③ 改用 R7-H 波動指數（斜率 > 0、數值 ≥ 75）；⑥ 只看重心線；MA20 與 EMA21 全部刪除；⑤ 全中名單按淺紅第 1 / 2 / 3 根分開排列。六項全中 <b>{len(strict)} 檔</b>。</div>
+<div class="note">{HTML_NOTE}六項全中 <b>{len(strict)} 檔</b>。</div>
 
 {upd_html}
 
@@ -212,9 +219,9 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 
 {chat_html}
 
-<h2>無法計算 <span class="n">{len(missing)} 檔無日線鏡像（多為 ADR／外國掛牌／.B 股）· {len(stale)} 檔鏡像停在 09-14</span></h2>
+<h2>無法計算 <span class="n">{len(missing)} 檔無日線鏡像（多為 ADR／外國掛牌／.B 股）· {len(stale)} 檔最後一根早於基準日</span></h2>
 <div class="tags">{"".join(f"<span>{esc(t)}</span>" for t in missing)}</div>
-<p class="mut" style="font-size:12px">鏡像停在 09-14（表中標「舊」）：{" · ".join(stale)}</p>
+<p class="mut" style="font-size:12px">最後一根早於基準日（表中標「舊」）：{" · ".join(stale) or "無"}</p>
 </div>
 <script>
 const root=document.documentElement,sw=document.querySelectorAll('.sw button');
