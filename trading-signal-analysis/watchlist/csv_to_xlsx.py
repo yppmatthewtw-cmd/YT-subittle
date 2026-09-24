@@ -89,7 +89,7 @@ if UNI and os.path.exists(UNI):
     uf = u[u.score == NC].copy()
     uf["lists"] = uf.ticker.map(lambda t: "榜內" if t in inwl else "榜外")
     uf = uf.sort_values(["c5_days", "volidx"], ascending=[True, False])
-    sheet(wb, "加掃 六項全中", uf, f"三鏡像併集 {PANEL_N} 檔中、收盤 ≥ $2 且 20 日均額 ≥ 300 萬美元的 %d 檔，六項全中 %d 檔（其中 %d 檔不在五份來源成品內）。這不是全市場：10MA 自己的漏斗算出美股可報價名單約 5,065 檔。" % (len(u), len(uf), (uf.lists == "榜外").sum()))
+    sheet(wb, "加掃 六項全中", uf, f"三鏡像併集 {PANEL_N} 檔中、收盤 ≥ $2、20 日 (收盤×量) 平均 ≥ 300 萬美元、歷史 ≥ 80 根、最後一根在 {BD}、同證券不同寫法只留一個的 {len(u):,} 檔，六項全中 %d 檔（其中 %d 檔不在五份來源成品內）。這不是全市場：10MA 自己的漏斗算出美股可報價名單約 5,065 檔。" % (len(uf), (uf.lists == "榜外").sum()))
 
 # chat 1–3 命中但未過六項（可選）：三個 session 各自用自己那套準則選中、但六項條件未全中的名字
 CH = os.environ.get("CHATHITS_CSV", "")
@@ -220,7 +220,7 @@ if CH and os.path.exists(CH):
     CH_NOTE = ("「Chat1-3 命中 未過六項」分頁：三個 session 各自的成品用自己那套準則選中、但本掃描六項未全中的名字，另按命中 1 / 2 / 3 套拆成子分頁。命中規則寫在該分頁第一行。"
                + (f"本版六項全中 {len(full)} 檔裡有 {len(_ov)} 檔同時是 chat 命中（{'、'.join(_ov)}），其餘 {len(full) - len(_ov)} 檔是本掃描獨有。" if _ch_all is not None else ""))
 if UNI and os.path.exists(UNI):
-    UNI_NOTE = f"「加掃 六項全中」分頁：合併面板中收盤 ≥ $2、20 日均額 ≥ 300 萬美元、歷史 ≥ 80 根的 {len(u):,} 檔全掃一次的結果（六項全中 {len(uf)} 檔，其中 {(uf.lists == '榜外').sum()} 檔不在五份來源成品內），含 watchlist 以外的名字。"
+    UNI_NOTE = f"「加掃 六項全中」分頁：合併面板中收盤 ≥ $2、20 日 (收盤×量) 平均 ≥ 300 萬美元、歷史 ≥ 80 根、最後一根在 {BD}、同證券不同寫法只留一個的 {len(u):,} 檔全掃一次的結果（六項全中 {len(uf)} 檔，其中 {(uf.lists == '榜外').sum()} 檔不在五份來源成品內），含 watchlist 以外的名字。"
 
 ws = wb.create_sheet("說明")
 for i, t in enumerate([t for t in [

@@ -27,6 +27,10 @@ y["symbol"] = y.symbol.astype(str).str.upper().str.strip()
 y = y.drop_duplicates(["symbol", "date"])
 yv = {dt: int((y.date == dt).sum()) for dt in ("2026-09-22", "2026-09-23")}
 
+# 20MA repo tail 路線（本次觸發的 fetch_yahoo_tail）拿到的 09-22 日線，與上面的 Yahoo 名單比
+tl = pd.read_csv("/home/user/yppmatthewtw-cmd/20mawarchlist/data/yahoo/r7scan_after_2026-09-21.csv.gz")
+tl22 = set(tl[(tl.date == "2026-09-22") & (tl.route == "hist5d")].symbol.str.upper())
+tl_new = len(tl22 - set(y[y.date == "2026-09-22"].symbol))
 chk, nas = {}, {}
 for dt in ("2026-09-22", "2026-09-23"):
     sn = pd.read_csv(f"{SNAPD}/{dt}.csv")
@@ -43,7 +47,7 @@ miss_nas = sorted(used - nas["2026-09-23"])
 
 data = (f"本版資料：再次觸發三個 repo 的 GitHub Actions（fetch_yahoo_eod ×3、fetch_eod_snapshot）抓到 09-24 01:25 UTC（美東 09-23 收盤後約 5.5 小時）。"
         f"Yahoo 的 09-22 日線在全部鏡像中合計只有 {yv['2026-09-22']:,} 檔（09-23 {yv['2026-09-23']:,} 檔；完整交易日約 3,040 檔），"
-        "20MA repo 的 tail 路線（5 日相對期間 / 小時線）也只多拿到 65 檔 09-22 日線，未達 50% 覆蓋門檻，"
+        f"另外觸發 20MA repo 的 tail 路線（5 日相對期間 / 小時線），只拿到 {len(tl22)} 檔 09-22 日線，其中 {tl_new} 檔是上述名單以外的，覆蓋仍遠低於 50% 門檻，"
         "所以完整 OHLC 的最新交易日仍是 09-21，六項條件的基準與 r7 相同。"
         f"09-22、09-23 兩天的收盤：Nasdaq 官方收盤快照涵蓋 {wl_nas['2026-09-23']}/760 檔"
         + (f"（{'、'.join(miss_nas)} 不在 Nasdaq 快照，改用 Yahoo 日線）" if miss_nas else "")
