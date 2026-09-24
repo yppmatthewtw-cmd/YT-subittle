@@ -87,18 +87,32 @@ def pivot_low(x, L, R):
             out[i] = c
     return out
 
+def _jump_warn(df, n=60, lim=0.6, vmul=3.0):
+    """最近 n 根內單日漲跌超過 lim（60%）、而且當天成交量沒有放大（< 前 20 根中位數的 vmul 倍）
+    → 多半是未調整的分割／重組，不是真實行情，指標值不可信。
+    真實的暴漲暴跌（例如 MRNA 08-19 +177%，量放大 46 倍）不標。"""
+    r = df.close.pct_change()
+    med = df.volume.shift(1).rolling(20, min_periods=5).median()
+    sus = (r.abs() > lim) & ~(df.volume >= vmul * med)
+    sus = sus.tail(n)
+    if sus.any():
+        k = r[sus[sus].index].abs().idxmax()
+        return f"單日 {r[k] * 100:+.0f}%（{df.date[k].strftime('%m-%d')}）且量未放大，疑似未調整分割/重組"
+    return ""
+
 # ───────────────────────── R7-B MACD 時鐘 ─────────────────────────
 def macd_clock(close, fast=12, slow=26, sig=9, lookN=8, defLen=12, drop_first_cycle=True):
     """r7b_macd_clock 的週期時鐘。
     ema() 已是 Pine 式（SMA 種子、種子前回 na），所以柱狀圖在前 (slow-1)+(sig-1) 根自然是 na，
     r7b 的 fl (翻轉偵測) 在那段期間不會記錄任何週期。若改用 pandas ewm，暖機段會在零軸上下亂穿、
     把假週期推進 ul/dl，污染平均週期長度 → 進度 → 指針角度。
-    另外丟掉每個方向的第一段（它是從資料視窗第一根量起的，不是真正的一段週期）。"""
+    另外丟掉「第一段」：含第一根有效柱的那一段在視窗起點之前就開始了，長度被截斷。
+    只丟這一段；另一方向的第一段是完整週期，要留著（TradingView 圖上載入長歷史，最近 lookN 段都是完整週期）。"""
     m = ema(close, fast) - ema(close, slow); s_ = ema(m, sig); h = (m - s_).values.astype(float)
     n = len(h); up = h >= 0
     valid = np.isfinite(h)
     cs = int(np.argmax(valid)) if valid.any() else 0
-    ul = []; dl = []; seen_up = False; seen_dn = False
+    ul = []; dl = []; seen_any = False
     theta = np.full(n, np.nan); prog = np.full(n, np.nan); elapsed = np.zeros(n, int)
     for i in range(n):
         if not valid[i]:
@@ -106,10 +120,9 @@ def macd_clock(close, fast=12, slow=26, sig=9, lookN=8, defLen=12, drop_first_cy
         if valid[i - 1] and up[i] != up[i - 1]:
             L = i - cs
             a = ul if up[i - 1] else dl
-            first = (not seen_up) if up[i - 1] else (not seen_dn)
-            if up[i - 1]: seen_up = True
-            else: seen_dn = True
-            if not (drop_first_cycle and first):   # 第一段是視窗邊界造成的，不算
+            first = not seen_any
+            seen_any = True
+            if not (drop_first_cycle and first):   # 第一段被視窗起點截斷，不算
                 a.append(L)
                 if len(a) > lookN: a.pop(0)
             cs = i
@@ -417,7 +430,8 @@ def scan_one(sym, df):
         c6=bool(near(dE)), dist_grav_pct=round(dE / c.iloc[i] * 100, 2), dist_grav_atr=round(dE / A, 2) if A > 0 else np.nan,
         lr_line=round(lr[i], 2) if not np.isnan(lr[i]) else np.nan,
         dist_lr_pct=round(dG / c.iloc[i] * 100, 2) if not np.isnan(dG) else np.nan, dist_lr_atr=round(dG / A, 2) if (A > 0 and not np.isnan(dG)) else np.nan,
-        turnover20_m=round(float(c.iloc[i] * df.volume.tail(20).mean() / 1e6), 1),
+        turnover20_m=round(float((c * df.volume).tail(20).mean() / 1e6), 1),
+        data_warn=_jump_warn(df),
         bar_src=("收盤快照" if ("prio" in df.columns and int(df.prio.iloc[i]) == 1) else "OHLC"),
         lr_dir={1: "↑", -1: "↓", 0: "—"}[int(lrDir[i])], struct={1: "HH/HL", -1: "LH/LL", 0: "—"}[int(st[i])], mk=MK[int(mk[i])], inBox=bool(inBox[i]),
         bars=len(df),
@@ -445,7 +459,7 @@ if __name__ == "__main__":
                 if a in t:
                     cands.add(t.replace(a, b))
         cands = [c for c in cands if c in have]
-        return max(cands, key=lambda c: counts[c]) if cands else None
+        return max(sorted(cands), key=lambda c: (counts[c], "/" in c)) if cands else None
 
     rows = []; missing = []
     for t in universe:

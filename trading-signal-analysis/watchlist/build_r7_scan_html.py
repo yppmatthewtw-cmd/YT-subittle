@@ -24,7 +24,7 @@ CRIT = [
     ("c3", "③ 波動指數 ≥ 75", "r7h_volidx 數值 ≥ 75（分隔線 80 之下一級；校準樣本 20 日內 ≥10% 回撤約 13%）"),
     ("c4", "④ 時鐘 6–10 點", "r7b_macd_clock 指針在 180°–300°：日線下跌周期已走 ≥ 50%，或上昇周期剛起步（9–10 點）"),
     ("c5", "⑤ 淺紅第 1–3 根", "MACD 柱狀圖 < 0 且回升（淺紅 #ffcdd2）已連續 1–3 根、中間未再加深 = 下跌動能峰值剛過"),
-    ("c6", "⑥ 價格貼近重心線", "收盤距 r7e 重心線 ≤ 1.0 × ATR14 或 ≤ 3%"),
+    ("c6", "⑥ 價格貼近重心線", "收盤距 r7e 重心線 ≤ 1.0 × ATR14 或 ≤ 3%（以收盤價為分母）"),
 ]
 CK = [c[0] for c in CRIT]
 NC = len(CK)
@@ -52,6 +52,7 @@ def row(r, i, mark=None):
     stale = r.date < meta["lastday"]
     tk = f'<a href="{TV}{esc(r.ticker)}" target="_blank" rel="noopener">{esc(r.ticker)}</a>'
     if stale: tk += f' <span class="stale" title="鏡像最後一根 {r.date}">舊 {r.date[5:]}</span>'
+    if isinstance(r.get("data_warn"), str) and r.get("data_warn"): tk += f' <span class="stale" title="{esc(r.data_warn)}">資料?</span>'
     cells = [
         f'<td class="rk">{i}</td>',
         f'<td class="tk">{tk}<span class="lst">{esc(r.lists).replace("+", " · ")}</span></td>',
@@ -112,7 +113,7 @@ CH = os.environ.get("CHATHITS_CSV", "")
 chd = pd.read_csv(CH) if (CH and os.path.exists(CH)) else None
 chat_html = ""
 if chd is not None:
-    SHORT = {"chat1 Combined R22": "C1", "chat2 SubSector R12": "C2", "chat2 AI Sector R13": "AI", "chat3 10MA R20": "10MA", "chat3 加息 R2": "加息"}
+    SHORT = {"chat1 10MA R20": "①10MA", "chat2 Combined R22": "②VCP", "chat3 SubSector R12": "③子板塊", "chat3 AI Sector R13": "③AI", "chat3 加息 R2": "③加息"}
 
     def chrow(r):
         tags = "".join(f'<em class="src">{esc(SHORT.get(x.strip(), x.strip()))}</em>' for x in str(r.hits).split("｜"))
@@ -126,18 +127,19 @@ if chd is not None:
 
     n3, n2, n1 = [int((chd.n_hit == k).sum()) for k in (3, 2, 1)]
     _bj = CH[:-4] + "_both.json"         # chat_hits.py 另寫的「同時六項全中」名單
-    both = json.load(open(_bj))["both"] if os.path.exists(_bj) else []
+    _bjd = json.load(open(_bj)) if os.path.exists(_bj) else {}
+    both = _bjd.get("both", []); SY = _bjd.get("sys", {})
     _six = set(strict.ticker)
     both = [t for t in strict.ticker if t in set(both)] + [t for t in both if t not in _six]
     chat_html = (
         '<h2>Chat 1–3 命中、六項未全中 <span class="n">%d 檔</span></h2>' % len(chd)
         + '<div class="note">三個 session 的成品各自用自己那套準則選中、但本掃描六項條件未全中的名字。'
           '命中規則一律採用來源成品自己寫明的通過標記：<br>'
-          '<b>C1</b> Combined R22：線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）→ 75/274 檔　'
-          '<b>C2</b> SubSector R12：所屬子板塊 5 日分 ≥70 且斜率 &gt;0 → 22/111 個子板塊　'
-          '<b>AI</b> AI Sector R13：所屬小群組 5 日分 ≥70 且個股 5 日強度 &gt;0 → 26 檔　'
-          '<b>10MA</b> R20：在總表（本版跌出 20 檔不算）→ 89 檔　'
-          '<b>加息</b> R2：受惠名單 19 檔（迴避名單不算命中，另標 ⚠）<br>'
+          f'<b>chat 1</b> 10MA R20：在總表（本版跌出 20 檔不算）→ {SY.get("10ma", "?")} 檔　'
+          f'<b>chat 2</b> Combined R22：線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）→ {SY.get("comb", "?")}/{SY.get("comb_all", "?")} 檔　'
+          f'<b>chat 3</b> SubSector R12：所屬子板塊 5 日分 ≥70 且斜率 &gt;0 → {SY.get("ss", "?")}/{SY.get("ss_all", "?")} 個子板塊；'
+          f'AI Sector R13：所屬小群組 5 日分 ≥70 且個股 5 日強度 &gt;0 → {SY.get("ai", "?")} 檔；'
+          f'加息 R2：受惠名單 {SY.get("rh", "?")} 檔（迴避名單 {SY.get("avoid", "?")} 檔不算命中，另標 ⚠）<br>'
           'chat 1–3 合共命中 %d 檔，其中 %d 檔同時六項全中（%s），餘下 %d 檔列於下表；'
           '本掃描六項全中的 %d 檔裡有 %d 檔是 chat 準則沒有選中的。'
           '同時命中 3 套 %d 檔、2 套 %d 檔、1 套 %d 檔。</div>' % (
@@ -197,7 +199,7 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 </style></head><body><div class="wrap">
 <header><h1>R7 A–H <em>六項條件掃描</em> {VER} ({stamp_t})</h1>
 <div class="sw"><button data-t="light">☀️ 淺色</button><button data-t="dark">🌙 深色</button></div>
-<div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b> · 另以 <b>{SD} Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）· 價格面板為三個 repo 的 Yahoo 鏡像合併（Yahoo 直連在本機被 proxy 封鎖，鏡像由各 repo 的 GitHub Actions 抓取）· 附件 4 份：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
+<div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b> · 另以 <b>{SD} Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）· 價格面板為三個 repo 的 Yahoo 鏡像合併（Yahoo 直連在本機被 proxy 封鎖，鏡像由各 repo 的 GitHub Actions 抓取）· 來源 5 份成品：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
 <div class="note">{HTML_NOTE}六項全中 <b>{len(strict)} 檔</b>。</div>
@@ -230,7 +232,7 @@ sw.forEach(b=>b.onclick=()=>setT(b.dataset.t));
 try{{const s=localStorage.getItem('r7theme');if(s)setT(s);else sw.forEach(b=>b.classList.toggle('on',(b.dataset.t==='dark')===matchMedia('(prefers-color-scheme:dark)').matches))}}catch(e){{}}
 let minS=0,q='';const rows=[...document.querySelectorAll('#all tbody tr')];
 function apply(){{rows.forEach(r=>{{r.style.display=(+r.dataset.score>=minS&&r.dataset.tk.includes(q))?'':'none'}})}}
-document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{{minS=+b.dataset.min;document.querySelectorAll('.filters button').forEach(x=>x.classList.toggle('on',x===b));apply()}});
+document.querySelectorAll('.filters button[data-min]').forEach(b=>b.onclick=()=>{{minS=+b.dataset.min;document.querySelectorAll('.filters button[data-min]').forEach(x=>x.classList.toggle('on',x===b));apply()}});
 document.getElementById('q').oninput=e=>{{q=e.target.value.trim().toUpperCase();apply()}};
 const chBox=document.getElementById('chat');
 if(chBox){{
