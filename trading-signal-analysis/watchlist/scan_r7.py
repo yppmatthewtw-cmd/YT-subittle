@@ -337,11 +337,15 @@ def load(verbose=True):
     cov0 = ohlc.groupby("date").symbol.nunique()
     last_full = cov0[cov0 >= 0.5 * cov0.max()].index.max() if len(cov0) else None
     known = set(ohlc.symbol.unique())
-    if USE_SNAP and os.path.isdir(SNAP_DIR) and last_full is not None:
+    # 缺口日：在最後完整日之前、但 OHLC 覆蓋不到一半的交易日（例如 Yahoo 始終沒出齊的 2026-09-22）。
+    # 整天丟掉會讓序列把前後兩日當成相鄰，所以一律用 Nasdaq 收盤快照補成「只有收盤」的一根（有 Yahoo 日線的照用 Yahoo）。
+    # 最後完整日之後的日子，仍只在 USE_SNAP=1 時才用快照補。
+    holes = set(cov0[(cov0 < 0.5 * cov0.max()) & (cov0.index < last_full)].index) if len(cov0) else set()
+    if os.path.isdir(SNAP_DIR) and last_full is not None:
         snaps = []
         for f in sorted(glob.glob(f"{SNAP_DIR}/*.csv")):
             dt = pd.Timestamp(os.path.basename(f)[:-4])
-            if dt <= last_full:
+            if not ((dt > last_full and USE_SNAP) or dt in holes):
                 continue
             try:
                 sn = pd.read_csv(f)
@@ -359,7 +363,7 @@ def load(verbose=True):
             sn["fend"] = str(dt.date())
             snaps.append(sn)
             if verbose:
-                print(f"snapshot {dt.date()}: +{len(sn)} 檔收盤（無盤中高低）")
+                print(f"snapshot {dt.date()}{'（缺口日）' if dt in holes else ''}: +{len(sn)} 檔收盤（無盤中高低）")
         if snaps:
             d0 = pd.concat([d0] + snaps, ignore_index=True)
     frames = [d0]

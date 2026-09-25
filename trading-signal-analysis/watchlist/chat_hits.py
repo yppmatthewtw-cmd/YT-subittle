@@ -4,8 +4,9 @@
 
 命中規則一律採用來源成品自己寫明的通過標記，不另設門檻：
 
-  chat 1  10MA_uptrend_watchlist_R20（10ma-watchlist，session_01U5TQY1…）
-          在「總表」= 已通過 10 日均線上升趨勢規則（本版跌出的 20 檔不算命中）。
+  chat 1  20MA_momentum_pullback_watchlist R21（10ma-watchlist，session_01U5TQY1…；R21 起取代 10MA R20）
+          在「總表」= 1/2/3/6 個月動能至少一個排前 10% 且五項回調形態全過（data/screen_mp21.json）；
+          「差一項」名單只掃描、不算命中。
   chat 2  Combined_Watchlist_R22（vcp-watchlist，session_01SVJ37W…）
           線上數 ≥ 1（至少一張榜顯示「線上」）且三榜中至少一個是該榜的頂級：
           VCP = A/B、Weinstein = 2A、Pre-breakout = A。
@@ -119,27 +120,21 @@ for _, r in con.iterrows():
          ai_group=f'{g[2]} {str(r["所屬群組"]).strip()}', ai_rank=g[1], ai_tf5=round(float(tf5), 4))
 print(f"chat3b {c3f}: {n_c3} / {len(con)} 檔成分股命中")
 
-# ── chat 1：10MA uptrend R20 ──────────────────────────────────────────────
-c4f = sorted([f for f in os.listdir(DELIV) if f.startswith("10MA_uptrend_watchlist_R")])[-1]
-m10 = pd.read_excel(f"{DELIV}/{c4f}", "總表", header=0)
-m10.columns = [str(c).replace("\n", "") for c in m10.columns]
-m10 = m10.dropna(subset=["代號"])
-m10 = m10[m10["排名"].apply(lambda v: str(v).strip().replace(".0", "").isdigit())]
-out20 = pd.read_excel(f"{DELIV}/{c4f}", "新上榜同跌出", header=0)
-dropped = {norm(r["代號"]) for _, r in out20.iterrows() if str(r.get("類別")).strip() == "跌出" and pd.notna(r.get("代號"))}
-for _, r in m10.iterrows():
-    if norm(r["代號"]) in dropped:
-        continue
-    tf = r.get("通過時間框")
-    # R20 的「確定性／綜合分數」兩欄整欄空白（來源工作簿本身沒填），只有 VCP 分數可用。
-    vcp10 = r.get("VCP")
-    mark(r["代號"], "k_10ma",
-         f'總表 #{int(r["排名"])}（通過 {int(tf) if pd.notna(tf) else "?"} 個時間框'
-         + (f'，VCP 分 {float(vcp10):.1f}' if pd.notna(vcp10) else '') + '）',
-         ma_rank=int(r["排名"]), ma_tf=tf, ma_vcp=vcp10, ma_flag=r.get("審視標記"),
-         name=r.get("公司"), ma_cat=r.get("催化句"))
-n_live = sum(1 for t in m10["代號"] if norm(t) not in dropped)
-print(f"chat1 {c4f}: {n_live} 檔在榜（跌出 {len(dropped)} 檔不算）")
+# ── chat 1：高動能回到 20MA R21（R21 起取代 10MA R20）────────────────────────
+# R21 工作簿的排名／分數全是公式（沒有快取值），所以讀同一 session 寫出的 screen_mp21.json。
+MPJ = os.environ.get("MP_JSON", "/home/user/yppmatthewtw-cmd/10ma-watchlist/data/screen_mp21.json")
+mp = json.load(open(MPJ))
+WIN = {21: "1月", 42: "2月", 63: "3月", 126: "6月"}
+for r in mp["rows"]:
+    fl = "；".join(f[1] for f in r.get("flags", []) if isinstance(f, (list, tuple)) and len(f) > 1)
+    mark(r["sym"], "k_10ma",
+         f'總表 #{int(r["rank"])}（動能 {"/".join(WIN[w] for w in r["hits_w"])}，爆發潛力 {r["score"]:.1f}）',
+         mp_rank=int(r["rank"]), mp_cov=int(r["hits"]), mp_win="/".join(WIN[w] for w in r["hits_w"]),
+         mp_score=round(float(r["score"]), 1), mp_mom=round(float(r["mom"]), 1), mp_pq=round(float(r["pq"]), 1),
+         mp_flag=fl, name=r.get("name"))
+n_live = len(mp["rows"])
+n_nm = len(mp.get("near_miss", []))
+print(f"chat1 {os.path.basename(MPJ)}（{mp['meta']['last_date']}）: {n_live} 檔上總表（差一項 {n_nm} 檔只掃描、不算命中）")
 
 # ── chat 3c：加息與地緣政治 3 日清單 R2 ─────────────────────────────────────
 rh = json.load(open(f"{S}/ratehike_r2.json"))
@@ -165,7 +160,7 @@ if upd_csv and os.path.exists(upd_csv):
 else:
     d["four_17"] = pd.NA; d["close_17"] = pd.NA; d["chg1d_pct"] = pd.NA; d["clock_17"] = pd.NA
 
-LBL = {"k_10ma": "chat1 10MA R20", "k_comb": "chat2 Combined R22", "k_ss": "chat3 SubSector R12",
+LBL = {"k_10ma": "chat1 動能回調 R21", "k_comb": "chat2 Combined R22", "k_ss": "chat3 SubSector R12",
        "k_ai": "chat3 AI Sector R13", "k_rh": "chat3 加息 R2"}
 ORDER = ("k_10ma", "k_comb", "k_ss", "k_ai", "k_rh")
 rows = []
@@ -182,8 +177,8 @@ for _, r in d.iterrows():
         comb_grade=v.get("comb_grade", ""), comb_up=v.get("comb_up"), comb_sure=v.get("comb_sure"),
         ss_rank=v.get("ss_rank"), ss_score=v.get("ss_score"), ss_name=v.get("ss_name", ""),
         ai_group=v.get("ai_group", ""), ai_rank=v.get("ai_rank"), ai_tf5=v.get("ai_tf5"),
-        ma_rank=v.get("ma_rank"), ma_tf=v.get("ma_tf"), ma_vcp=v.get("ma_vcp"), ma_flag=v.get("ma_flag", ""),
-        rh=v.get("rh", ""), catalyst=str(v.get("comb_cat", "") or v.get("ma_cat", "") or "")[:60],
+        mp_rank=v.get("mp_rank"), mp_win=v.get("mp_win", ""), mp_score=v.get("mp_score"), mp_flag=v.get("mp_flag", ""),
+        rh=v.get("rh", ""), catalyst=str(v.get("comb_cat", "") or "")[:60],
         score=r["score"], miss=r["miss"],
         close=r["close"], volidx=r["volidx"], volidx_slope=r["volidx_slope"], grav_slope=r["grav_slope"],
         clock=r["clock"], c5_cat=r["c5_cat"], dist_grav_pct=r["dist_grav_pct"],
@@ -196,7 +191,7 @@ o = pd.DataFrame(rows).sort_values(["score", "n_hit", "volidx"], ascending=[Fals
 o.to_csv(out_csv, index=False, encoding="utf-8-sig")
 both = [r.ticker for _, r in d.iterrows() if r["score"] == NC and r["key"] in hit]
 json.dump({"both": both, "n_chat_only": len(o),
-           "sys": {"10ma": n_live, "comb": n_c1, "comb_all": len(c1), "ss": n_c2, "ss_all": len(c2), "ai": n_c3,
+           "sys": {"10ma": n_live, "mp_nm": n_nm, "comb": n_c1, "comb_all": len(c1), "ss": n_c2, "ss_all": len(c2), "ai": n_c3,
                    "rh": len(rh.get("benefit", [])), "avoid": len(avoid)}}, open(out_csv[:-4] + "_both.json", "w"), ensure_ascii=False)   # 給報表寫「同時六項全中」一句
 print(f"\nchat 1–3 命中合共 {len(o) + len(both)} 檔，其中 {len(both)} 檔同時六項全中（{'、'.join(both)}）")
 print(f"六項全中 {int((d.score == NC).sum())} 檔已排除；chat 1–3 命中但未過六項：{len(o)} 檔")

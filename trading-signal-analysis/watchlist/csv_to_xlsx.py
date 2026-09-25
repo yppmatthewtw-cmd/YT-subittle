@@ -19,6 +19,7 @@ VER = os.environ.get("VER", "r7")
 DATA_NOTE = os.environ.get("DATA_NOTE", "")
 PANEL_NOTE = os.environ.get("PANEL_NOTE", "")
 FIX_NOTE = os.environ.get("FIX_NOTE", "")
+SCOPE_NOTE = os.environ.get("SCOPE_NOTE", "")
 COLS = [  # (csv 欄, Excel 標題, 格式)
     ("ticker", "Ticker", "link"), ("lists", "來源榜單", "txt"), ("date", "數據日", "txt"), ("close", "收盤", "num2"), ("score", "命中 /6", "int"),
     ("c1", "① 重心線向上", "tick"), ("grav", "重心線", "num2"), ("grav_slope", "重心斜率", "num3"), ("grav_shift5atr", "重心 5 根位移 (ATR)", "num2"),
@@ -105,11 +106,14 @@ if CH and os.path.exists(CH):
               ("comb_grade", "chat2 VCP/Wein/Pre", "txt"), ("comb_up", "chat2 上升分數", "num1"), ("comb_sure", "chat2 確定性", "num1"),
               ("ss_name", "chat3 子板塊", "txt"), ("ss_rank", "子板塊名次", "int"), ("ss_score", "子板塊 5 日分", "num1"),
               ("ai_group", "chat3 AI 小群組", "txt"), ("ai_rank", "AI 群組名次", "int"), ("ai_tf5", "AI 個股 5 日強度", "num3"),
-              ("ma_rank", "chat1 10MA 排名", "int"), ("ma_tf", "通過時間框", "int"), ("ma_vcp", "10MA VCP 分", "num1"),
-              ("ma_flag", "10MA 審視標記", "txt"), ("rh", "chat3 加息 R2", "txt"),
+              ("mp_rank", "chat1 R21 排名", "int"), ("mp_win", "R21 動能時間框", "txt"), ("mp_score", "R21 爆發潛力", "num1"),
+              ("mp_flag", "R21 審視標記", "txt"), ("rh", "chat3 加息 R2", "txt"),
               ("four_17", f"{SD} ①④⑤⑥", "tick"), ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", f"{BD}→{SD} %", "num2"),
               ("turnover20_m", "20 日均額 (百萬)", "num1"), ("bars", "歷史根數", "int"), ("hist_ok", "歷史足夠 ≥250", "tick"),
               ("vcp", "VCP 指數 (參考)", "num1"), ("struct", "結構", "txt"), ("lists", "來源榜單", "txt")]
+
+    if not (os.environ.get("UPDATE_CSV") and os.path.exists(os.environ.get("UPDATE_CSV"))):
+        CHCOLS = [c for c in CHCOLS if c[0] not in ("four_17", "close_17", "chg1d_pct")]
 
     def chsheet(name, df, note):
         w = wb.create_sheet(name)
@@ -134,7 +138,7 @@ if CH and os.path.exists(CH):
         w.auto_filter.ref = f"A2:{get_column_letter(len(CHCOLS))}{max(3, 2 + len(df))}"
         for j, (k, h, f) in enumerate(CHCOLS, 1):
             w.column_dimensions[get_column_letter(j)].width = (
-                58 if k == "detail" else 30 if k in ("hits", "ai_group", "catalyst", "ma_flag", "lists") else
+                58 if k == "detail" else 30 if k in ("hits", "ai_group", "catalyst", "mp_flag", "lists") else
                 20 if k in ("name", "ss_name", "comb_grade") else
                 9 if f in ("tick", "num1", "num2", "num3", "int") else 12)
         w.row_dimensions[2].height = 32
@@ -142,7 +146,7 @@ if CH and os.path.exists(CH):
 
     chsheet("Chat1-3 命中 未過六項", ch,
             "三個 session 各自用自己那套準則選中、但 R7 六項條件未全中的 %d 檔。命中規則（一律採用來源成品自己的通過標記）："
-            "chat1 10MA R20 = 在總表（本版跌出 20 檔不算）；"
+            "chat1 動能回調 R21 = 在總表（1/2/3/6 個月動能至少一個排前 10% 且回到上升中的 20MA；差一項名單不算）；"
             "chat2 Combined R22 = 線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）；"
             "chat3 SubSector R12 = 所屬子板塊 5 日分 ≥70 且斜率 >0；"
             "chat3 AI Sector R13 = 所屬小群組 5 日分 ≥70 且個股 5 日強度 >0；chat3 加息 R2 = 受惠名單。"
@@ -193,6 +197,53 @@ if UPD and os.path.exists(UPD):
     usheet(f"{SD} 已失效", lost, f"{BD} 六項全中、但 {SD} 收盤已有一項不成立（多數是 ⑤ 淺紅中斷）：{len(lost)} 檔。")
     usheet(f"{SD} 新符合", fresh, f"{SD} 收盤下 ①④⑤⑥ 成立、且 {BD} 的 ②③（波動指數）也通過的候補：{len(fresh)} 檔。快照無盤中高低，②③ 用 {BD} 值。")
 
+# 與上版對照（可選）：上一版六項全中與本版六項全中的延續／新進／退出
+PREV = os.environ.get("PREV_CSV", "")
+PV = os.environ.get("PREV_VER", "上版"); PD_ = os.environ.get("PREV_DAY", "")
+if PREV and os.path.exists(PREV):
+    pv = pd.read_csv(PREV).set_index("ticker")
+    cur = d.set_index("ticker")
+    CNM = {"c1": "①", "c2": "②", "c3": "③", "c4": "④", "c5": "⑤", "c6": "⑥"}
+    rows = []
+    for t in list(full.ticker) + [t for t in pv.index[pv.score == NC] if t not in set(full.ticker)]:
+        p6 = t in pv.index and int(pv.loc[t, "score"]) == NC
+        c = cur.loc[t] if t in cur.index else None
+        st = "延續" if (p6 and c is not None and int(c.score) == NC) else ("新進" if not p6 else ("退出" if c is not None else "已不在來源榜單"))
+        rows.append(dict(ticker=t, status=st, lists=(c["lists"] if c is not None else pv.loc[t, "lists"]),
+                         prev_score=int(pv.loc[t, "score"]) if t in pv.index else None,
+                         score=int(c.score) if c is not None else None,
+                         miss="".join(CNM[k] for k in CNM if c is not None and not bool(c[k])),
+                         close=c.close if c is not None else None, volidx=c.volidx if c is not None else None,
+                         clock=c.clock if c is not None else "", c5_cat=c.c5_cat if c is not None else ""))
+    cmp_ = pd.DataFrame(rows)
+    cmp_["_o"] = cmp_.status.map({"延續": 0, "新進": 1, "退出": 2, "已不在來源榜單": 3})
+    cmp_ = cmp_.sort_values(["_o", "volidx"], ascending=[True, False]).drop(columns="_o")
+    PCOLS = [("ticker", "Ticker", "link"), ("status", "狀態", "txt"), ("lists", "來源榜單", "txt"),
+             ("prev_score", f"{PV} 命中 /6（{PD_}）", "int"), ("score", f"本版命中 /6（{BD}）", "int"), ("miss", "本版欠缺", "txt"),
+             ("close", f"{BD} 收盤", "num2"), ("volidx", "波動指數", "num1"), ("clock", "時鐘", "txt"), ("c5_cat", "淺紅第幾根", "txt")]
+    wp = wb.create_sheet(f"與 {PV} 對照")
+    k_ = cmp_.status.value_counts().to_dict()
+    wp.cell(1, 1, f"{PV}（{PD_} 基準）六項全中 {int((pv.score == NC).sum())} 檔 vs 本版（{BD} 基準）{len(full)} 檔："
+                  f"延續 {k_.get('延續', 0)}、新進 {k_.get('新進', 0)}、退出 {k_.get('退出', 0)}"
+                  + (f"、已不在來源榜單 {k_['已不在來源榜單']}" if k_.get('已不在來源榜單') else "") + "。").font = Font(italic=True, color="64748B")
+    for j, (_, h, _) in enumerate(PCOLS, 1):
+        c = wp.cell(2, j, h); c.font = Font(bold=True); c.fill = HEAD_FILL
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for i, (_, r) in enumerate(cmp_.iterrows(), 3):
+        for j, (k, _, f) in enumerate(PCOLS, 1):
+            v = r[k]
+            if f == "link":
+                c = wp.cell(i, j, str(v)); c.hyperlink = TV + str(v); c.font = LINK
+            elif f in FMT:
+                c = wp.cell(i, j, None if pd.isna(v) else float(v)); c.number_format = FMT[f]
+            else:
+                c = wp.cell(i, j, "" if pd.isna(v) else (str(v).replace("+", " · ") if k == "lists" else str(v)))
+            c.border = Border(bottom=thin)
+    wp.freeze_panes = wp.cell(3, 2)
+    for j, (k, h, f) in enumerate(PCOLS, 1):
+        wp.column_dimensions[get_column_letter(j)].width = 30 if k == "lists" else (12 if f in ("num1", "num2", "int") else 14)
+    wp.row_dimensions[2].height = 32
+
 # 來源分頁（可選）：三個 session 的最新成品出處
 SRC_ROWS = os.environ.get("SRC_ROWS", "")
 if SRC_ROWS and os.path.exists(SRC_ROWS):
@@ -234,10 +285,10 @@ for i, t in enumerate([t for t in [
     "⑥ 貼近重心線：收盤距重心線 ≤ 1.0 × ATR14 或 ≤ 3%（% 以收盤價為分母，與「距重心 %」欄相同）",
     "VCP / 結構 / 最低阻力線 只作參考，不計分。MA20 與 EMA21 已刪除。",
     "Ticker 欄為 TradingView 圖表超連結（Q1c5VWwD 版面）。",
-    "來源榜單欄會標明名字的身分：10MA_R20（在榜 89）· 10MA_R20_跌出（本版被剔除 20）· RateHike_R2_受惠 / _迴避 / _索引（chat 3 SubSector session 09-18 的加息與地緣政治 3 日清單）。六項全中裡若出現「跌出」或「迴避」標籤，代表原榜單本身不推薦，請自行判斷。",
+    "來源榜單欄會標明名字的身分：MP_R21（chat 1 動能回調總表）· MP_R21_差一項（形態只差一項，只掃描）· RateHike_R2_受惠 / _迴避 / _索引（chat 3 SubSector session 09-18 的加息與地緣政治 3 日清單）。六項全中裡若出現「跌出」或「迴避」標籤，代表原榜單本身不推薦，請自行判斷。",
     PANEL_NOTE,
     FIX_NOTE,
-    f"10MA R20 的 109 檔 = 89 檔在榜 + 20 檔本版跌出（新上榜同跌出 分頁），兩者都掃；{len(d)} 檔全部掃到，0 檔缺資料。",
+    SCOPE_NOTE or f"{len(d)} 檔全部掃到，0 檔缺資料。",
     CH_NOTE,
     UNI_NOTE,
     "① 用的是「重心線 1 根斜率 > 0」（六項條件的原文）。R7-E 自己把線塗綠的條件較嚴：5 根位移 ≥ 0.8 ATR；表中已附「重心 5 根位移 (ATR)」欄，可自行加嚴。",

@@ -109,11 +109,27 @@ if mupd is not None:
         + '<b>已失效（%d，多數是 ⑤ 淺紅中斷）</b>：%s<br>' % (len(lost), _row_names(lost))
         + f'<b>{SD} 新符合（{len(fresh)}，①④⑤⑥ 成立且 {BD} 的 ②③ 也過）</b>：{_row_names(fresh)}</div>')
 
+# 與上版對照（可選）
+PREV = os.environ.get("PREV_CSV", ""); PV = os.environ.get("PREV_VER", "上版"); PD_ = os.environ.get("PREV_DAY", "")
+if PREV and os.path.exists(PREV):
+    _pv = pd.read_csv(PREV); _p6 = set(_pv[_pv.score == NC].ticker); _c6 = list(strict.ticker)
+    _cur = d.set_index("ticker")
+    _keep = [t for t in _c6 if t in _p6]; _new = [t for t in _c6 if t not in _p6]
+    _out = [t for t in _pv[_pv.score == NC].ticker if t not in set(_c6)]
+    def _why(t):
+        if t not in _cur.index: return f"{esc(t)}（已不在來源榜單）"
+        r = _cur.loc[t]; m = "".join(k[1][0] for k in CRIT if not r[k[0]])
+        return f"{esc(t)}（{int(r.score)}/{NC}，缺 {m}）"
+    upd_html += (f'<h2>與 {PV} 對照 <span class="n">{PV}（{PD_} 基準）六項全中 {len(_p6)} 檔 → 本版（{BD} 基準）{len(_c6)} 檔</span></h2>'
+                 f'<div class="note"><b>延續（{len(_keep)}）</b>：{" · ".join(map(esc, _keep)) or "—"}<br>'
+                 f'<b>新進（{len(_new)}）</b>：{" · ".join(map(esc, _new)) or "—"}<br>'
+                 f'<b>退出（{len(_out)}）</b>：{" · ".join(_why(t) for t in _out) or "—"}</div>')
+
 CH = os.environ.get("CHATHITS_CSV", "")
 chd = pd.read_csv(CH) if (CH and os.path.exists(CH)) else None
 chat_html = ""
 if chd is not None:
-    SHORT = {"chat1 10MA R20": "①10MA", "chat2 Combined R22": "②VCP", "chat3 SubSector R12": "③子板塊", "chat3 AI Sector R13": "③AI", "chat3 加息 R2": "③加息"}
+    SHORT = {"chat1 動能回調 R21": "①動能", "chat2 Combined R22": "②VCP", "chat3 SubSector R12": "③子板塊", "chat3 AI Sector R13": "③AI", "chat3 加息 R2": "③加息"}
 
     def chrow(r):
         tags = "".join(f'<em class="src">{esc(SHORT.get(x.strip(), x.strip()))}</em>' for x in str(r.hits).split("｜"))
@@ -135,7 +151,7 @@ if chd is not None:
         '<h2>Chat 1–3 命中、六項未全中 <span class="n">%d 檔</span></h2>' % len(chd)
         + '<div class="note">三個 session 的成品各自用自己那套準則選中、但本掃描六項條件未全中的名字。'
           '命中規則一律採用來源成品自己寫明的通過標記：<br>'
-          f'<b>chat 1</b> 10MA R20：在總表（本版跌出 20 檔不算）→ {SY.get("10ma", "?")} 檔　'
+          f'<b>chat 1</b> 動能回調 R21：在總表（1/2/3/6 個月動能排前 10% 且回到上升中的 20MA；差一項 {SY.get("mp_nm", "?")} 檔只掃描）→ {SY.get("10ma", "?")} 檔　'
           f'<b>chat 2</b> Combined R22：線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）→ {SY.get("comb", "?")}/{SY.get("comb_all", "?")} 檔　'
           f'<b>chat 3</b> SubSector R12：所屬子板塊 5 日分 ≥70 且斜率 &gt;0 → {SY.get("ss", "?")}/{SY.get("ss_all", "?")} 個子板塊；'
           f'AI Sector R13：所屬小群組 5 日分 ≥70 且個股 5 日強度 &gt;0 → {SY.get("ai", "?")} 檔；'
