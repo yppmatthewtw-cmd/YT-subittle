@@ -304,6 +304,9 @@ def _files():
     return out
 
 
+STALE_SNAPS = []   # load() 判定為過期、未使用的快照日期
+
+
 def load(verbose=True):
     """合併所有鏡像檔；同一 symbol×date 取優先度最高的來源。
     prio 0 = 官方 EOD（有 OHLC）
@@ -341,11 +344,34 @@ def load(verbose=True):
     # 整天丟掉會讓序列把前後兩日當成相鄰，所以一律用 Nasdaq 收盤快照補成「只有收盤」的一根（有 Yahoo 日線的照用 Yahoo）。
     # 最後完整日之後的日子，仍只在 USE_SNAP=1 時才用快照補。
     holes = set(cov0[(cov0 < 0.5 * cov0.max()) & (cov0.index < last_full)].index) if len(cov0) else set()
+    # 完整交易日（≤ 最後完整日）上個別缺漏的名字（例如 Yahoo 沒給 HUBB 09-24）也用當日收盤快照補，
+    # 但只補該日前後 7 天內仍有 OHLC 的名字，避免把已下市、代號被重用的公司接到舊序列後面。
+    last_ohlc = ohlc.groupby("symbol").date.max()
     if os.path.isdir(SNAP_DIR) and last_full is not None:
         snaps = []
+        prev_px = None                      # 上一份快照的收盤（偵測「過期快照」用）
         for f in sorted(glob.glob(f"{SNAP_DIR}/*.csv")):
             dt = pd.Timestamp(os.path.basename(f)[:-4])
-            if not ((dt > last_full and USE_SNAP) or dt in holes):
+            # 過期快照：與上一份快照的收盤 ≥90% 逐檔相同 → 其實是前一交易日的資料（例如 10MA repo 的 2026-09-24.csv
+            # 與 09-23.csv 完全相同），不可當成當天收盤。
+            try:
+                _raw = pd.read_csv(f, usecols=["symbol", "lastsale"])
+                _px = pd.Series(pd.to_numeric(_raw.lastsale.astype(str).str.replace(r"[$,]", "", regex=True), errors="coerce").values,
+                                index=_raw.symbol.astype(str).str.upper().str.strip())
+                _px = _px[~_px.index.duplicated()]
+            except Exception:
+                _px = None
+            if _px is not None and prev_px is not None:
+                _c = _px.index.intersection(prev_px.index)
+                if len(_c) and (_px[_c] == prev_px[_c]).mean() >= 0.9:
+                    STALE_SNAPS.append(str(dt.date()))
+                    if verbose:
+                        print(f"snapshot {dt.date()}: 與上一份快照 {(_px[_c] == prev_px[_c]).mean():.1%} 相同 → 過期，不使用")
+                    continue
+            if _px is not None:
+                prev_px = _px
+            fill_gap = dt <= last_full and dt not in holes
+            if not ((dt > last_full and USE_SNAP) or dt in holes or fill_gap):
                 continue
             try:
                 sn = pd.read_csv(f)
@@ -358,12 +384,16 @@ def load(verbose=True):
             sn = pd.DataFrame({"symbol": sn["symbol"].astype(str).str.upper().str.strip(), "date": dt,
                                "open": px, "high": px, "low": px, "close": px, "adj_close": px, "volume": vol})
             sn = sn[sn.symbol.isin(known)].dropna(subset=["close"])
+            if fill_gap or dt in holes:
+                have_day = set(ohlc.symbol[ohlc.date == dt])
+                recent = set(last_ohlc.index[last_ohlc >= dt - pd.Timedelta(days=7)])
+                sn = sn[~sn.symbol.isin(have_day) & sn.symbol.isin(recent)]
             sn["route"] = "snapshot-close"
             sn["prio"] = 1
             sn["fend"] = str(dt.date())
             snaps.append(sn)
             if verbose:
-                print(f"snapshot {dt.date()}{'（缺口日）' if dt in holes else ''}: +{len(sn)} 檔收盤（無盤中高低）")
+                print(f"snapshot {dt.date()}{'（缺口日）' if dt in holes else ('（補個別缺漏）' if fill_gap else '')}: +{len(sn)} 檔收盤（無盤中高低）")
         if snaps:
             d0 = pd.concat([d0] + snaps, ignore_index=True)
     frames = [d0]

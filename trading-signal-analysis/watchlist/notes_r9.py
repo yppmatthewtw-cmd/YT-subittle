@@ -31,10 +31,20 @@ y = y.drop_duplicates(["symbol", "date"])
 cov = y.groupby("date").symbol.nunique().to_dict()
 full_n = max(cov.values())
 
+def _snap(dt):
+    sn = pd.read_csv(f"{SNAPD}/{dt}.csv")
+    sn["px"] = pd.to_numeric(sn.lastsale.astype(str).str.replace(r"[$,]", "", regex=True), errors="coerce")
+    sn["symbol"] = sn.symbol.astype(str).str.upper().str.strip()
+    return sn.drop_duplicates("symbol").set_index("symbol").px
+# 過期快照：與前一份快照逐檔相同（10MA repo 的 2026-09-24.csv 就是 09-23 的資料）
+p23, p24 = _snap("2026-09-23"), _snap("2026-09-24")
+_c = p23.index.intersection(p24.index)
+same24 = float((p23[_c] == p24[_c]).mean())
+stale24 = same24 >= 0.9
 chk = {}
 for dt in ("2026-09-22", "2026-09-23", "2026-09-24"):
     fp = f"{SNAPD}/{dt}.csv"
-    if not os.path.exists(fp):
+    if not os.path.exists(fp) or (dt == "2026-09-24" and stale24):
         continue
     sn = pd.read_csv(fp)
     sn["px"] = pd.to_numeric(sn.lastsale.astype(str).str.replace(r"[$,]", "", regex=True), errors="coerce")
@@ -43,6 +53,16 @@ for dt in ("2026-09-22", "2026-09-23", "2026-09-24"):
     dc = (m.close / m.px - 1).abs() * 100
     chk[dt] = (len(m), float(dc.max()) if len(m) else 0.0, int((dc > 0.05).sum()))
 used = set(b.symbol_used)
+# 完整交易日上個別缺漏、以 Nasdaq 收盤補的 watchlist 名字（快取：面板載入約 1 分鐘）
+cache = f"{S}/r9_gapfill.json"
+if not os.path.exists(cache):
+    os.environ["USE_SNAP"] = "0"
+    import scan_r7
+    pn = scan_r7.load(verbose=False)
+    gf = pn[(pn.prio == 1) & (pn.date != "2026-09-22") & pn.symbol.isin(used)]
+    json.dump({s_: sorted(str(x.date()) for x in g.date) for s_, g in gf.groupby("symbol")}, open(cache, "w"))
+gapfill = json.load(open(cache))
+gf_txt = "、".join(k + "（" + "、".join(x[5:] for x in v) + "）" for k, v in gapfill.items())
 wl_y22 = len(used & set(y[y.date == "2026-09-22"].symbol))
 sn22 = pd.read_csv(f"{SNAPD}/2026-09-22.csv"); sn22s = set(sn22.symbol.astype(str).str.upper().str.strip())
 wl_hole = len(used - set(y[y.date == "2026-09-22"].symbol))
@@ -54,7 +74,10 @@ data = (f"本版資料：再次觸發三個 repo 的 GitHub Actions（fetch_yaho
         f"09-22 則成了永久缺口：Yahoo 始終只出了 {cov.get('2026-09-22', 0):,} 檔（完整交易日約 {full_n:,} 檔；chat 1 的 R21 也記錄了同一個缺口）。"
         f"整天丟掉會讓 09-21 直接接 09-23、指標錯位，所以 09-22 用 10MA repo 的 Nasdaq 官方收盤快照補成「只有收盤」的一根（O=H=L=C）；"
         f"掃描的 {len(b)} 檔中 {wl_y22} 檔 09-22 有 Yahoo 完整日線照用，其餘 {wl_hole} 檔用 Nasdaq 收盤（{wl_hole_nas} 檔在快照內）。"
-        f"這一根的真實波幅被低估，會讓 ATR14 與 R7-H 波動指數略為偏低、約 14 個交易日後淡出。"
+        + (f"完整交易日上 Yahoo 個別缺漏的名字也用當日 Nasdaq 收盤補：{gf_txt}。" if gapfill else "")
+        + f"這一根的真實波幅被低估，會讓 ATR14 與 R7-H 波動指數略為偏低、約 14 個交易日後淡出。"
+        + (f"注意：10MA repo 的「2026-09-24」Nasdaq 快照與 09-23 的快照 {same24:.0%} 逐檔相同，價格等於 09-23 收盤，是過期資料；"
+           "載入器已偵測並略過它（09-24 一律用 Yahoo 日線）。" if stale24 else "")
         + "兩個來源重疊的收盤逐檔比對：" + "、".join(f"{k[5:]} {v[0]:,} 檔最大差 {v[1]:.3f}%" for k, v in chk.items())
         + f"，差 >0.05% 合計 {sum(v[2] for v in chk.values())} 檔。")
 
@@ -75,7 +98,8 @@ scope = (f"掃描 {len(u9)} 檔 = 五份成品去重："
 # ── 與 r8 對照 ──
 s8 = set(p8[p8.score == 6].ticker); s9 = set(b[b.score == 6].ticker)
 fix = (f"r9 的變動：(1) chat 1 改用 R21（{mp['meta']['last_date']} 收盤，總表 {len(mp['rows'])} 檔，差一項 {len(mp['near_miss'])} 檔只掃描不算命中）。"
-       f"(2) 載入器新增「缺口日」規則：最後完整日之前、OHLC 覆蓋不到一半的交易日，若有 Nasdaq 收盤快照就補成只有收盤的一根（本版只有 09-22）。"
+       f"(2) 載入器新增兩條補值規則：最後完整日之前、OHLC 覆蓋不到一半的「缺口日」（本版只有 09-22），以及完整交易日上個別名字的缺漏，"
+       f"若有 Nasdaq 收盤快照就補成只有收盤的一根；只補前後 7 天內仍有 Yahoo 日線的名字，避免把已下市、代號被重用的公司接上舊序列。"
        f"(3) 六項基準由 r8 的 09-21 推進到 {BASE[5:]}，最新一日是完整 OHLC，所以不再需要「收盤快照更新」分頁，改附「與 r8 對照」："
        f"r8 六項全中 {len(s8)} 檔 → 本版 {len(s9)} 檔，延續 {len(s8 & s9)}、新進 {len(s9 - s8)}、退出 {len(s8 - s9)}。")
 off = u[(u.score == 6) & (~u.ticker.isin(set(b.ticker)))]
@@ -99,6 +123,6 @@ src.loc[src.Session == "加掃", ["Repo / 取得方式", "成品基準日", "取
 src.loc[len(src)] = ["價格資料", "三個 repo 的 fetch_yahoo_eod（09-25 01:3x UTC）＋ 10MA fetch_eod_snapshot（09-22 缺口補收盤）",
                      f"完整 OHLC 至 {BASE}；09-22 為缺口日，Yahoo 沒有的名字用 Nasdaq 官方收盤", BASE, os.environ.get("PANEL_N", "?")]
 src.to_csv(f"{S}/src_rows_r9.csv", index=False, encoding="utf-8-sig")
-print(json.dumps({"cov": cov, "chk": chk, "wl_y22": wl_y22, "wl_hole": wl_hole, "wl_hole_nas": wl_hole_nas, "only20": len(only20),
+print(json.dumps({"stale24": stale24, "same24": same24, "cov": cov, "chk": chk, "wl_y22": wl_y22, "wl_hole": wl_hole, "wl_hole_nas": wl_hole_nas, "only20": len(only20),
                   "six8": len(s8), "six9": len(s9), "keep": sorted(s8 & s9), "new": sorted(s9 - s8), "out": sorted(s8 - s9),
                   "uni": len(u), "u6": int((u.score == 6).sum()), "off": len(off), "warn": warn.ticker.tolist()}, ensure_ascii=False))

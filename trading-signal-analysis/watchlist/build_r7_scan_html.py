@@ -151,7 +151,7 @@ if chd is not None:
         '<h2>Chat 1–3 命中、六項未全中 <span class="n">%d 檔</span></h2>' % len(chd)
         + '<div class="note">三個 session 的成品各自用自己那套準則選中、但本掃描六項條件未全中的名字。'
           '命中規則一律採用來源成品自己寫明的通過標記：<br>'
-          f'<b>chat 1</b> 動能回調 R21：在總表（1/2/3/6 個月動能排前 10% 且回到上升中的 20MA；差一項 {SY.get("mp_nm", "?")} 檔只掃描）→ {SY.get("10ma", "?")} 檔　'
+          f'<b>chat 1</b> 動能回調 R21：在總表（1/2/3/6 個月動能排前 10%% 且回到上升中的 20MA；差一項 {SY.get("mp_nm", "?")} 檔只掃描）→ {SY.get("10ma", "?")} 檔　'
           f'<b>chat 2</b> Combined R22：線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）→ {SY.get("comb", "?")}/{SY.get("comb_all", "?")} 檔　'
           f'<b>chat 3</b> SubSector R12：所屬子板塊 5 日分 ≥70 且斜率 &gt;0 → {SY.get("ss", "?")}/{SY.get("ss_all", "?")} 個子板塊；'
           f'AI Sector R13：所屬小群組 5 日分 ≥70 且個股 5 日強度 &gt;0 → {SY.get("ai", "?")} 檔；'
