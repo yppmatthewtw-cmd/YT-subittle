@@ -224,8 +224,8 @@ if PREV and os.path.exists(PREV):
     wp = wb.create_sheet(f"與 {PV} 對照")
     k_ = cmp_.status.value_counts().to_dict()
     wp.cell(1, 1, f"{PV}（{PD_} 基準）六項全中 {int((pv.score == NC).sum())} 檔 vs 本版（{BD} 基準）{len(full)} 檔："
-                  f"延續 {k_.get('延續', 0)}、新進 {k_.get('新進', 0)}、退出 {k_.get('退出', 0)}"
-                  + (f"、已不在來源榜單 {k_['已不在來源榜單']}" if k_.get('已不在來源榜單') else "") + "。").font = Font(italic=True, color="64748B")
+                  f"延續 {k_.get('延續', 0)}、新進 {k_.get('新進', 0)}、退出 {k_.get('退出', 0) + k_.get('已不在來源榜單', 0)}"
+                  + (f"（其中 {k_['已不在來源榜單']} 檔已不在來源榜單）" if k_.get('已不在來源榜單') else "") + "。").font = Font(italic=True, color="64748B")
     for j, (_, h, _) in enumerate(PCOLS, 1):
         c = wp.cell(2, j, h); c.font = Font(bold=True); c.fill = HEAD_FILL
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -269,9 +269,11 @@ if CH and os.path.exists(CH):
     _bjd = json.load(open(_bj)) if os.path.exists(_bj) else None
     _ch_all = set(_bjd["both"]) if _bjd else None
     _bav = set(_bjd.get("both_avoid", [])) if _bjd else set()
+    _sav = [t for t in (_bjd.get("six_avoid", []) if _bjd else []) if t not in (_ch_all or set())]
     _ov = [t for t in full.ticker if _ch_all is not None and t in _ch_all]
     CH_NOTE = ("「Chat1-3 命中 未過六項」分頁：三個 session 各自的成品用自己那套準則選中、但本掃描六項未全中的名字，另按命中 1 / 2 / 3 套拆成子分頁。命中規則寫在該分頁第一行。"
-               + (f"本版六項全中 {len(full)} 檔裡有 {len(_ov)} 檔同時是 chat 命中（{'、'.join(t + ('（加息清單「迴避」）' if t in _bav else '') for t in _ov)}），其餘 {len(full) - len(_ov)} 檔是本掃描獨有。" if _ch_all is not None else ""))
+               + (f"本版六項全中 {len(full)} 檔裡有 {len(_ov)} 檔同時是 chat 命中（{'、'.join(t + ('（加息清單「迴避」）' if t in _bav else '') for t in _ov)}），其餘 {len(full) - len(_ov)} 檔是本掃描獨有"
+          + (f"（其中 {'、'.join(_sav)} 在加息清單「迴避」）" if _sav else "") + "。" if _ch_all is not None else ""))
 if UNI and os.path.exists(UNI):
     UNI_NOTE = f"「加掃 六項全中」分頁：合併面板中收盤 ≥ $2、20 日 (收盤×量) 平均 ≥ 300 萬美元、歷史 ≥ 80 根、最後一根在 {BD}、同證券不同寫法只留一個的 {len(u):,} 檔全掃一次的結果（六項全中 {len(uf)} 檔，其中 {(uf.lists == '榜外').sum()} 檔不在五份來源成品內），含 watchlist 以外的名字。"
 
@@ -296,7 +298,7 @@ for i, t in enumerate([t for t in [
     UNI_NOTE,
     "① 用的是「重心線 1 根斜率 > 0」（六項條件的原文）。R7-E 自己把線塗綠的條件較嚴：5 根位移 ≥ 0.8 ATR；表中已附「重心 5 根位移 (ATR)」欄，可自行加嚴。",
     "③ 門檻用 75（六項條件原文）。R7-H 圖上那條綠色分隔線預設在 80，所以有些通過 ③ 的名字在圖上仍在線下。",
-    "④ 時鐘：MACD 柱狀圖在 Pine 的前 33 根是 na（EMA 要等 SMA 種子），本掃描已照做，並丟掉含第一根有效柱的那一段（它在視窗起點之前就開始，長度被截斷）；其後每一段都是完整週期，取最近 8 段平均，與 TradingView 載入長歷史時的結果一致（r8 以前多丟了另一方向的第一段完整週期）。歷史根數 < 150 的名字，時鐘與進度仍不夠可靠，請以「歷史根數」欄判斷。",
+    "④ 時鐘：MACD 柱狀圖在 Pine 的前 33 根是 na（EMA 要等 SMA 種子），本掃描已照做，並丟掉含第一根有效柱的那一段（它在視窗起點之前就開始，長度被截斷）；其後每一段都是完整週期，取最近 8 段平均，與 TradingView 載入長歷史時的結果一致（r7 以前多丟了另一方向的第一段完整週期；r8 起已修正）。歷史根數 < 150 的名字，時鐘與進度仍不夠可靠，請以「歷史根數」欄判斷。",
     "代號對齊：鏡像用 BRK/A、BRK/B、BF/B 等斜線寫法，watchlist 用 BRK-A、BF.B；掃描會自動試點/槓/斜線並取資料最長者（本次 " + os.environ.get("REMAP_NOTE", "3 檔重對應") + "）。",
     SRC_NOTE,
 ] if t], 1):

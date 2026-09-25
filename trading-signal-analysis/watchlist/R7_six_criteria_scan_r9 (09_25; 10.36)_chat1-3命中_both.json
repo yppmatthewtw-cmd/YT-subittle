@@ -1,1 +1,0 @@
-{"both": ["TGT", "TRGP", "CVX", "EQNR", "APA", "MA", "RNR", "EOG", "MET", "KO"], "both_avoid": ["CVX"], "n_chat_only": 180, "sys": {"10ma": 28, "mp_nm": 96, "comb": 75, "comb_all": 274, "ss": 22, "ss_all": 111, "ai": 26, "rh": 19, "avoid": 25}}

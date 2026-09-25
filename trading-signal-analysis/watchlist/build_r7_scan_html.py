@@ -154,16 +154,18 @@ if chd is not None:
         '<h2>Chat 1–3 命中、六項未全中 <span class="n">%d 檔</span></h2>' % len(chd)
         + '<div class="note">三個 session 的成品各自用自己那套準則選中、但本掃描六項條件未全中的名字。'
           '命中規則一律採用來源成品自己寫明的通過標記：<br>'
-          f'<b>chat 1</b> 動能回調 R21：在總表（1/2/3/6 個月動能排前 10%% 且回到上升中的 20MA；差一項 {SY.get("mp_nm", "?")} 檔只掃描）→ {SY.get("10ma", "?")} 檔　'
+          f'<b>chat 1</b> 動能回調 R21：在總表（1/2/3/6 個月動能至少一個排前 10%% 且回到上升中的 20MA；差一項 {SY.get("mp_nm", "?")} 檔只掃描）→ {SY.get("10ma", "?")} 檔　'
           f'<b>chat 2</b> Combined R22：線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）→ {SY.get("comb", "?")}/{SY.get("comb_all", "?")} 檔　'
           f'<b>chat 3</b> SubSector R12：所屬子板塊 5 日分 ≥70 且斜率 &gt;0 → {SY.get("ss", "?")}/{SY.get("ss_all", "?")} 個子板塊；'
           f'AI Sector R13：所屬小群組 5 日分 ≥70 且個股 5 日強度 &gt;0 → {SY.get("ai", "?")} 檔；'
           f'加息 R2：受惠名單 {SY.get("rh", "?")} 檔（迴避名單 {SY.get("avoid", "?")} 檔不算命中，另標 ⚠）<br>'
           'chat 1–3 合共命中 %d 檔，其中 %d 檔同時六項全中（%s），餘下 %d 檔列於下表；'
-          '本掃描六項全中的 %d 檔裡有 %d 檔是 chat 準則沒有選中的。'
+          '本掃描六項全中的 %d 檔裡有 %d 檔是 chat 準則沒有選中的%s。'
           '同時命中 3 套 %d 檔、2 套 %d 檔、1 套 %d 檔。</div>' % (
               len(chd) + len(both), len(both), " · ".join(t + (" ⚠迴避" if t in _bav else "") for t in both) or "—", len(chd),
-              len(strict), len(strict) - len(both), n3, n2, n1)
+              len(strict), len(strict) - len(both),
+              (("（其中 " + "、".join(t for t in _bjd.get("six_avoid", []) if t not in set(both)) + " 在加息清單「迴避」）")
+               if [t for t in _bjd.get("six_avoid", []) if t not in set(both)] else ""), n3, n2, n1)
         + '<div class="filters"><span class="mut">命中系統 ≥</span>'
         + "".join('<button data-cn="%d" class="%s">%d</button>' % (k, "on" if k == 1 else "", k) for k in (1, 2, 3))
         + '<span class="mut" style="margin-left:14px">六項 ≥</span>'
@@ -231,7 +233,7 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 <h2>差一項 <span class="n">{NC - 1}/{NC} · {len(five)} 檔 · 按缺少的條件分組</span></h2>
 {table(five)}
 
-{f'<h2>全市場加掃：watchlist 以外的六項全中 <span class="n">{len(uhit)} 檔 · 合併面板 {len(udf)} 檔流動性達標股票中</span></h2>' + table(uhit) if uhit is not None else ''}
+{f'<h2>加掃：watchlist 以外的六項全中 <span class="n">{len(uhit)} 檔 · 合併面板中流動性達標的 {len(udf):,} 檔</span></h2>' + (f'<div class="note">{esc(os.environ.get("MKT_NOTE", ""))}</div>' if os.environ.get("MKT_NOTE") else '') + table(uhit) if uhit is not None else ''}
 
 <h2>全部 {len(d)} 檔 <span class="n">按命中數排序 · 可篩選</span></h2>
 <div class="filters"><span class="mut">命中 ≥</span>{"".join(f'<button data-min="{k}" class="{"on" if k == 0 else ""}">{k}</button>' for k in range(0, NC + 1))}

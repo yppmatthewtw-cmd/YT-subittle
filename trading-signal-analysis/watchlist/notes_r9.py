@@ -95,7 +95,8 @@ only20 = sorted(u8 - u9)
 scope = (f"掃描 {len(u9)} 檔 = 五份成品去重："
          + "、".join(f"{k} {len(v)}" for k, v in tk.items())
          + f"。chat 1 的最新成品已由 10MA R20 換成 R21 動能回調（R21 起取代 R20 的篩選），所以 R20 不再列入："
-         f"只在 R20 上的 {len(only20)} 檔不再掃描（流動性達標的仍在「加掃」分頁），新加入 R21 總表與差一項共 {len(u9 - u8)} 檔。"
+         f"只在 R20 上的 {len(only20)} 檔不再列入 watchlist 掃描；其中 {len(set(only20) & set(u.ticker))} 檔流動性達標、仍在加掃範圍內"
+         f"（加掃六項全中 {int(u[u.ticker.isin(only20)].score.eq(6).sum())} 檔，完整分數見 _加掃.csv）。新加入 R21 總表與差一項共 {len(u9 - u8)} 檔。"
          f"{len(b)} 檔全部掃到，0 檔缺資料。")
 
 # ── 與 r8 對照 ──

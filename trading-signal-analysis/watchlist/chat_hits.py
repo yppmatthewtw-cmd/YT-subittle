@@ -195,7 +195,8 @@ o = pd.DataFrame(rows).sort_values(["score", "n_hit", "volidx"], ascending=[Fals
 o.to_csv(out_csv, index=False, encoding="utf-8-sig")
 both = [r.ticker for _, r in d.iterrows() if r["score"] == NC and r["key"] in hit]
 both_avoid = [t for t in both if norm(t) in avoid]
-json.dump({"both": both, "both_avoid": both_avoid, "n_chat_only": len(o),
+six_avoid = [r.ticker for _, r in d.iterrows() if r["score"] == NC and r["key"] in avoid]   # 六項全中且在加息「迴避」名單
+json.dump({"both": both, "both_avoid": both_avoid, "six_avoid": six_avoid, "n_chat_only": len(o),
            "sys": {"10ma": n_live, "mp_nm": n_nm, "comb": n_c1, "comb_all": len(c1), "ss": n_c2, "ss_all": len(c2), "ai": n_c3,
                    "rh": len(rh.get("benefit", [])), "avoid": len(avoid)}}, open(out_csv[:-4] + "_both.json", "w"), ensure_ascii=False)   # 給報表寫「同時六項全中」一句
 print(f"\nchat 1–3 命中合共 {len(o) + len(both)} 檔，其中 {len(both)} 檔同時六項全中（{'、'.join(both)}）")
