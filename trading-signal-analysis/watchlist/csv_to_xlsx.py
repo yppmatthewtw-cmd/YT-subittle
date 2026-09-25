@@ -146,7 +146,7 @@ if CH and os.path.exists(CH):
 
     chsheet("Chat1-3 命中 未過六項", ch,
             "三個 session 各自用自己那套準則選中、但 R7 六項條件未全中的 %d 檔。命中規則（一律採用來源成品自己的通過標記）："
-            "chat1 動能回調 R21 = 在總表（1/2/3/6 個月動能至少一個排前 10% 且回到上升中的 20MA；差一項名單不算）；"
+            "chat1 動能回調 R21 = 在總表（1/2/3/6 個月動能至少一個排前 10%% 且回到上升中的 20MA；差一項名單不算）；"
             "chat2 Combined R22 = 線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）；"
             "chat3 SubSector R12 = 所屬子板塊 5 日分 ≥70 且斜率 >0；"
             "chat3 AI Sector R13 = 所屬小群組 5 日分 ≥70 且個股 5 日強度 >0；chat3 加息 R2 = 受惠名單。"
@@ -275,7 +275,8 @@ if UNI and os.path.exists(UNI):
 
 ws = wb.create_sheet("說明")
 for i, t in enumerate([t for t in [
-    f"R7 A–H 六項條件掃描 {VER} — 六項條件的基準是 2026-{BD} 官方收盤（完整 OHLC，三個 repo 的 Yahoo 鏡像合併 {PANEL_N} 檔）。另有三個 {SD} 分頁，用 10MA repo 的 Nasdaq 收盤快照更新 ①④⑤⑥；快照沒有盤中高低，②③（波動指數）不能重算，沿用 {BD} 值。",
+    f"R7 A–H 六項條件掃描 {VER} — 六項條件的基準是 2026-{BD} 官方收盤（完整 OHLC，三個 repo 的 Yahoo 鏡像合併 {PANEL_N} 檔）。"
+    + (f"另有三個 {SD} 分頁，用 10MA repo 的 Nasdaq 收盤快照更新 ①④⑤⑥；快照沒有盤中高低，②③（波動指數）不能重算，沿用 {BD} 值。" if (UPD and os.path.exists(UPD)) else ""),
     DATA_NOTE,
     "① 重心線向上：r7e_gravity（滾動 VWAP 30，hlc3）最新一根斜率 > 0",
     "② 波動指數向上：r7h_volidx（0–100，高 = 平靜）最新一根斜率 > 0",
@@ -285,7 +286,7 @@ for i, t in enumerate([t for t in [
     "⑥ 貼近重心線：收盤距重心線 ≤ 1.0 × ATR14 或 ≤ 3%（% 以收盤價為分母，與「距重心 %」欄相同）",
     "VCP / 結構 / 最低阻力線 只作參考，不計分。MA20 與 EMA21 已刪除。",
     "Ticker 欄為 TradingView 圖表超連結（Q1c5VWwD 版面）。",
-    "來源榜單欄會標明名字的身分：MP_R21（chat 1 動能回調總表）· MP_R21_差一項（形態只差一項，只掃描）· RateHike_R2_受惠 / _迴避 / _索引（chat 3 SubSector session 09-18 的加息與地緣政治 3 日清單）。六項全中裡若出現「跌出」或「迴避」標籤，代表原榜單本身不推薦，請自行判斷。",
+    "來源榜單欄會標明名字的身分：MP_R21（chat 1 動能回調總表）· MP_R21_差一項（形態只差一項，只掃描）· RateHike_R2_受惠 / _迴避 / _索引（chat 3 SubSector session 09-18 的加息與地緣政治 3 日清單）。六項全中裡若出現「差一項」或「迴避」標籤，代表原榜單本身沒有選中或不推薦，請自行判斷。",
     PANEL_NOTE,
     FIX_NOTE,
     SCOPE_NOTE or f"{len(d)} 檔全部掃到，0 檔缺資料。",

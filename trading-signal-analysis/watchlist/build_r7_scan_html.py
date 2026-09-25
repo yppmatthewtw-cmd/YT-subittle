@@ -16,7 +16,10 @@ import os
 VER = os.environ.get("VER", "r7")
 BD = os.environ.get("BASE_DAY", "09-16")   # 六項條件基準日（最新完整 OHLC）
 SD = os.environ.get("SNAP_DAY", "09-17")   # 收盤快照日（只重算 ①④⑤⑥）
-HTML_NOTE = os.environ.get("HTML_NOTE", "")   # 本版資料敘述（每版由呼叫端帶入）
+HTML_NOTE = os.environ.get("HTML_NOTE", "")
+_U = os.environ.get("UPDATE_CSV", "")
+SNAP_META = (f' · 另以 <b>{SD} Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）'
+             if (_U and os.path.exists(_U)) else "")   # 本版資料敘述（每版由呼叫端帶入）
 
 CRIT = [
     ("c1", "① 重心線向上", "r7e_gravity 線（滾動 VWAP 30，hlc3）最新一根斜率 > 0"),
@@ -215,7 +218,7 @@ td.rk{{color:var(--mut);width:34px}} td.tk a{{font-weight:700;color:var(--ink);t
 </style></head><body><div class="wrap">
 <header><h1>R7 A–H <em>六項條件掃描</em> {VER} ({stamp_t})</h1>
 <div class="sw"><button data-t="light">☀️ 淺色</button><button data-t="dark">🌙 深色</button></div>
-<div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b> · 另以 <b>{SD} Nasdaq 收盤快照</b>更新 ①④⑤⑥（快照無盤中高低，②③ 不能重算）· 價格面板為三個 repo 的 Yahoo 鏡像合併（Yahoo 直連在本機被 proxy 封鎖，鏡像由各 repo 的 GitHub Actions 抓取）· 來源 5 份成品：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
+<div class="meta">日線 · 六項條件基準 <b>{esc(meta["lastday"])} 官方收盤（完整 OHLC）</b>{SNAP_META} · 價格面板為三個 repo 的 Yahoo 鏡像合併（Yahoo 直連在本機被 proxy 封鎖，鏡像由各 repo 的 GitHub Actions 抓取）· 來源 5 份成品：{src_html} · 去重 <b>{len(d) + len(missing)} 檔</b>，可算 <b>{len(d)}</b>，無資料 {len(missing)} · 產生 {now.strftime("%Y.%m.%d %H:%M")} 台北 · 規則以 r7b/e/h 預設參數在 Python 重現</div></header>
 
 <ul class="crit">{crit_html}</ul>
 <div class="note">{HTML_NOTE}六項全中 <b>{len(strict)} 檔</b>。</div>

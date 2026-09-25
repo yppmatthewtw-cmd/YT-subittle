@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """r9 的版本敘述：寫成 env 檔給 csv_to_xlsx.py / build_r7_scan_html.py 讀。所有數字由資料算出。"""
-import os, sys, json
+import os, sys, json, shlex
 import pandas as pd
 
 S = "/tmp/claude-0/-home-user-YT-subittle/0bd65ef0-0bef-5829-9a6f-f0a46d2d96cd/scratchpad"
@@ -83,7 +83,9 @@ data = (f"本版資料：再次觸發三個 repo 的 GitHub Actions（fetch_yaho
 
 warn = b[b.data_warn.fillna("") != ""]
 panel = (f"面板：三個鏡像合併 {os.environ.get('PANEL_N', '?')} 檔（10MA repo 自 09-24 起把抓取清單擴大為所有 ≥$1 的普通股，面板比 r8 的 3,097 檔大），"
-         f"同一檔同一天多份資料時取抓取窗口較新的檔。{len(b)} 檔最後一根全部落在 {BASE[5:]}：{int((b.date == BASE).sum())} / {len(b)}。"
+         f"同一檔同一天多份資料時取抓取窗口較新的檔。{int((b.date == BASE).sum())} / {len(b)} 檔最後一根落在 {BASE[5:]}"
+         + (f"；{'、'.join(f'{r.ticker}（停在 {r.date[5:]}：Yahoo 沒有它的 {BASE[5:]} 日線，當天的 Nasdaq 快照又是過期的，表中標「舊」）' for r in b[b.date < BASE].itertuples())}" if (b.date < BASE).any() else "")
+         + "。"
          + (f"資料警示：{'、'.join(f'{r.ticker}（{r.data_warn}）' for r in warn.itertuples())}，指標值不可信。" if len(warn) else ""))
 
 # ── 來源範圍 ──
@@ -101,13 +103,14 @@ fix = (f"r9 的變動：(1) chat 1 改用 R21（{mp['meta']['last_date']} 收盤
        f"(2) 載入器新增兩條補值規則：最後完整日之前、OHLC 覆蓋不到一半的「缺口日」（本版只有 09-22），以及完整交易日上個別名字的缺漏，"
        f"若有 Nasdaq 收盤快照就補成只有收盤的一根；只補前後 7 天內仍有 Yahoo 日線的名字，避免把已下市、代號被重用的公司接上舊序列。"
        f"(3) 六項基準由 r8 的 09-21 推進到 {BASE[5:]}，最新一日是完整 OHLC，所以不再需要「收盤快照更新」分頁，改附「與 r8 對照」："
-       f"r8 六項全中 {len(s8)} 檔 → 本版 {len(s9)} 檔，延續 {len(s8 & s9)}、新進 {len(s9 - s8)}、退出 {len(s8 - s9)}。")
+       f"r8 六項全中 {len(s8)} 檔 → 本版 {len(s9)} 檔，延續 {len(s8 & s9)}、新進 {len(s9 - s8)}、退出 {len(s8 - s9)}"
+       + (f"（其中 {'、'.join(sorted((s8 - s9) - set(b.ticker)))} 只在 R20 上，本版已不在來源榜單）" if (s8 - s9) - set(b.ticker) else "") + "。")
 off = u[(u.score == 6) & (~u.ticker.isin(set(b.ticker)))]
 html = ("r9：條件與 r3–r8 相同。" + data + " " + panel + "<br>" + scope + "<br>" + fix)
 env = {"DATA_NOTE": data, "PANEL_NOTE": panel, "FIX_NOTE": fix, "SCOPE_NOTE": scope, "HTML_NOTE": html}
 with open(f"{S}/notes_r9.env", "w") as f:
     for k, v in env.items():
-        f.write(f"export {k}={json.dumps(v, ensure_ascii=False)}\n")
+        f.write(f"export {k}={shlex.quote(v)}\n")          # shlex：避免 bash 把 $1、$2 當變數展開
 
 # ── 來源分頁 ──
 src = pd.read_csv(f"{S}/src_rows_r8.csv")
