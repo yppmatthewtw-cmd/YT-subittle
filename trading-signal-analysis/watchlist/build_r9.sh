@@ -14,7 +14,7 @@ export VER=r9 BASE_DAY=09-24 SNAP_DAY=09-24
 export UNIVERSE_CSV=$S/universe_r9.csv CHATHITS_CSV=$S/chat_hits_r9.csv SRC_ROWS=$S/src_rows_r9.csv
 unset UPDATE_CSV
 export PREV_CSV=$S/r8keep/base_r8.csv PREV_VER=r8 PREV_DAY=09-21
-export REMAP_NOTE="3 檔重對應：BRK-A→BRK/A、BRK-B→BRK/B、BF.B→BF/B；20MA 鏡像另有一份寫成 BF.B 的相同資料，同根數時固定取斜線寫法（Nasdaq 快照的寫法）"
+# REMAP_NOTE 由 notes_r9.py 依資料算出
 export SRC_NOTE="來源：三個 session 的最新成品 —— chat 1 R21 動能回調（09-23 收盤）、chat 2 Combined R22（09-16）、chat 3 SubSector R12 / AI R13 / 加息 R2（09-17）；價格資料已於 2026-09-25 01:3x UTC 由各 repo 的 GitHub Actions 重新抓取，完整 OHLC 至 09-24，09-22 缺口以 Nasdaq 官方收盤補。"
 cd $W
 rm -f "$W"/R7_six_criteria_scan_r9*

@@ -345,8 +345,8 @@ def load(verbose=True):
     # 最後完整日之後的日子，仍只在 USE_SNAP=1 時才用快照補。
     holes = set(cov0[(cov0 < 0.5 * cov0.max()) & (cov0.index < last_full)].index) if len(cov0) else set()
     # 完整交易日（≤ 最後完整日）上個別缺漏的名字（例如 Yahoo 沒給 HUBB 09-24）也用當日收盤快照補，
-    # 但只補該日前後 7 天內仍有 OHLC 的名字，避免把已下市、代號被重用的公司接到舊序列後面。
-    last_ohlc = ohlc.groupby("symbol").date.max()
+    # 但只補「該日之前 7 天內」有 OHLC 的名字，避免把已下市、代號被重用的公司接到舊序列後面，
+    # 也不在名字第一根 Yahoo 日線之前憑空補值。
     if os.path.isdir(SNAP_DIR) and last_full is not None:
         snaps = []
         prev_px = None                      # 上一份快照的收盤（偵測「過期快照」用）
@@ -386,7 +386,7 @@ def load(verbose=True):
             sn = sn[sn.symbol.isin(known)].dropna(subset=["close"])
             if fill_gap or dt in holes:
                 have_day = set(ohlc.symbol[ohlc.date == dt])
-                recent = set(last_ohlc.index[last_ohlc >= dt - pd.Timedelta(days=7)])
+                recent = set(ohlc.symbol[(ohlc.date >= dt - pd.Timedelta(days=7)) & (ohlc.date < dt)])
                 sn = sn[~sn.symbol.isin(have_day) & sn.symbol.isin(recent)]
             sn["route"] = "snapshot-close"
             sn["prio"] = 1

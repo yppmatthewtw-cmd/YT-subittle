@@ -125,8 +125,12 @@ print(f"chat3b {c3f}: {n_c3} / {len(con)} 檔成分股命中")
 MPJ = os.environ.get("MP_JSON", "/home/user/yppmatthewtw-cmd/10ma-watchlist/data/screen_mp21.json")
 mp = json.load(open(MPJ))
 WIN = {21: "1月", 42: "2月", 63: "3月", 126: "6月"}
+REVJ = os.environ.get("MP_REVIEW_JSON", os.path.join(os.path.dirname(MPJ), "review_mp21.json"))
+extra = (json.load(open(REVJ)).get("extra_flags") or {}) if os.path.exists(REVJ) else {}
 for r in mp["rows"]:
-    fl = "；".join(f[1] for f in r.get("flags", []) if isinstance(f, (list, tuple)) and len(f) > 1)
+    # R21 的「審視標記」= 篩選器自己的 flags + 覆核層 extra_flags（build_mp_xlsx.py 的 flags_by）
+    fls = list(r.get("flags", [])) + list(extra.get(r["sym"], []))
+    fl = "；".join(f[1] for f in fls if isinstance(f, (list, tuple)) and len(f) > 1)
     mark(r["sym"], "k_10ma",
          f'總表 #{int(r["rank"])}（動能 {"/".join(WIN[w] for w in r["hits_w"])}，爆發潛力 {r["score"]:.1f}）',
          mp_rank=int(r["rank"]), mp_cov=int(r["hits"]), mp_win="/".join(WIN[w] for w in r["hits_w"]),
@@ -190,7 +194,8 @@ for _, r in d.iterrows():
 o = pd.DataFrame(rows).sort_values(["score", "n_hit", "volidx"], ascending=[False, False, False])
 o.to_csv(out_csv, index=False, encoding="utf-8-sig")
 both = [r.ticker for _, r in d.iterrows() if r["score"] == NC and r["key"] in hit]
-json.dump({"both": both, "n_chat_only": len(o),
+both_avoid = [t for t in both if norm(t) in avoid]
+json.dump({"both": both, "both_avoid": both_avoid, "n_chat_only": len(o),
            "sys": {"10ma": n_live, "mp_nm": n_nm, "comb": n_c1, "comb_all": len(c1), "ss": n_c2, "ss_all": len(c2), "ai": n_c3,
                    "rh": len(rh.get("benefit", [])), "avoid": len(avoid)}}, open(out_csv[:-4] + "_both.json", "w"), ensure_ascii=False)   # 給報表寫「同時六項全中」一句
 print(f"\nchat 1–3 命中合共 {len(o) + len(both)} 檔，其中 {len(both)} 檔同時六項全中（{'、'.join(both)}）")

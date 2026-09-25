@@ -147,7 +147,7 @@ if chd is not None:
     n3, n2, n1 = [int((chd.n_hit == k).sum()) for k in (3, 2, 1)]
     _bj = CH[:-4] + "_both.json"         # chat_hits.py 另寫的「同時六項全中」名單
     _bjd = json.load(open(_bj)) if os.path.exists(_bj) else {}
-    both = _bjd.get("both", []); SY = _bjd.get("sys", {})
+    both = _bjd.get("both", []); SY = _bjd.get("sys", {}); _bav = set(_bjd.get("both_avoid", []))
     _six = set(strict.ticker)
     both = [t for t in strict.ticker if t in set(both)] + [t for t in both if t not in _six]
     chat_html = (
@@ -162,7 +162,7 @@ if chd is not None:
           'chat 1–3 合共命中 %d 檔，其中 %d 檔同時六項全中（%s），餘下 %d 檔列於下表；'
           '本掃描六項全中的 %d 檔裡有 %d 檔是 chat 準則沒有選中的。'
           '同時命中 3 套 %d 檔、2 套 %d 檔、1 套 %d 檔。</div>' % (
-              len(chd) + len(both), len(both), " · ".join(both) or "—", len(chd),
+              len(chd) + len(both), len(both), " · ".join(t + (" ⚠迴避" if t in _bav else "") for t in both) or "—", len(chd),
               len(strict), len(strict) - len(both), n3, n2, n1)
         + '<div class="filters"><span class="mut">命中系統 ≥</span>'
         + "".join('<button data-cn="%d" class="%s">%d</button>' % (k, "on" if k == 1 else "", k) for k in (1, 2, 3))
