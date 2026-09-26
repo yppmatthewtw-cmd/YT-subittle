@@ -1,0 +1,219 @@
+<!-- Ross Momentum 三層看板：層一掃描評分 / 層二訊號確認 / 層三條件單計算器與警報 -->
+<title>Ross Momentum 三層交易看板</title>
+<style>
+  :root{
+    --bg:#f8fafc; --card:#ffffff; --ink:#0f172a; --ink2:#475569; --line:#e2e8f0;
+    --blue:#2563eb; --green:#16a34a; --red:#dc2626; --amber:#d97706; --violet:#7c3aed;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0b1220; --card:#111a2e; --ink:#e2e8f0; --ink2:#94a3b8; --line:#24324d; }
+  }
+  *{box-sizing:border-box; margin:0}
+  body{font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;
+       background:var(--bg); color:var(--ink); padding:24px; line-height:1.55}
+  h1{font-size:22px; margin-bottom:4px}
+  .sub{color:var(--ink2); font-size:13px; margin-bottom:20px}
+  .layer{background:var(--card); border:1px solid var(--line); border-radius:12px;
+         padding:20px; margin-bottom:20px}
+  .layer h2{font-size:16px; margin-bottom:2px}
+  .layer .tag{display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px;
+              color:#fff; margin-right:8px; vertical-align:2px}
+  .hint{color:var(--ink2); font-size:12.5px; margin-bottom:14px}
+  label{font-size:12.5px; color:var(--ink2); display:block; margin-bottom:3px}
+  input,select{width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:8px;
+        background:var(--bg); color:var(--ink); font-size:14px}
+  .grid{display:grid; gap:12px}
+  .g5{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  .score{font-size:15px; font-weight:700; padding:10px 14px; border-radius:10px; margin-top:14px}
+  .s-go{background:rgba(22,163,74,.12); color:var(--green)}
+  .s-ok{background:rgba(217,119,6,.12); color:var(--amber)}
+  .s-no{background:rgba(220,38,38,.12); color:var(--red)}
+  .chk{display:flex; gap:10px; align-items:flex-start; padding:9px 10px;
+       border:1px solid var(--line); border-radius:8px; margin-bottom:8px; cursor:pointer}
+  .chk input{width:16px; height:16px; margin-top:3px; flex:none}
+  .chk b{font-size:13.5px}
+  .chk small{display:block; color:var(--ink2); font-size:12px}
+  table{width:100%; border-collapse:collapse; font-size:13.5px; margin-top:12px}
+  th,td{padding:8px 10px; border-bottom:1px solid var(--line); text-align:left}
+  th{color:var(--ink2); font-weight:600; font-size:12px}
+  .mono{font-variant-numeric:tabular-nums}
+  .out{background:var(--bg); border:1px dashed var(--line); border-radius:8px;
+       padding:12px 14px; font-size:13.5px; margin-top:12px; white-space:pre-wrap}
+  .warn{color:var(--red); font-weight:600}
+  .good{color:var(--green); font-weight:600}
+  footer{color:var(--ink2); font-size:12px; margin-top:8px}
+</style>
+
+<h1>Ross Momentum 三層交易看板</h1>
+<div class="sub">依據 Logic Analysis (Opus Warrior) 規則庫 — 層一選股、層二確認、層三執行。所有計算在本機瀏覽器完成，資料自動儲存於 localStorage。</div>
+
+<!-- ─────────── 層一 ─────────── -->
+<div class="layer">
+  <h2><span class="tag" style="background:var(--blue)">層一</span>盤前掃描 · 五大選股標準評分</h2>
+  <div class="hint">6:30 前完成。逐項輸入候選股資料，自動按 Ross 五大標準評分（規則 #8/#69：5/5 加大倉位、4/5 正常、≤3/5 不入場）。市場溫度決定整體倉位（規則 #33/#71）。</div>
+  <div class="grid g5">
+    <div><label>今日漲幅 >30% 股票數（市場溫度）</label><input id="mktHot" type="number" value="3" min="0"></div>
+    <div><label>候選股代碼</label><input id="c_sym" placeholder="例: ABCD"></div>
+    <div><label>股價 ($)</label><input id="c_price" type="number" step="0.01" placeholder="2 – 10 最佳"></div>
+    <div><label>流通量 Float（百萬股）</label><input id="c_float" type="number" step="0.1" placeholder="<10 合格, <5 最佳"></div>
+    <div><label>相對成交量 RVOL（倍）</label><input id="c_rvol" type="number" step="0.1" placeholder=">5 合格"></div>
+    <div><label>今日漲幅排名</label><select id="c_rank"><option value="1">前 3 名</option><option value="0">3 名以外</option></select></div>
+    <div><label>消息催化劑</label><select id="c_news">
+      <option value="5">FDA 批准（最強）</option><option value="4">臨床試驗結果</option>
+      <option value="3">大公司合作（Nvidia/SpaceX…）</option><option value="2">私募融資 PP</option>
+      <option value="1">其他消息</option><option value="0">無消息</option></select></div>
+    <div style="align-self:end"><button onclick="addCand()" style="width:100%;padding:9px;border:0;border-radius:8px;background:var(--blue);color:#fff;font-size:14px;cursor:pointer">加入觀察清單</button></div>
+  </div>
+  <div id="mktBadge" class="score s-ok"></div>
+  <table id="watchTbl"><thead><tr>
+    <th>代碼</th><th>股價</th><th>Float</th><th>RVOL</th><th>排名</th><th>消息</th><th>評分</th><th>判定</th><th></th>
+  </tr></thead><tbody></tbody></table>
+</div>
+
+<!-- ─────────── 層二 ─────────── -->
+<div class="layer">
+  <h2><span class="tag" style="background:var(--violet)">層二</span>入場前確認 · 訊號品質檢查表</h2>
+  <div class="hint">開盤後對準備入場的一隻股票逐項打勾。紅色項目任何一項成立即放棄本次入場（規則 #24/#25/#68/#76）。</div>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div>
+      <b style="font-size:13px;color:var(--green)">✅ 做多條件（全部成立才入場）</b><br><br>
+      <label class="chk"><input type="checkbox" class="q2 pos"><span><b>MACD 綠燈</b><small>MACD > 0 才可做多，無例外（#24）</small></span></label>
+      <label class="chk"><input type="checkbox" class="q2 pos"><span><b>價格站在 VWAP 之上</b><small>多頭結構完整；回踩 VWAP 收盤站穩 = 強做多（#2）</small></span></label>
+      <label class="chk"><input type="checkbox" class="q2 pos"><span><b>突破有量能確認</b><small>突破量 ≥ 3–5x 平均量；無量突破一律不追（#68）</small></span></label>
+      <label class="chk"><input type="checkbox" class="q2 pos"><span><b>時間窗口正確</b><small>9:30–9:45 黃金窗口最佳；10:05 後動能衰減（#30/#31）</small></span></label>
+      <label class="chk"><input type="checkbox" class="q2 pos"><span><b>形態清晰</b><small>Gap&Go 破盤前高 / Bull Flag 首次縮量回踩（#10/#13/#15）</small></span></label>
+    </div>
+    <div>
+      <b style="font-size:13px;color:var(--red)">⛔ 否決條件（任一成立即放棄）</b><br><br>
+      <label class="chk"><input type="checkbox" class="q2 neg"><span><b>MACD 紅燈下的「突破」</b><small>= Bull Trap，看起來突破也不入（#25）</small></span></label>
+      <label class="chk"><input type="checkbox" class="q2 neg"><span><b>從當日高點回落 >20%</b><small>已進入 Back-side，做多勝率 <40%（#76）</small></span></label>
+      <label class="chk"><input type="checkbox" class="q2 neg"><span><b>放量長上影 / Dump 訊號</b><small>大量長上影 + MACD 轉負 = Dump 不是回踩（#16）</small></span></label>
+      <label class="chk"><input type="checkbox" class="q2 neg"><span><b>主題股已連漲 ≥3 天</b><small>消息已 price-in，第 3 天後追入風險高（#51/#77）</small></span></label>
+      <label class="chk"><input type="checkbox" class="q2 neg"><span><b>中國註冊公司 / 股價 <$2</b><small>信息不透明 / 點差過大（#56/#78）</small></span></label>
+    </div>
+  </div>
+  <div id="l2out" class="score s-no">尚未完成檢查</div>
+</div>
+
+<!-- ─────────── 層三 ─────────── -->
+<div class="layer">
+  <h2><span class="tag" style="background:var(--green)">層三</span>執行 · 條件單計算器 + 風控 + 警報</h2>
+  <div class="hint">輸入帳戶與入場參數，產生倉位大小與 OCO 括號單（入場 Stop-Limit + 止損 + 分批止盈），可直接抄入券商條件單。風控規則自動套用（#45/#47/#48/#57）。</div>
+  <div class="grid g5">
+    <div><label>帳戶資金 ($)</label><input id="acct" type="number" value="10000"></div>
+    <div><label>單筆風險 (% 帳戶)</label><input id="riskPct" type="number" value="1" step="0.25"></div>
+    <div><label>入場觸發價 ($)</label><input id="entry" type="number" step="0.01" placeholder="突破位上方 1–2 美分"></div>
+    <div><label>止損價 ($)</label><input id="stop" type="number" step="0.01" placeholder="突破K線低點 / 旗形低點"></div>
+    <div><label>盈虧比目標 (R)</label><input id="rr" type="number" value="2" step="0.5"></div>
+    <div><label>今日已實現盈虧 ($)</label><input id="dayPnl" type="number" value="0"></div>
+    <div><label>今日峰值盈利 ($)</label><input id="peakPnl" type="number" value="0"></div>
+    <div><label>日最大虧損 ($)</label><input id="maxLoss" type="number" value="500"></div>
+  </div>
+  <div id="l3out" class="out">輸入入場價與止損價後自動計算…</div>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="out"><b>📣 警報條件（抄入 TradingView）</b>
+以 pine/ 目錄三支腳本設定：
+① 破盤前高 + RVOL>5 → App 推播
+② MACD 轉綠/轉紅 → 推播
+③ 跌破 VWAP + 放量 → 推播(止損警報)
+④ Bull Flag 首次回踩突破 → 推播</div>
+    <div class="out"><b>🕐 時間紀律</b>
+09:30–09:45 黃金窗口（主戰場）
+10:05 後動能衰減 → 降倉
+11:30 後停止主動交易
+整點(7/8AM)突破+量 = 有效訊號</div>
+    <div class="out"><b>🧠 心理風控</b>
+達到日最大虧損 → 強制停止
+峰值回吐 >50% → 收工保利潤
+禁止加倍倉位回本(Revenge)
+大贏日次日 → 倉位減半</div>
+  </div>
+</div>
+
+<footer>規則編號對應 data/ross_rules.csv。本工具僅供教育用途，不構成投資建議。</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+const store=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+let watch=store('rossWatch')||[];
+
+function mktTemp(){
+  const n=+$('mktHot').value||0;
+  const b=$('mktBadge');
+  if(n>5){b.className='score s-go';b.textContent=`🔥 Hot Market（${n} 隻 >30%）→ 倉位可 +50%，每日可至 10–15 筆，但不降標準`;}
+  else if(n<2){b.className='score s-no';b.textContent=`🧊 Cold Market（${n} 隻 >30%）→ 倉位 −50%，只做 5/5 setup，目標降為平日 1/3`;}
+  else{b.className='score s-ok';b.textContent=`😐 中性市場（${n} 隻 >30%）→ 正常倉位，維持標準`;}
+  localStorage.setItem('rossHot',n);
+}
+function scoreCand(c){
+  let s=0, why=[];
+  if(c.price>=2&&c.price<=10)s++;else why.push('股價');
+  if(c.float>0&&c.float<10)s++;else why.push('Float');
+  if(c.rvol>=5)s++;else why.push('RVOL');
+  if(c.rank==1)s++;else why.push('排名');
+  if(c.news>=1)s++;else why.push('消息');
+  return {s,why};
+}
+function renderWatch(){
+  const tb=$('watchTbl').tBodies[0]; tb.innerHTML='';
+  const newsTxt=['無','其他','PP','大公司合作','臨床','FDA'];
+  watch.forEach((c,i)=>{
+    const {s,why}=scoreCand(c);
+    const verdict=s===5?'<span class="good">5/5 加大倉位</span>':s===4?'4/5 正常倉位':`<span class="warn">${s}/5 不入場</span>`;
+    const extra=(c.float<5&&c.news>=3)?' ⭐低Float+強消息':'';
+    tb.insertAdjacentHTML('beforeend',
+      `<tr><td><b>${c.sym}</b></td><td class="mono">$${(+c.price).toFixed(2)}</td>
+       <td class="mono">${c.float}M${c.float<1?' 🚀':''}</td><td class="mono">${c.rvol}x</td>
+       <td>${c.rank==1?'前3':'—'}</td><td>${newsTxt[c.news]}</td>
+       <td class="mono"><b>${s}/5</b></td><td>${verdict}${extra}</td>
+       <td><a href="#" onclick="watch.splice(${i},1);save();return false" style="color:var(--red)">✕</a></td></tr>`);
+  });
+  localStorage.setItem('rossWatch',JSON.stringify(watch));
+}
+function addCand(){
+  const c={sym:($('c_sym').value||'?').toUpperCase(),price:+$('c_price').value,
+    float:+$('c_float').value,rvol:+$('c_rvol').value,rank:+$('c_rank').value,news:+$('c_news').value};
+  watch.push(c); save(); $('c_sym').value='';
+}
+function save(){renderWatch();}
+
+function l2(){
+  const pos=[...document.querySelectorAll('.q2.pos')].filter(x=>x.checked).length;
+  const neg=[...document.querySelectorAll('.q2.neg')].filter(x=>x.checked).length;
+  const o=$('l2out');
+  if(neg>0){o.className='score s-no';o.textContent=`⛔ 有 ${neg} 項否決條件成立 → 放棄本次入場（學會說「不」是長期盈利關鍵 #62）`;}
+  else if(pos===5){o.className='score s-go';o.textContent='✅ 5/5 做多條件全部成立，且無否決條件 → 可入場，倉位依層一市場溫度';}
+  else{o.className='score s-ok';o.textContent=`⚠️ 僅 ${pos}/5 做多條件成立 → 等待條件補齊，不勉強入場`;}
+}
+document.querySelectorAll('.q2').forEach(x=>x.addEventListener('change',l2));
+
+function l3(){
+  const acct=+$('acct').value, riskPct=+$('riskPct').value,
+        e=+$('entry').value, st=+$('stop').value, rr=+$('rr').value,
+        pnl=+$('dayPnl').value, peak=+$('peakPnl').value, ml=+$('maxLoss').value;
+  const o=$('l3out');
+  let head='';
+  if(pnl<=-ml) head='🛑 已達日最大虧損 → 鐵律：強制停止，今日不再交易（#47）\n\n';
+  else if(peak>0&&pnl<peak*0.5) head='🛑 已從峰值回吐 >50% 利潤 → 立即收工保護剩餘利潤（#48）\n\n';
+  if(!e||!st||e<=st){o.textContent=head+'輸入入場價與止損價後自動計算…（入場價須高於止損價）';return;}
+  const riskPS=e-st, risk$=acct*riskPct/100;
+  let shares=Math.floor(risk$/riskPS);
+  const cost=shares*e;
+  let capNote='';
+  if(cost>acct){shares=Math.floor(acct/e);capNote=`（受現金限制縮至 ${shares} 股）`;}
+  const t1=e+riskPS, t2=e+riskPS*rr;
+  o.innerHTML=
+`${head}<b>倉位</b>：<span class="mono"><b>${shares} 股</b></span> ${capNote} — 每股風險 $${riskPS.toFixed(2)}，單筆風險 $${risk$.toFixed(0)}（帳戶 ${riskPct}%）
+<b>條件單（OCO 括號單，抄入券商）</b>
+ ① 入場：Buy Stop-Limit ${shares} 股 @ 觸發 $${e.toFixed(2)} / 限價 $${(e+0.05).toFixed(2)}
+ ② 止損：Sell Stop ${shares} 股 @ $${st.toFixed(2)}（跌破即市價出場）
+ ③ 止盈1：Sell Limit ${Math.ceil(shares/2)} 股 @ $${t1.toFixed(2)}（+1R 先收半倉，餘倉止損上移至保本 $${e.toFixed(2)}）
+ ④ 止盈2：Sell Limit ${Math.floor(shares/2)} 股 @ $${t2.toFixed(2)}（+${rr}R，或延伸棒/整數關口先出）
+<b>檢查</b>：盈虧比 ${rr}:1 ${rr>=1.5?'<span class="good">✓ ≥1.5 合格</span>':'<span class="warn">✗ 低於 1.5（#45）</span>'} · 大倉位用限價單出場，市價單僅緊急用（#46）`;
+}
+['acct','riskPct','entry','stop','rr','dayPnl','peakPnl','maxLoss'].forEach(id=>$(id).addEventListener('input',l3));
+$('mktHot').addEventListener('input',mktTemp);
+$('mktHot').value=store('rossHot')??3;
+mktTemp(); renderWatch(); l3();
+</script>
