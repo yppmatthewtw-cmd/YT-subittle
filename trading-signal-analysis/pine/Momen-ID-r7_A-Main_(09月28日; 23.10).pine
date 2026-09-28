@@ -1,26 +1,26 @@
 //@version=6
 // R7 全套為 Pine v6（備註框 / 資訊框粗體字 text_formatting 需要 v6）
 // ═══════════════════════════════════════════════════════════════════════════
-//  版本 r7(09:17_17:16)
-//  R7-A  主圖：EMA9 Band Width Strategy
+//  版本 Momen-ID-r7 (09月28日; 23:10)
+//  A-Main  主圖：EMA9 Band Width Strategy
 //
-//  R7 八件套 —— 每支各佔一個 pane；策略 (A) 與價格重心 (E) 分開，可各自加減：
-//     R7-A  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                r7a_main(09.17_17.16).pine
-//     R7-B  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  r7b_macd_clock(09.17_17.16).pine
-//     R7-C  下方 pane ②      VCP 指數 + 標準化成交量柱                         r7c_vcp(09.17_17.16).pine
-//     R7-D  下方 pane ③      確定性指數 (高確定性著色)                         r7d_cert(09.17_17.16).pine
-//     R7-E  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  r7e_gravity(09.17_17.16).pine
-//     R7-F  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   r7f_force(09.17_17.16).pine
-//     R7-G  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  r7g_livermore(09.17_17.16).pine
+//  R7 七件套（另附 R7-H 波動指數，不在七件套內） —— 每支各佔一個 pane；策略 (A-Main) 與價格重心 (B-Gravity) 分開，可各自加減：
+//     A-Main  主圖 (overlay)   EMA9 帶寬策略 + 進出場 + 狀態面板                Momen-ID-r7_A-Main_(09月28日; 23.10).pine
+//     1-MACD  下方 pane ①      MACD 柱狀圖 + 週期時鐘 + 背馳 + 升破前頂/跌破前底  Momen-ID-r7_1-MACD_(09月28日; 23.10).pine
+//     2-VCP  下方 pane ②      VCP 指數 + 標準化成交量柱                         Momen-ID-r7_2-VCP_(09月28日; 23.10).pine
+//     3-Cert  下方 pane ③      確定性指數 (高確定性著色)                         Momen-ID-r7_3-Cert_(09月28日; 23.10).pine
+//     B-Gravity  主圖 (overlay)   價格重心 (VWAP / 錨定 / 滾動 / POC) + 成本帶 + 訊號  Momen-ID-r7_B-Gravity_(09月28日; 23.10).pine
+//     4-Force  下方 pane ④      買賣力度 (1 分鐘近似主動買賣) + 結構低點 + 防守位   Momen-ID-r7_4-Force_(09月28日; 23.10).pine
+//     C-Livermore  主圖 (overlay)   Livermore 最低阻力線：樞紐點結構 + Market Key 六欄 + 放量/跟進濾網  Momen-ID-r7_C-Livermore_(09月28日; 23.10).pine
 //     R7-H  下方 pane ⑤      波動指數：絕對波動水準 → 未來 20/40 日大幅回撤機率 (高 = 平靜 = 不易大跌)  r7h_volidx(09.17_17.16).pine
-//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。R7-E 框預設右上 (高 40%)；同時載入 R7-A 時請把 R7-A 的框改 右下 / 高度 60。
+//  六支的「⑦ 版面 boxW」設同一值即等寬貼右。B-Gravity 框預設右上 (高 40%)；同時載入 A-Main 時請把 A-Main 的框改 右下 / 高度 60。
 //
 //  本檔內容：MODULE 2（EMA9 中線 ± 帶寬、擠壓突破 / 回踩進場、風控出場）。
 //  M1 的日線週期與 M3 的 VCP／確定性仍在此計算，供「⑥ 模組整合」過濾與右上狀態面板使用，
-//  但它們的圖形改由 R7-B / R7-C / R7-D 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
+//  但它們的圖形改由 1-MACD / 2-VCP / 3-Cert 在各自的 pane 呈現，本檔不再畫時鐘與資訊框。
 // ═══════════════════════════════════════════════════════════════════════════
 
-strategy("R7-A EMA9 BW (main) r7(09:17_17:16)", shorttitle = "R7-A EMA9-BW",
+strategy("Momen-ID-r7_A-Main_(09月28日; 23:10)", shorttitle = "Momen-ID-r7_A-Main_(09月28日; 23:10)",
      overlay = true, initial_capital = 10000,
      default_qty_type = strategy.percent_of_equity, default_qty_value = 20,
      commission_type = strategy.commission.percent, commission_value = 0.05,
@@ -28,7 +28,7 @@ strategy("R7-A EMA9 BW (main) r7(09:17_17:16)", shorttitle = "R7-A EMA9-BW",
      max_labels_count = 500)
 
 
-// ── M1 週期引擎（僅供過濾與面板；圖形在 R7-B）──
+// ── M1 週期引擎（僅供過濾與面板；圖形在 1-MACD）──
 // ── M1 參數 ──
 grpM = "M1 ① MACD (日線)"
 m1src = input.source(close, "價格來源", group = grpM, display = display.none)
@@ -100,7 +100,7 @@ phaseTxt = up ? (rising ? "▲ 日線上昇周期 · 動能加速" : "▲ 日線
 bgcolor(showBg ? (up ? color.new(cUp, 94) : color.new(cDn, 94)) : na, title = "日線週期背景")
 
 
-// ── M3 計算（僅供過濾與面板；曲線在 R7-C / R7-D）──
+// ── M3 計算（僅供過濾與面板；曲線在 2-VCP / 3-Cert）──
 grpV = "M3 ① 資料來源"
 m3TF  = input.timeframe("D", "計算時間框 (預設日線)", group = grpV, display = display.none)
 bench = input.symbol("SPY", "相對強度 (RS) 基準", group = grpV, display = display.none)
@@ -469,10 +469,10 @@ plotshape(shortSig, "做空訊號", shape.triangledown, location.abovebar, color
 plot(strategy.position_size != 0 ? stopPx : na, "止損線", color = color.red,   style = plot.style_linebr, linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 plot(strategy.position_size != 0 ? tpPx   : na, "止盈線", color = color.green, style = plot.style_linebr, linewidth = 1, display = display.pane + display.data_window + display.price_scale)
 
-// ── ⑧ 主力大單日（成交量柱本身畫在 R7-C pane，主圖只留 ◆ 標記 / 狀態列 / 警報）──
+// ── ⑧ 主力大單日（成交量柱本身畫在 2-VCP pane，主圖只留 ◆ 標記 / 狀態列 / 警報）──
 // 主力大單 = 量 ≥ bigX × 均量，且收在當日區間上緣 (買入) / 下緣 (賣出)。
-grpVol  = "⑧ 主力大單 (成交量柱在 R7-C)"
-volLen  = input.int(50, "均量期數 (與 R7-C 設同值)", minval = 5, group = grpVol, display = display.none)
+grpVol  = "⑧ 主力大單 (成交量柱在 2-VCP)"
+volLen  = input.int(50, "均量期數 (與 2-VCP 設同值)", minval = 5, group = grpVol, display = display.none)
 bigX    = input.float(2.0, "主力大單門檻 (× 均量)", minval = 1.2, step = 0.1, group = grpVol, display = display.none)
 bigPos  = input.float(0.6, "主力買入：收盤位於當日區間 ≥ (0.5–1)；賣出反之", minval = 0.5, maxval = 1, step = 0.05, group = grpVol, display = display.none)
 markBig = input.bool(true, "K 線旁加 ◆ 標記 (藍 = 主買、橙 = 主賣)", group = grpVol, display = display.none)
@@ -491,7 +491,7 @@ plotshape(markBig and bigSell, "主力大單賣出日", shape.diamond, location.
 plot(volume, "成交量", color = bigBuy ? cBuy : bigSell ? cSell : color.gray, display = display.data_window)
 plot(vAvg,   "均量",   color = color.gray, display = display.data_window)
 
-// M2 狀態面板 (貼右；寬度/高度/位置由 ⑦ 版面 決定，與 R7-B/C/D 對齊)
+// M2 狀態面板 (貼右；寬度/高度/位置由 ⑦ 版面 決定，與 1-MACD / 2-VCP / 3-Cert 對齊)
 var tbl = table.new(f_boxPos(boxPos), 2, 10, bgcolor = color.new(#ffffff, 5),
      frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
 if barstate.islast
@@ -507,12 +507,12 @@ if barstate.islast
     table.cell(tbl, 1, 4, m2_macd > 0 ? "綠燈" : "紅燈", width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = m2_macd > 0 ? color.new(color.green, 88) : color.new(color.red, 88), text_formatting = text.format_bold)
     table.cell(tbl, 0, 5, "EMA9 斜率", width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
     table.cell(tbl, 1, 5, basisUp ? "上升" : (basisDn ? "下降" : "走平"), width = boxW * 0.45, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
-    table.cell(tbl, 0, 6, "日線週期 (R7-B)", width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 0, 6, "日線週期 (1-MACD)", width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
     table.cell(tbl, 1, 6, (up ? "上昇 " : "下跌 ") + str.tostring(progRaw * 100, "#") + "%" + (useDailyCycle ? " ·過濾中" : ""), width = boxW * 0.45, height = boxH / 10,
          text_size = size.small, bgcolor = up ? color.new(cUp, 88) : color.new(cDn, 88), text_formatting = text.format_bold)
-    table.cell(tbl, 0, 7, "VCP 等級 (R7-C)", width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 0, 7, "VCP 等級 (2-VCP)", width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
     table.cell(tbl, 1, 7, f_gradeTxt(vcpGrade) + " · " + str.tostring(vcpScore, "#") + (useVcpGrade ? " ·過濾中" : ""), width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = color.new(f_gradeCol(vcpGrade), 88), text_formatting = text.format_bold)
-    table.cell(tbl, 0, 8, "確定性 (R7-D)", width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
+    table.cell(tbl, 0, 8, "確定性 (3-Cert)", width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
     table.cell(tbl, 1, 8, str.tostring(certTotal, "#.#") + (minCert > 0 ? " ·門檻 " + str.tostring(minCert, "#") : ""), width = boxW * 0.45, height = boxH / 10, text_size = size.small, bgcolor = certTotal >= certAlert ? color.new(#3FB68B, 88) : na, text_formatting = text.format_bold)
 
     table.cell(tbl, 0, 9, "主力大單 (20日)", width = boxW * 0.55, height = boxH / 10, text_size = size.small, text_formatting = text.format_bold)
