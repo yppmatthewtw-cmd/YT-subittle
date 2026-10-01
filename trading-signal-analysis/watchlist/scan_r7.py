@@ -100,6 +100,21 @@ def _jump_warn(df, n=60, lim=0.6, vmul=3.0):
         return f"單日 {r[k] * 100:+.0f}%（{df.date[k].strftime('%m-%d')}）且量未放大，疑似未調整分割/重組"
     return ""
 
+def _gap_warn(df, n=20, k=5):
+    """序列完整度：近 n 個面板交易日內缺了幾天；近 k 根有幾根只有收盤（Nasdaq 快照補，沒有盤中高低）。"""
+    out = []
+    if PANEL_DATES:
+        last = df.date.iloc[-1]
+        cal = [x for x in PANEL_DATES if x <= last][-n:]
+        miss = sorted(set(cal) - set(df.date))
+        if miss:
+            out.append(f"近 {n} 個交易日缺 {len(miss)} 天（{'、'.join(pd.Timestamp(x).strftime('%m-%d') for x in miss)}）")
+    if "route" in df.columns:
+        sc = int((df.route.tail(k) == "snapshot-close").sum())
+        if sc >= 2:
+            out.append(f"近 {k} 根有 {sc} 根只有收盤（Nasdaq 快照補）")
+    return "；".join(out)
+
 # ───────────────────────── R7-B MACD 時鐘 ─────────────────────────
 def macd_clock(close, fast=12, slow=26, sig=9, lookN=8, defLen=12, drop_first_cycle=True):
     """r7b_macd_clock 的週期時鐘。
@@ -306,6 +321,7 @@ def _files():
 
 STALE_SNAPS = []   # load() 判定為過期、未使用的快照日期
 SNAP_RELABEL = []  # load() 依 Yahoo 收盤改標日期的快照：(原標示日, 實際日)
+PANEL_DATES = []   # load() 保留下來的交易日（完整日曆）
 
 
 def load(verbose=True):
@@ -455,6 +471,7 @@ def load(verbose=True):
         mix = d[d.date == last].prio.value_counts().to_dict()
         print(f"panel: {len(d):,} rows  {d.symbol.nunique():,} symbols  {d.date.min().date()} .. {last.date()}  "
               f"(最後一根來源 prio 分佈 {mix}；1 = 收盤快照，無盤中高低)")
+    PANEL_DATES[:] = sorted(d.date.unique())          # 面板交易日曆（scan_one 用來檢查個股序列缺天）
     return d.sort_values(["symbol", "date"])
 
 
@@ -503,7 +520,7 @@ def scan_one(sym, df):
         lr_line=round(lr[i], 2) if not np.isnan(lr[i]) else np.nan,
         dist_lr_pct=round(dG / c.iloc[i] * 100, 2) if not np.isnan(dG) else np.nan, dist_lr_atr=round(dG / A, 2) if (A > 0 and not np.isnan(dG)) else np.nan,
         turnover20_m=round(float((c * df.volume).tail(20).mean() / 1e6), 1),
-        data_warn=_jump_warn(df),
+        data_warn="；".join(x for x in (_jump_warn(df), _gap_warn(df)) if x),
         bar_src=("收盤快照" if ("prio" in df.columns and int(df.prio.iloc[i]) == 1) else "OHLC"),
         lr_dir={1: "↑", -1: "↓", 0: "—"}[int(lrDir[i])], struct={1: "HH/HL", -1: "LH/LL", 0: "—"}[int(st[i])], mk=MK[int(mk[i])], inBox=bool(inBox[i]),
         bars=len(df),
