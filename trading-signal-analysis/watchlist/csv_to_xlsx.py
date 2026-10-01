@@ -106,8 +106,8 @@ if CH and os.path.exists(CH):
               ("comb_grade", "chat2 VCP/Wein/Pre", "txt"), ("comb_up", "chat2 上升分數", "num1"), ("comb_sure", "chat2 確定性", "num1"),
               ("ss_name", "chat3 子板塊", "txt"), ("ss_rank", "子板塊名次", "int"), ("ss_score", "子板塊 5 日分", "num1"),
               ("ai_group", "chat3 AI 小群組", "txt"), ("ai_rank", "AI 群組名次", "int"), ("ai_tf5", "AI 個股 5 日強度", "num3"),
-              ("mp_rank", "chat1 R21 排名", "int"), ("mp_win", "R21 動能時間框", "txt"), ("mp_score", "R21 爆發潛力", "num1"),
-              ("mp_flag", "R21 審視標記", "txt"), ("rh", "chat3 加息 R2", "txt"),
+              ("mp_rank", "chat1 R23 排名", "int"), ("mp_win", "R23 事件日", "txt"), ("mp_score", "R23 綜合分", "num1"),
+              ("mp_flag", "R23 審視標記", "txt"), ("rh", "chat3 加息 R2", "txt"),
               ("four_17", f"{SD} ①④⑤⑥", "tick"), ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", f"{BD}→{SD} %", "num2"),
               ("turnover20_m", "20 日均額 (百萬)", "num1"), ("bars", "歷史根數", "int"), ("hist_ok", "歷史足夠 ≥250", "tick"),
               ("vcp", "VCP 指數 (參考)", "num1"), ("struct", "結構", "txt"), ("lists", "來源榜單", "txt")]
@@ -146,7 +146,7 @@ if CH and os.path.exists(CH):
 
     chsheet("Chat1-3 命中 未過六項", ch,
             "三個 session 各自用自己那套準則選中、但 R7 六項條件未全中的 %d 檔。命中規則（一律採用來源成品自己的通過標記）："
-            "chat1 動能回調 R21 = 在總表（1/2/3/6 個月動能至少一個排前 10%% 且回到上升中的 20MA；差一項名單不算）；"
+            "chat1 熱錢回落 R23 = 第一梯隊（C1 熱錢事件日、C2 曾有 10MA 上升、C3 回落到上升中的 20MA、C4 波幅收窄 全過；第二梯隊、差一項、熱錢板塊不算）；"
             "chat2 Combined R22 = 線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）；"
             "chat3 SubSector R12 = 所屬子板塊 5 日分 ≥70 且斜率 >0；"
             "chat3 AI Sector R13 = 所屬小群組 5 日分 ≥70 且個股 5 日強度 >0；chat3 加息 R2 = 受惠名單。"
@@ -290,7 +290,7 @@ for i, t in enumerate([t for t in [
     "⑥ 貼近重心線：收盤距重心線 ≤ 1.0 × ATR14 或 ≤ 3%（% 以收盤價為分母，與「距重心 %」欄相同）",
     "VCP / 結構 / 最低阻力線 只作參考，不計分。MA20 與 EMA21 已刪除。",
     "Ticker 欄為 TradingView 圖表超連結（Q1c5VWwD 版面）。",
-    "來源榜單欄會標明名字的身分：MP_R21（chat 1 動能回調總表）· MP_R21_差一項（形態只差一項，只掃描）· RateHike_R2_受惠 / _迴避 / _索引（chat 3 SubSector session 09-18 的加息與地緣政治 3 日清單）。六項全中裡若出現「差一項」或「迴避」標籤，代表原榜單本身沒有選中或不推薦，請自行判斷。",
+    "來源榜單欄會標明名字的身分：HM_R23（chat 1 熱錢回落第一梯隊）· HM_R23_第二梯隊 / _差一項 / _熱錢板塊（只掃描）· RateHike_R2_受惠 / _迴避 / _索引（chat 3 SubSector session 09-18 的加息與地緣政治 3 日清單）。六項全中裡若出現「第二梯隊」「差一項」「熱錢板塊」或「迴避」標籤，代表原榜單本身沒有選中或不推薦，請自行判斷。",
     PANEL_NOTE,
     FIX_NOTE,
     SCOPE_NOTE or f"{len(d)} 檔全部掃到，0 檔缺資料。",

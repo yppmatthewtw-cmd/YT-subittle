@@ -132,7 +132,7 @@ CH = os.environ.get("CHATHITS_CSV", "")
 chd = pd.read_csv(CH) if (CH and os.path.exists(CH)) else None
 chat_html = ""
 if chd is not None:
-    SHORT = {"chat1 動能回調 R21": "①動能", "chat2 Combined R22": "②VCP", "chat3 SubSector R12": "③子板塊", "chat3 AI Sector R13": "③AI", "chat3 加息 R2": "③加息"}
+    SHORT = {"chat1 熱錢回落 R23": "①熱錢", "chat2 Combined R22": "②VCP", "chat3 SubSector R12": "③子板塊", "chat3 AI Sector R13": "③AI", "chat3 加息 R2": "③加息"}
 
     def chrow(r):
         tags = "".join(f'<em class="src">{esc(SHORT.get(x.strip(), x.strip()))}</em>' for x in str(r.hits).split("｜"))
@@ -154,7 +154,7 @@ if chd is not None:
         '<h2>Chat 1–3 命中、六項未全中 <span class="n">%d 檔</span></h2>' % len(chd)
         + '<div class="note">三個 session 的成品各自用自己那套準則選中、但本掃描六項條件未全中的名字。'
           '命中規則一律採用來源成品自己寫明的通過標記：<br>'
-          f'<b>chat 1</b> 動能回調 R21：在總表（1/2/3/6 個月動能至少一個排前 10%% 且回到上升中的 20MA；差一項 {SY.get("mp_nm", "?")} 檔只掃描）→ {SY.get("10ma", "?")} 檔　'
+          f'<b>chat 1</b> 熱錢回落 R23：第一梯隊（C1 熱錢事件日、C2 曾有 10MA 上升、C3 回落到上升中的 20MA、C4 波幅收窄 全過；第二梯隊 {SY.get("mp_t2", "?")}、差一項 {SY.get("mp_nm", "?")}、熱錢板塊 {SY.get("mp_hot", "?")} 檔只掃描）→ {SY.get("10ma", "?")} 檔　'
           f'<b>chat 2</b> Combined R22：線上 ≥1 且三榜有頂級（VCP A/B、Weinstein 2A、Pre-breakout A）→ {SY.get("comb", "?")}/{SY.get("comb_all", "?")} 檔　'
           f'<b>chat 3</b> SubSector R12：所屬子板塊 5 日分 ≥70 且斜率 &gt;0 → {SY.get("ss", "?")}/{SY.get("ss_all", "?")} 個子板塊；'
           f'AI Sector R13：所屬小群組 5 日分 ≥70 且個股 5 日強度 &gt;0 → {SY.get("ai", "?")} 檔；'

@@ -305,6 +305,7 @@ def _files():
 
 
 STALE_SNAPS = []   # load() 判定為過期、未使用的快照日期
+SNAP_RELABEL = []  # load() 依 Yahoo 收盤改標日期的快照：(原標示日, 實際日)
 
 
 def load(verbose=True):
@@ -327,7 +328,7 @@ def load(verbose=True):
         d["fend"] = _ds[-1] if _ds else "0000-00-00"
         d["prio"] = 0
         d.loc[d["route"].str.contains("hourly|intraday|quote", case=False, na=False), "prio"] = 2
-        if "tail" in b:
+        if "tail" in b or "intraday" in b:      # tail / 60 分鐘線彙總成的日線：不是官方收盤，只作墊底
             d.loc[d["prio"] == 0, "prio"] = 2
         frames.append(d)
     d0 = pd.concat(frames, ignore_index=True)
@@ -350,6 +351,12 @@ def load(verbose=True):
     if os.path.isdir(SNAP_DIR) and last_full is not None:
         snaps = []
         prev_px = None                      # 上一份快照的收盤（偵測「過期快照」用）
+        used_snap_dates = set()
+        # Yahoo 官方收盤（每日一個 symbol→close 的 Series），只取覆蓋 ≥200 檔的日子，供快照日期稽核
+        _yc = ohlc[["symbol", "date", "close"]].drop_duplicates(["symbol", "date"])
+        _cnt = _yc.groupby("date").size()
+        ycal = pd.Series(sorted(_cnt[_cnt >= 200].index))
+        ycl = {dd: g.set_index("symbol").close for dd, g in _yc[_yc.date.isin(set(ycal))].groupby("date")}
         for f in sorted(glob.glob(f"{SNAP_DIR}/*.csv")):
             dt = pd.Timestamp(os.path.basename(f)[:-4])
             # 過期快照：與上一份快照的收盤 ≥90% 逐檔相同 → 其實是前一交易日的資料（例如 10MA repo 的 2026-09-24.csv
@@ -370,6 +377,37 @@ def load(verbose=True):
                     continue
             if _px is not None:
                 prev_px = _px
+            # 日期稽核：快照收盤與 Yahoo 官方收盤逐檔比對，找出它真正屬於哪個交易日。
+            #   與標示日 ≥90% 吻合 → 正確；與更早某日 ≥90% 吻合 → 標錯日期（例如 10MA repo 的 2026-09-30.csv 其實是 09-29）→ 改標；
+            #   標示日有 Yahoo 資料卻對不上任何一日 → 不可信（可能是盤中抓的），不拿來補值。
+            label = dt
+            valid = True
+            if _px is not None:
+                best, bestf = None, 0.0
+                for cand in sorted(set(ycal[(ycal >= dt - pd.Timedelta(days=7)) & (ycal <= dt)]), reverse=True):
+                    yc = ycl.get(cand)
+                    if yc is None:
+                        continue
+                    _c = _px.index.intersection(yc.index)
+                    if len(_c) < 200:
+                        continue
+                    fr = float(((_px[_c] / yc[_c] - 1).abs() < 5e-4).mean())
+                    if fr > bestf:
+                        best, bestf = cand, fr
+                if best is not None and bestf >= 0.9 and best != dt:
+                    dt = best
+                    SNAP_RELABEL.append((str(label.date()), str(dt.date())))
+                    if verbose:
+                        print(f"snapshot {label.date()}: 收盤與 Yahoo {dt.date()} {bestf:.1%} 吻合 → 改標為 {dt.date()}")
+                elif best is None or bestf < 0.9:
+                    yc = ycl.get(dt)
+                    if yc is not None and len(_px.index.intersection(yc.index)) >= 200:
+                        valid = False                      # 標示日有 Yahoo，卻對不上 → 不可信
+                        if verbose:
+                            print(f"snapshot {label.date()}: 與任何交易日的 Yahoo 收盤都對不上（最高 {bestf:.1%}）→ 不使用")
+            if not valid or str(dt.date()) in used_snap_dates:
+                continue
+            used_snap_dates.add(str(dt.date()))
             fill_gap = dt <= last_full and dt not in holes
             if not ((dt > last_full and USE_SNAP) or dt in holes or fill_gap):
                 continue

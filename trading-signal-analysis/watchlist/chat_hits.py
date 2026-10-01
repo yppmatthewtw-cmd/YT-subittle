@@ -4,9 +4,9 @@
 
 命中規則一律採用來源成品自己寫明的通過標記，不另設門檻：
 
-  chat 1  20MA_momentum_pullback_watchlist R21（10ma-watchlist，session_01U5TQY1…；R21 起取代 10MA R20）
-          在「總表」= 1/2/3/6 個月動能至少一個排前 10% 且五項回調形態全過（data/screen_mp21.json）；
-          「差一項」名單只掃描、不算命中。
+  chat 1  10MA_watchlist R23 熱錢回落 20MA（10ma-watchlist，session_01U5TQY1…；R23 起取代 R21–R22 / R1–R20）
+          第一梯隊 = C1 熱錢事件日 + C2 曾有 10MA 上升 + C3 回落到上升中的 20MA + C4 波幅收窄 全過（data/screen_hm23.json）；
+          第二梯隊、差一項、熱錢板塊只掃描、不算命中。
   chat 2  Combined_Watchlist_R22（vcp-watchlist，session_01SVJ37W…）
           線上數 ≥ 1（至少一張榜顯示「線上」）且三榜中至少一個是該榜的頂級：
           VCP = A/B、Weinstein = 2A、Pre-breakout = A。
@@ -120,25 +120,27 @@ for _, r in con.iterrows():
          ai_group=f'{g[2]} {str(r["所屬群組"]).strip()}', ai_rank=g[1], ai_tf5=round(float(tf5), 4))
 print(f"chat3b {c3f}: {n_c3} / {len(con)} 檔成分股命中")
 
-# ── chat 1：高動能回到 20MA R21（R21 起取代 10MA R20）────────────────────────
-# R21 工作簿的排名／分數全是公式（沒有快取值），所以讀同一 session 寫出的 screen_mp21.json。
-MPJ = os.environ.get("MP_JSON", "/home/user/yppmatthewtw-cmd/10ma-watchlist/data/screen_mp21.json")
+# ── chat 1：熱錢回落 20MA R23（R23 起取代 R21–R22 的動能回調、R1–R20 的 10MA 上升）──────────
+# R23 工作簿的排名／分數是公式（沒有快取值），所以讀同一 session 寫出的 screen_hm23.json。
+# 命中 = 第一梯隊（四項條件 C1–C4 全過）；第二梯隊（每個門檻放寬一級才合格）、差一項、熱錢板塊只掃描、不算命中。
+MPJ = os.environ.get("MP_JSON", "/home/user/yppmatthewtw-cmd/10ma-watchlist/data/screen_hm23.json")
 mp = json.load(open(MPJ))
-WIN = {21: "1月", 42: "2月", 63: "3月", 126: "6月"}
-REVJ = os.environ.get("MP_REVIEW_JSON", os.path.join(os.path.dirname(MPJ), "review_mp21.json"))
+REVJ = os.environ.get("MP_REVIEW_JSON", os.path.join(os.path.dirname(MPJ), MPJ.split("/")[-1].replace("screen_", "review_")))
 extra = (json.load(open(REVJ)).get("extra_flags") or {}) if os.path.exists(REVJ) else {}
-for r in mp["rows"]:
-    # R21 的「審視標記」= 篩選器自己的 flags + 覆核層 extra_flags（build_mp_xlsx.py 的 flags_by）
+tier1 = [r for r in mp["rows"] if int(r.get("tier", 1)) == 1]
+for r in tier1:
+    # R23 的「審視標記」= 篩選器自己的 flags + 覆核層 extra_flags（build_hm_xlsx.py 的做法）
     fls = list(r.get("flags", [])) + list(extra.get(r["sym"], []))
     fl = "；".join(f[1] for f in fls if isinstance(f, (list, tuple)) and len(f) > 1)
+    ev = f'事件日 {str(r.get("ev_date", ""))[5:]} {float(r.get("ev_ret") or 0) * 100:+.1f}%' if r.get("ev_date") else ""
     mark(r["sym"], "k_10ma",
-         f'總表 #{int(r["rank"])}（動能 {"/".join(WIN[w] for w in r["hits_w"])}，爆發潛力 {r["score"]:.1f}）',
-         mp_rank=int(r["rank"]), mp_cov=int(r["hits"]), mp_win="/".join(WIN[w] for w in r["hits_w"]),
-         mp_score=round(float(r["score"]), 1), mp_mom=round(float(r["mom"]), 1), mp_pq=round(float(r["pq"]), 1),
-         mp_flag=fl, name=r.get("name"))
-n_live = len(mp["rows"])
+         f'總表 #{int(r["rank"])} 第一梯隊（{ev}，綜合 {float(r["score"]):.1f}）',
+         mp_rank=int(r["rank"]), mp_win=ev, mp_score=round(float(r["score"]), 1), mp_flag=fl, name=r.get("name"))
+n_live = len(tier1)
+n_t2 = len(mp["rows"]) - n_live
 n_nm = len(mp.get("near_miss", []))
-print(f"chat1 {os.path.basename(MPJ)}（{mp['meta']['last_date']}）: {n_live} 檔上總表（差一項 {n_nm} 檔只掃描、不算命中）")
+n_hot = len(mp.get("hot", []))
+print(f"chat1 {os.path.basename(MPJ)}（{mp['meta']['last_date']}）: 第一梯隊 {n_live} 檔命中（第二梯隊 {n_t2}、差一項 {n_nm}、熱錢板塊 {n_hot} 只掃描）")
 
 # ── chat 3c：加息與地緣政治 3 日清單 R2 ─────────────────────────────────────
 rh = json.load(open(f"{S}/ratehike_r2.json"))
@@ -164,7 +166,7 @@ if upd_csv and os.path.exists(upd_csv):
 else:
     d["four_17"] = pd.NA; d["close_17"] = pd.NA; d["chg1d_pct"] = pd.NA; d["clock_17"] = pd.NA
 
-LBL = {"k_10ma": "chat1 動能回調 R21", "k_comb": "chat2 Combined R22", "k_ss": "chat3 SubSector R12",
+LBL = {"k_10ma": "chat1 熱錢回落 R23", "k_comb": "chat2 Combined R22", "k_ss": "chat3 SubSector R12",
        "k_ai": "chat3 AI Sector R13", "k_rh": "chat3 加息 R2"}
 ORDER = ("k_10ma", "k_comb", "k_ss", "k_ai", "k_rh")
 rows = []
@@ -197,7 +199,7 @@ both = [r.ticker for _, r in d.iterrows() if r["score"] == NC and r["key"] in hi
 both_avoid = [t for t in both if norm(t) in avoid]
 six_avoid = [r.ticker for _, r in d.iterrows() if r["score"] == NC and r["key"] in avoid]   # 六項全中且在加息「迴避」名單
 json.dump({"both": both, "both_avoid": both_avoid, "six_avoid": six_avoid, "n_chat_only": len(o),
-           "sys": {"10ma": n_live, "mp_nm": n_nm, "comb": n_c1, "comb_all": len(c1), "ss": n_c2, "ss_all": len(c2), "ai": n_c3,
+           "sys": {"10ma": n_live, "mp_t2": n_t2, "mp_nm": n_nm, "mp_hot": n_hot, "comb": n_c1, "comb_all": len(c1), "ss": n_c2, "ss_all": len(c2), "ai": n_c3,
                    "rh": len(rh.get("benefit", [])), "avoid": len(avoid)}}, open(out_csv[:-4] + "_both.json", "w"), ensure_ascii=False)   # 給報表寫「同時六項全中」一句
 print(f"\nchat 1–3 命中合共 {len(o) + len(both)} 檔，其中 {len(both)} 檔同時六項全中（{'、'.join(both)}）")
 print(f"六項全中 {int((d.score == NC).sum())} 檔已排除；chat 1–3 命中但未過六項：{len(o)} 檔")
