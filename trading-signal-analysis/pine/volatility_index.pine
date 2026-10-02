@@ -1,0 +1,182 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  波動指數 (Volatility Index) r1 —— 下方 pane，0–100，越高 = 越平靜 = 未來大幅下跌的機會越小
+//
+//  為什麼不用 VCP 指數看「會不會大跌」：
+//    在 2,779 檔 × 2026-04 → 09 的日線樣本 (293,860 個交易日) 回測，VCP 指數對「未來 20 日出現 ≥10% 回撤」
+//    的 AUC 只有 0.52 (擲硬幣 = 0.50)；而「絕對波動水準」(ATR14% 與 60 日日波動率) 的 AUC 為 0.71，
+//    十分位單調：最平靜 10% 的交易日只有 2.6% 會在 20 日內回撤 ≥10%，最波動 10% 則有 61%。
+//    注意：相對自身歷史的「收縮百分位」(擠壓) 反而是反向指標 —— 同樣 ATR% 的股票，壓得越緊之後越常大跌
+//    (波動擴張)，這正是 VCP 想抓的突破，也是它不能拿來看下跌風險的原因。
+//
+//  指數 = 100 × (1 − p)，p = 未來 20 日回撤 ≥10% 的機率 (對數邏輯迴歸，用日波動 % 校準)：
+//    volD = ½ ATR14/收盤 % + ½ 60 日對數報酬標準差 %
+//    p    = 1 / (1 + e^-(a + b·ln volD))，a = −3.381、b = 1.892 (樣本校準；40 日 ≥15% 版 a = −3.818、b = 1.788)
+//  校準樣本內的實際回撤率 (20 日 ≥10%)：指數 ≥85 → 6.5%、70–85 → 25%、55–70 → 38%、40–55 → 51%、<40 → 65%。
+//  代價：平靜的股票 20 日內 ≥10% 的「上漲」機會也低 (指數 ≥85 只有 6%)，這是「不大跌」的另一面。
+//
+//  分隔線 (cut-off，預設 80)：把「高分 = 低波動」區隔出來。在校準樣本中掃 50–95 每一個門檻：
+//    Youden (命中率 − 誤納率) 在 73–80 是平台 (0.36–0.37)；取 80 → 線上 41% 的交易日，20 日內 ≥10% 回撤 10.4%
+//    (線下 40%、全樣本 28%)，逐月 7–15%。85 更嚴 (6.5% / 29% 交易日)，75 更寬 (13.5% / 51%)。
+// ═══════════════════════════════════════════════════════════════════════════
+
+indicator("波動指數 Volatility Index r1", shorttitle = "VolIdx", overlay = false, max_labels_count = 100, max_lines_count = 100)
+
+grpV = "① 波動來源"
+atrLen  = input.int(14, "ATR 長度", minval = 5, maxval = 50, group = grpV, display = display.none)
+sdLen   = input.int(60, "日波動率長度 (對數報酬標準差)", minval = 10, maxval = 250, group = grpV, display = display.none)
+wAtr    = input.float(0.5, "ATR% 權重 (其餘給日波動率)", minval = 0, maxval = 1, step = 0.1, group = grpV, display = display.none)
+calcTF  = input.timeframe("D", "計算時間框 (預設日線；日內圖也會用日線算)", group = grpV, display = display.none)
+
+grpC = "② 校準 (回撤機率 → 指數)"
+horizon = input.string("20 日 ≥10% 回撤", "校準目標", options = ["20 日 ≥10% 回撤", "40 日 ≥15% 回撤"], group = grpC, display = display.none)
+a20 = input.float(-3.381, "a (20 日)", step = 0.01, group = grpC, display = display.none)
+b20 = input.float(1.892,  "b (20 日)", step = 0.01, group = grpC, display = display.none)
+a40 = input.float(-3.818, "a (40 日)", step = 0.01, group = grpC, display = display.none)
+b40 = input.float(1.788,  "b (40 日)", step = 0.01, group = grpC, display = display.none)
+
+grpX = "③ 分隔線 (高分 = 低波動 區)"
+cutLv   = input.float(80, "分隔線：指數 ≥ 此值 = 高分區", minval = 40, maxval = 98, step = 1, group = grpX, display = display.none)
+showZone = input.bool(true, "高分區底色", group = grpX, display = display.none)
+showCross = input.bool(true, "進入 / 跌出高分區 標記", group = grpX, display = display.none)
+
+grpB = "④ 分級與備註"
+lvCalm = input.float(85, "平靜 ≥", minval = 50, maxval = 99, group = grpB, display = display.none)
+lvLow  = input.float(70, "低波 ≥", minval = 30, maxval = 95, group = grpB, display = display.none)
+lvMid  = input.float(55, "中等 ≥", minval = 20, maxval = 90, group = grpB, display = display.none)
+lvHigh = input.float(40, "高波 ≥ (低於此 = 極高波)", minval = 5, maxval = 80, group = grpB, display = display.none)
+lblHold = input.int(3, "等級備註：新等級需持續幾根才標註 (去雜訊)", minval = 1, maxval = 20, group = grpB, display = display.none)
+lblMax  = input.int(8, "等級備註：最多保留最近幾個", minval = 1, maxval = 40, group = grpB, display = display.none)
+lblGap  = input.float(18, "備註框與曲線距離 (0–100 刻度)", minval = 5, maxval = 40, group = grpB, display = display.none)
+prLen   = input.int(126, "擠壓警示：相對自身百分位回看 (根)", minval = 20, maxval = 500, group = grpB, display = display.none)
+sqzPct  = input.float(15, "擠壓警示：波動落在自身最低 % 以內", minval = 1, maxval = 50, group = grpB, display = display.none)
+
+// ── ⑦ 版面（與其他 R7 腳本設同一 boxW，資訊框即等寬、右緣對齊）──
+grpL   = "⑦ 版面 (各 pane 統一)"
+showBox = input.bool(true, "顯示資訊框", group = grpL, display = display.none)
+boxW   = input.float(18, "資訊框寬度 (% 圖表寬；各支腳本設同值)", minval = 8, maxval = 45, step = 0.5, group = grpL, display = display.none)
+boxH   = input.float(100, "資訊框高度 (% 本 pane 高；100 = 撐滿)", minval = 30, maxval = 100, step = 5, group = grpL, display = display.none)
+boxPos = input.string("右中", "垂直位置 (高度 <100 時才有差別)", options = ["右上", "右中", "右下"], group = grpL, display = display.none)
+f_boxPos(s) => s == "右上" ? position.top_right : s == "右下" ? position.bottom_right : position.middle_right
+// 備註框：淺色底 + 黑字，與曲線同一座標系，虛線指回被標註的點
+f_note(x, yAnchor, yBox, txt, col, above) =>
+    lb = label.new(x, yBox, txt, style = above ? label.style_label_down : label.style_label_up,
+         color = color.new(col, 88), textcolor = color.black, size = size.small)
+    ln = line.new(x, yAnchor, x, yBox, color = color.new(col, 25), style = line.style_dotted, width = 1)
+    [lb, ln]
+
+// ── 波動計算 (在 calcTF 環境執行，日內圖也拿日線值) ──
+f_vol() =>
+    atrP = ta.atr(atrLen) / close * 100
+    lr   = math.log(close / close[1])
+    sdP  = ta.stdev(lr, sdLen) * 100
+    volD = wAtr * atrP + (1 - wAtr) * sdP
+    // 相對自身歷史的百分位 (只作擠壓警示，不進指數)
+    pr   = ta.percentrank(volD, prLen)
+    // 近 20 日相對 60 日：>1.3 = 波動正在擴張
+    sd20 = ta.stdev(lr, 20) * 100
+    expR = sdP > 0 ? sd20 / sdP : 1.0
+    [atrP, sdP, volD, pr, expR]
+
+[atrP, sdP, volD, volPr, expR] = request.security(syminfo.tickerid, calcTF, f_vol(), lookahead = barmerge.lookahead_off)
+
+a = horizon == "20 日 ≥10% 回撤" ? a20 : a40
+b = horizon == "20 日 ≥10% 回撤" ? b20 : b40
+pDrop = volD > 0 ? 1.0 / (1.0 + math.exp(-(a + b * math.log(volD)))) : na
+volIdx = na(pDrop) ? na : 100 * (1 - pDrop)
+// 另一個 horizon 的機率 (資訊框並列)
+pOther = volD > 0 ? 1.0 / (1.0 + math.exp(-((horizon == "20 日 ≥10% 回撤" ? a40 : a20) + (horizon == "20 日 ≥10% 回撤" ? b40 : b20) * math.log(volD)))) : na
+
+// ── 等級：0 平靜 / 1 低波 / 2 中等 / 3 高波 / 4 極高波 ──
+int grade = na(volIdx) ? 2 : volIdx >= lvCalm ? 0 : volIdx >= lvLow ? 1 : volIdx >= lvMid ? 2 : volIdx >= lvHigh ? 3 : 4
+f_gTxt(g) => g == 0 ? "平靜 · 大跌機會低" : g == 1 ? "低波" : g == 2 ? "中等" : g == 3 ? "高波" : "極高波 · 大跌機會高"
+f_gCol(g) => g == 0 ? #3FB68B : g == 1 ? #5CA3D6 : g == 2 ? #6B7885 : g == 3 ? #E5B15C : #E0705F
+gCol = f_gCol(grade)
+squeeze = volPr <= sqzPct            // 壓得比自己 prLen 根內 sqzPct% 還緊 → 波動擴張前兆 (不是安全訊號)
+expanding = expR >= 1.3
+
+// ── 分隔線與高分區 ──
+inZone  = volIdx >= cutLv
+zoneIn  = inZone and not inZone[1]
+zoneOut = not inZone and inZone[1]
+barsIn  = ta.barssince(zoneOut)      // 進入高分區後已維持幾根
+barsOut = ta.barssince(zoneIn)
+hCut = hline(cutLv, "分隔線 (高分 = 低波動 區)", color = color.new(#16a34a, 0), linestyle = hline.style_solid, linewidth = 2)
+hTop = hline(100, "100", color = color.new(color.gray, 100))
+fill(hCut, hTop, color = showZone ? color.new(#3FB68B, 90) : na, title = "高分區底色")
+
+// ── 曲線：高分區內綠色、區外紅色，一眼分開 ──
+lineCol = inZone ? #16a34a : #E0705F
+plot(volIdx, "波動指數 (100 = 最平靜)", color = color.new(lineCol, 0), linewidth = 3, display = display.pane + display.data_window + display.price_scale)
+plot(grade, "波動等級 (0=平靜…4=極高)", color = color.gray, display = display.data_window)
+plotshape(showCross and zoneIn ? volIdx : na, "進入高分區 ▲", shape.triangleup, location.absolute, color.new(#16a34a, 0), size = size.tiny)
+plotshape(showCross and zoneOut ? volIdx : na, "跌出高分區 ▼", shape.triangledown, location.absolute, color.new(#E0705F, 0), size = size.tiny)
+hline(85, "85 平靜", color = color.new(#3FB68B, 70), linestyle = hline.style_dotted)
+hline(70, "70 低波", color = color.new(#5CA3D6, 70), linestyle = hline.style_dotted)
+hline(55, "55 中等", color = color.new(#6B7885, 70), linestyle = hline.style_dotted)
+hline(40, "40 高波", color = color.new(#E0705F, 70), linestyle = hline.style_dotted)
+plotshape(squeeze and not squeeze[1] ? volIdx : na, "擠壓警示 (波動擴張前兆)", shape.diamond, location.absolute, color.new(#E5B15C, 0), size = size.tiny)
+
+// ── 等級變動備註 (與 R7-C 同一風格) ──
+gradeChangedAgo = ta.barssince(grade != grade[1])
+var int     lastLblGrade = -1
+var label[] gL = array.new_label()
+var line[]  gN = array.new_line()
+gradeEvt = gradeChangedAgo == lblHold - 1 and grade != lastLblGrade
+if gradeEvt
+    lastLblGrade := grade
+    above = grade <= 1 ? volIdx <= 100 - lblGap : volIdx < lblGap
+    [lb, ln] = f_note(bar_index, volIdx, above ? volIdx + lblGap : volIdx - lblGap, f_gTxt(grade), f_gCol(grade), above)
+    array.push(gL, lb)
+    array.push(gN, ln)
+    if array.size(gL) > lblMax
+        label.delete(array.shift(gL))
+        line.delete(array.shift(gN))
+
+// ── 資訊框 ──
+var table tb = table.new(f_boxPos(boxPos), 2, 9, bgcolor = color.new(#ffffff, 5),
+     frame_color = color.black, frame_width = 2, border_width = 1, border_color = color.new(color.black, 85))
+var bool tInit = false
+if showBox and barstate.islast
+    if not tInit
+        for rj = 0 to 8
+            table.cell(tb, 0, rj, "")
+            table.cell(tb, 1, rj, "")
+        tInit := true
+    rh = boxH / 9
+    is20 = horizon == "20 日 ≥10% 回撤"
+    table.cell(tb, 0, 0, "波動指數 " + str.tostring(volIdx, "#.#"), width = boxW * 0.45, height = rh, text_color = color.black,
+         bgcolor = color.new(gCol, 88), text_size = size.small)
+    table.cell(tb, 1, 0, f_gTxt(grade), width = boxW * 0.55, height = rh, text_color = color.black,
+         bgcolor = color.new(gCol, 88), text_size = size.small)
+    table.cell(tb, 0, 1, (is20 ? "20 日內回撤 ≥10%" : "40 日內回撤 ≥15%") + " 機率", width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 1, str.tostring(pDrop * 100, "#.#") + "%", width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = pDrop <= 0.15 ? #3FB68B : pDrop >= 0.45 ? #E0705F : color.gray)
+    table.cell(tb, 0, 2, (is20 ? "40 日內回撤 ≥15%" : "20 日內回撤 ≥10%") + " 機率", width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 2, str.tostring(pOther * 100, "#.#") + "%", width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 3, "ATR" + str.tostring(atrLen) + " / 收盤", width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 3, str.tostring(atrP, "#.##") + "%", width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 4, str.tostring(sdLen) + " 日日波動率", width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 4, str.tostring(sdP, "#.##") + "%  (年化 " + str.tostring(sdP * math.sqrt(252), "#") + "%)", width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 5, "20 日 / " + str.tostring(sdLen) + " 日 波動比", width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 5, str.tostring(expR, "#.##") + (expanding ? " 擴張中 ⚠" : expR <= 0.8 ? " 收縮" : ""), width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = expanding ? #E0705F : color.gray)
+    table.cell(tb, 0, 6, "相對自身 " + str.tostring(prLen) + " 根百分位", width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 6, str.tostring(volPr, "#") + "%" + (squeeze ? " 擠壓 ◆ 擴張前兆" : ""), width = boxW * 0.55, height = rh, text_size = size.tiny,
+         text_color = squeeze ? #E5B15C : color.gray)
+    table.cell(tb, 0, 7, "樣本回撤率 (指數區間)", width = boxW * 0.45, height = rh, text_size = size.tiny)
+    table.cell(tb, 1, 7, grade == 0 ? "≥85：6.5%" : grade == 1 ? "70–85：25%" : grade == 2 ? "55–70：38%" : grade == 3 ? "40–55：51%" : "<40：65%",
+         width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = color.gray)
+    table.cell(tb, 0, 8, "分隔線 " + str.tostring(cutLv, "#"), width = boxW * 0.45, height = rh, text_size = size.tiny,
+         text_color = inZone ? #16a34a : #E0705F)
+    table.cell(tb, 1, 8, inZone ? "高分區內 第 " + str.tostring(barsIn + 1) + " 根 (+" + str.tostring(volIdx - cutLv, "#.#") + ")"
+         : "區外 第 " + str.tostring(barsOut + 1) + " 根 (" + str.tostring(volIdx - cutLv, "#.#") + ")",
+         width = boxW * 0.55, height = rh, text_size = size.tiny, text_color = inZone ? #16a34a : #E0705F,
+         bgcolor = color.new(inZone ? #3FB68B : #E0705F, 88))
+
+alertcondition(zoneIn,  "進入高分區 (分隔線之上)", "{{ticker}} 波動指數升越分隔線：進入低波動高分區，20 日內大幅回撤機會低")
+alertcondition(zoneOut, "跌出高分區 (分隔線之下)", "{{ticker}} 波動指數跌破分隔線：離開低波動高分區")
+alertcondition(grade == 0 and grade[1] != 0, "波動指數進入平靜區", "{{ticker}} 波動指數進入平靜區 (≥85)：20 日內大幅回撤機會低")
+alertcondition(grade >= 3 and grade[1] < 3, "波動指數進入高波區", "{{ticker}} 波動指數跌入高波區 (<55)：大幅回撤機會升高")
+alertcondition(squeeze and not squeeze[1], "波動擠壓 (擴張前兆)", "{{ticker}} 波動壓到自身低位：留意波動擴張，不是安全訊號")
+alertcondition(expanding and not expanding[1], "波動擴張中", "{{ticker}} 20 日波動 ≥ 1.3 × 60 日波動：波動擴張中")
