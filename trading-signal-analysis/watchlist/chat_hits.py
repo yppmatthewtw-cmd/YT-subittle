@@ -191,6 +191,7 @@ for _, r in d.iterrows():
         turnover20_m=r["turnover20_m"], bars=r["bars"], hist_ok=r["hist_ok"],
         vcp=r["vcp"], vcp_grade=r["vcp_grade"], struct=r["struct"],
         four_17=r["four_17"], close_17=r["close_17"], chg1d_pct=r["chg1d_pct"], clock_17=r["clock_17"],
+        date=r["date"], data_warn=("" if pd.isna(r.get("data_warn")) else r.get("data_warn", "")),
         lists=r["lists"]))
 
 o = pd.DataFrame(rows).sort_values(["score", "n_hit", "volidx"], ascending=[False, False, False])

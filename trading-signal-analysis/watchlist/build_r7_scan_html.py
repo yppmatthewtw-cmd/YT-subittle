@@ -137,6 +137,12 @@ if chd is not None:
     def chrow(r):
         tags = "".join(f'<em class="src">{esc(SHORT.get(x.strip(), x.strip()))}</em>' for x in str(r.hits).split("｜"))
         warn = ' <em class="warn">⚠ 迴避</em>' if str(r.avoid).strip() not in ("", "nan") else ""
+        _d = str(r.get("date", "")) if "date" in r else ""
+        if _d and _d != "nan" and _d < meta["lastday"]:
+            warn += f' <span class="stale" title="鏡像最後一根 {esc(_d)}">舊 {esc(_d[5:])}</span>'
+        _w = str(r.get("data_warn", "")) if "data_warn" in r else ""
+        if _w and _w != "nan":
+            warn += f' <span class="stale" title="{esc(_w)}">資料?</span>'
         return ('<tr data-n="%d" data-s="%d" data-tk="%s"><td><a href="%s%s" target="_blank">%s</a>%s</td>'
                 '<td class="c">%d</td><td>%s</td><td class="c">%d/6</td><td class="miss">%s</td>'
                 '<td class="c">%s</td><td class="c">%s</td><td class="c">%s</td><td class="c">%s</td><td class="d">%s</td></tr>') % (

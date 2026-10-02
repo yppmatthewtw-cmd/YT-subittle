@@ -65,9 +65,16 @@ if not os.path.exists(cache):
     import scan_r7
     pn = scan_r7.load(verbose=False)
     gf = pn[(pn.prio == 1) & pn.symbol.isin(used)]
+    _p0 = pn[pn.prio == 0].sort_values(["symbol", "date"])
+    _p0 = _p0.assign(v20=_p0.groupby("symbol").volume.transform(lambda v: v.shift(1).rolling(20, min_periods=10).median()))
+    _last = _p0[_p0.date == pn.date.max()]
+    vr = float((_last.volume / _last.v20).median())
+    nfix_last = int(sum(1 for s_, ds in scan_r7.OHLC_FIX.items() if pn.date.max() in ds))
+    nlast = int((pn.date == pn.date.max()).sum())
     json.dump({"fills": {s_: sorted(str(x.date()) for x in g.date) for s_, g in gf.groupby("symbol")},
                "stale": scan_r7.STALE_SNAPS, "relabel": scan_r7.SNAP_RELABEL,
-               "counts": pn.groupby("symbol").size().to_dict()}, open(cache, "w"))
+               "counts": pn.groupby("symbol").size().to_dict(), "vr": vr, "nfix_last": nfix_last, "nlast": nlast,
+               "wl_fix": sorted(s_ for s_ in used if pn.date.max() in scan_r7.OHLC_FIX.get(s_, ()))}, open(cache, "w"))
 gc = json.load(open(cache))
 gapfill = gc["fills"]
 gf_txt = "、".join(k + "（" + "、".join(x[5:] for x in v) + "）" for k, v in gapfill.items())
@@ -76,7 +83,12 @@ days = [d_ for d_ in sorted(cov) if d_ >= "2026-09-22"]
 data = (f"本版資料：再次觸發三個 repo 的 GitHub Actions（fetch_yahoo_eod ×3、fetch_eod_snapshot）抓到 10-01 23:18–23:23 UTC（美東 10-01 收盤後約 3.3 小時）。"
         f"Yahoo 這次出齊了 09-25 到 10-01 每一天的完整日線，連 r9 時的 09-22 缺口也已回補："
         + "、".join(f"{d_[5:]} {cov[d_]:,}" for d_ in days)
-        + f" 檔（完整交易日約 {full_n:,} 檔）。六項條件的基準推進到 {BASE} 官方收盤（完整 OHLC），10-01 的成交量中位數為 20 日中位數的 1.09 倍，是收盤後的完整日。"
+        + f" 檔（完整交易日約 {full_n:,} 檔）。六項條件的基準推進到 {BASE} 官方收盤。"
+        f"{BASE[5:]} 的收盤與成交量已是收盤後的完整值（各檔當日成交量 ÷ 自身前 20 日中位數，再取中位數 = {gc['vr']:.2f}）；"
+        f"但高低價仍是 Yahoo 的暫定值：{gc['nlast']:,} 根中有 {gc['nfix_last']} 根的開盤或收盤落在高低區間外（之前幾次剛收盤就抓的最後一根也是如此，"
+        "下一次抓取時約一半名字的振幅會被修正、收盤幾乎不動）。載入器把這些 K 棒的高低價放寬到至少包住開與收"
+        + (f"，watchlist 中受影響的 {len(gc['wl_fix'])} 檔在「資料警示」欄註明" if gc["wl_fix"] else "")
+        + "；②（波動指數斜率）與 ⑥ 用到最後一根的真實波幅，修訂後可能變動。"
         + (f"10MA repo 的 Nasdaq 快照有標錯日期的情形：{mis_txt}；載入器逐份與 Yahoo 官方收盤比對後已改標或略過，所以 10-01 沒有可用的 Nasdaq 快照，"
            "10-01 的收盤只有 Yahoo 一個來源。" if mislab else "")
         + (f"Yahoo 個別缺漏、以當日 Nasdaq 收盤補成只有收盤的一根：{gf_txt}。" if gapfill else "Watchlist 名字沒有任何一天需要用 Nasdaq 收盤補。"))
@@ -104,7 +116,10 @@ scope = (f"掃描 {len(u10)} 檔 = 五份成品去重："
 s9 = set(p9[p9.score == 6].ticker); s10 = set(b[b.score == 6].ticker)
 out_gone = sorted((s9 - s10) - set(b.ticker))
 fix = (f"r10 的變動：(1) chat 1 改用 R23（{mp['meta']['last_date']} 收盤）：第一梯隊 {len(t1)} 檔（{'、'.join(t1)}）算命中；"
-       f"第二梯隊 {len(mp['rows']) - len(t1)}、差一項 {len(mp['near_miss'])}、熱錢板塊 {len(mp['hot'])} 檔只掃描、不算命中。"
+       f"第二梯隊 {len(mp['rows']) - len(t1)}、差一項 {len(mp['near_miss'])}、熱錢板塊 {len(mp['hot'])} 檔只掃描、不算命中"
+       f"（三份名單互有重疊；來源榜單標籤依 第一梯隊 > 第二梯隊 > 差一項 > 熱錢板塊 去重，所以標籤數是 "
+       f"{len(tk.get('HM_R23_第二梯隊', []))} / {len(tk.get('HM_R23_差一項', []))} / {len(tk.get('HM_R23_熱錢板塊', []))}）。"
+       f"(1b) 加息 R2 受惠名單補回 Agilent（A）：之前從工作簿抽代號時把單字母代號漏掉，受惠名單一直是 19 檔，實際是 20 檔（r6–r9 都受影響）。"
        "(2) 載入器新增快照日期稽核：每份 Nasdaq 快照先和 Yahoo 官方收盤逐檔比對，吻合更早日子的改標、和任何一天都對不上的不使用。"
        "(3) chat 1 repo 新增的 intraday_*_60m 檔（60 分鐘線彙總）列為最低優先，不會蓋掉官方日線。"
        f"(4) 六項基準由 r9 的 09-24 推進到 {BASE[5:]}，附「與 r9 對照」：r9 六項全中 {len(s9)} 檔 → 本版 {len(s10)} 檔，"
@@ -133,8 +148,11 @@ src.loc[i1, ["Repo / 取得方式", "最新成品", "成品基準日", "取用�
     "10MA-watchlist（branch claude/20ma-uptrend-watchlist-pages-pa7hmf，commit 84356ad；R23 起改為熱錢回落 20MA）",
     "reports/10MA_watchlistGit_R23.00_claudefable51xhigh_10.01_1724.xlsx（數值取自 data/screen_hm23.json）",
     mp["meta"]["last_date"],
-    f"第一梯隊 {len(t1)}（+ 第二梯隊 {len(mp['rows']) - len(t1)}、差一項 {len(mp['near_miss'])}、熱錢板塊 {len(mp['hot'])} 只掃描）"]
+    f"第一梯隊 {len(t1)}（+ 第二梯隊 {len(mp['rows']) - len(t1)}、差一項 {len(mp['near_miss'])}、熱錢板塊 {len(mp['hot'])} 只掃描；去重後另掃 "
+    f"{len(tk.get('HM_R23_第二梯隊', [])) + len(tk.get('HM_R23_差一項', [])) + len(tk.get('HM_R23_熱錢板塊', []))} 檔）"]
 src.loc[src.Session == "五份成品去重", "取用檔數"] = str(len(u10))
+i2 = src.index[src.Session.str.startswith("chat 2")][0]
+src.loc[i2, "Repo / 取得方式"] = "VCP-watchlist（branch claude/vcp-watch-list-z9z66i；R22 = commit 426f365，之後只有資料 commit）"
 src.loc[src.Session == "加掃", ["Repo / 取得方式", "最新成品", "成品基準日", "取用檔數"]] = [
     f"三個 repo 的 Yahoo 鏡像併集 {PANEL_N} 檔",
     f"收盤 ≥ $2、20 日 (收盤×量) 平均 ≥ 300 萬美元、歷史 ≥ 80 根、最後一根在 {BASE[5:]}、同證券不同寫法只留一個", BASE, str(len(u))]

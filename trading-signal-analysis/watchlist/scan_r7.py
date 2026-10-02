@@ -100,6 +100,14 @@ def _jump_warn(df, n=60, lim=0.6, vmul=3.0):
         return f"單日 {r[k] * 100:+.0f}%（{df.date[k].strftime('%m-%d')}）且量未放大，疑似未調整分割/重組"
     return ""
 
+def _ohlc_warn(sym, df):
+    """最後一根的高低價是 Yahoo 暫定值（開/收落在高低區間外，已放寬校正）→ ②③⑥ 用到的真實波幅可能隨修訂變動。"""
+    s_ = df.symbol.iloc[-1] if "symbol" in df.columns else sym
+    if df.date.iloc[-1] in OHLC_FIX.get(s_, ()):
+        return f"{df.date.iloc[-1].strftime('%m-%d')} 高低價為 Yahoo 暫定值（開/收落在高低區間外，已放寬校正）"
+    return ""
+
+
 def _gap_warn(df, n=20, k=5):
     """序列完整度：近 n 個面板交易日內缺了幾天；近 k 根有幾根只有收盤（Nasdaq 快照補，沒有盤中高低）。"""
     out = []
@@ -322,6 +330,7 @@ def _files():
 STALE_SNAPS = []   # load() 判定為過期、未使用的快照日期
 SNAP_RELABEL = []  # load() 依 Yahoo 收盤改標日期的快照：(原標示日, 實際日)
 PANEL_DATES = []   # load() 保留下來的交易日（完整日曆）
+OHLC_FIX = {}      # load() 放寬過高低價的 symbol → {日期}
 
 
 def load(verbose=True):
@@ -465,12 +474,24 @@ def load(verbose=True):
     if dropped and verbose:
         det = {str(k.date()): int(v) for k, v in cov.items() if k not in full}
         print("partial sessions dropped:", dropped, "close-grade rows:", det)
-    d = d[d.date.isin(full)]
+    d = d[d.date.isin(full)].copy()
     if verbose:
         last = d.date.max()
         mix = d[d.date == last].prio.value_counts().to_dict()
         print(f"panel: {len(d):,} rows  {d.symbol.nunique():,} symbols  {d.date.min().date()} .. {last.date()}  "
               f"(最後一根來源 prio 分佈 {mix}；1 = 收盤快照，無盤中高低)")
+    # OHLC 一致性：Yahoo 剛收盤後給的最後一根，高低價常是暫定值，開盤或收盤會落在高低區間外（下一次抓取才修正）。
+    # 真實區間至少要包住開與收，所以放寬成 H = max(H,O,C)、L = min(L,O,C)，並記下校正過的 symbol×date。
+    bad = (d.prio == 0) & ((d.open > d.high) | (d.open < d.low) | (d.close > d.high) | (d.close < d.low))
+    OHLC_FIX.clear()
+    for sym_, dt_ in zip(d.symbol[bad], d.date[bad]):
+        OHLC_FIX.setdefault(sym_, set()).add(dt_)
+    if bad.any():
+        d.loc[bad, "high"] = d.loc[bad, ["high", "open", "close"]].max(axis=1)
+        d.loc[bad, "low"] = d.loc[bad, ["low", "open", "close"]].min(axis=1)
+        if verbose:
+            per = d[bad].groupby("date").size()
+            print("OHLC 校正（開/收落在高低區間外）:", {str(k.date()): int(v) for k, v in per.tail(5).items()}, f"共 {int(bad.sum())} 根")
     PANEL_DATES[:] = sorted(d.date.unique())          # 面板交易日曆（scan_one 用來檢查個股序列缺天）
     return d.sort_values(["symbol", "date"])
 
@@ -520,7 +541,7 @@ def scan_one(sym, df):
         lr_line=round(lr[i], 2) if not np.isnan(lr[i]) else np.nan,
         dist_lr_pct=round(dG / c.iloc[i] * 100, 2) if not np.isnan(dG) else np.nan, dist_lr_atr=round(dG / A, 2) if (A > 0 and not np.isnan(dG)) else np.nan,
         turnover20_m=round(float((c * df.volume).tail(20).mean() / 1e6), 1),
-        data_warn="；".join(x for x in (_jump_warn(df), _gap_warn(df)) if x),
+        data_warn="；".join(x for x in (_jump_warn(df), _gap_warn(df), _ohlc_warn(sym, df)) if x),
         bar_src=("收盤快照" if ("prio" in df.columns and int(df.prio.iloc[i]) == 1) else "OHLC"),
         lr_dir={1: "↑", -1: "↓", 0: "—"}[int(lrDir[i])], struct={1: "HH/HL", -1: "LH/LL", 0: "—"}[int(st[i])], mk=MK[int(mk[i])], inBox=bool(inBox[i]),
         bars=len(df),

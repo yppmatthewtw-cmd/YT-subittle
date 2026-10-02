@@ -96,11 +96,14 @@ if UNI and os.path.exists(UNI):
 CH = os.environ.get("CHATHITS_CSV", "")
 if CH and os.path.exists(CH):
     ch = pd.read_csv(CH)
+    for _c in ("date", "data_warn"):
+        if _c not in ch.columns:
+            ch[_c] = ""
     CHCOLS = [("ticker", "Ticker", "link"), ("name", "公司", "txt"),
               ("n_hit", "命中系統數", "int"), ("hits", "命中哪幾套", "txt"), ("detail", "命中內容（來源原話）", "txt"),
               ("avoid", "反向標註", "txt"), ("catalyst", "催化", "txt"),
               ("score", "六項命中 /6", "int"), ("miss", "欠缺條件", "txt"),
-              ("close", f"{BD} 收盤", "num2"), ("volidx", "波動指數", "num1"), ("volidx_slope", "指數斜率", "num2"),
+              ("date", "數據日", "txt"), ("close", "收盤", "num2"), ("volidx", "波動指數", "num1"), ("volidx_slope", "指數斜率", "num2"),
               ("grav_slope", "重心斜率", "num3"), ("clock", "時鐘", "txt"), ("c5_cat", "淺紅第幾根", "txt"),
               ("dist_grav_pct", "距重心 %", "num2"),
               ("comb_grade", "chat2 VCP/Wein/Pre", "txt"), ("comb_up", "chat2 上升分數", "num1"), ("comb_sure", "chat2 確定性", "num1"),
@@ -110,7 +113,7 @@ if CH and os.path.exists(CH):
               ("mp_flag", "R23 審視標記", "txt"), ("rh", "chat3 加息 R2", "txt"),
               ("four_17", f"{SD} ①④⑤⑥", "tick"), ("close_17", f"{SD} 收盤", "num2"), ("chg1d_pct", f"{BD}→{SD} %", "num2"),
               ("turnover20_m", "20 日均額 (百萬)", "num1"), ("bars", "歷史根數", "int"), ("hist_ok", "歷史足夠 ≥250", "tick"),
-              ("vcp", "VCP 指數 (參考)", "num1"), ("struct", "結構", "txt"), ("lists", "來源榜單", "txt")]
+              ("data_warn", "資料警示", "txt"), ("vcp", "VCP 指數 (參考)", "num1"), ("struct", "結構", "txt"), ("lists", "來源榜單", "txt")]
 
     if not (os.environ.get("UPDATE_CSV") and os.path.exists(os.environ.get("UPDATE_CSV"))):
         CHCOLS = [c for c in CHCOLS if c[0] not in ("four_17", "close_17", "chg1d_pct")]
