@@ -80,6 +80,18 @@ gapfill = gc["fills"]
 gf_txt = "、".join(k + "（" + "、".join(x[5:] for x in v) + "）" for k, v in gapfill.items())
 
 days = [d_ for d_ in sorted(cov) if d_ >= "2026-09-22"]
+# 00:07–00:12 UTC 的重抓：Yahoo 在整理期間把 10-01 撤回，與面板使用的前一次抓取比較
+refetch = {}
+for repo, f, pre in (("vcp-watchlist", "eod_2025-09-01_2026-10-02.csv.gz", "eod2/vcp_"),
+                     ("10ma-watchlist", "eod_2025-12-26_2026-10-02.csv.gz", "eod/10ma_")):
+    try:
+        nw = pd.read_csv(f"/home/user/{repo}/data/yahoo/{f}"); od = pd.read_csv(f"{S}/{pre}{f}")
+        m_ = od[od.date == BASE].merge(nw[nw.date == BASE], on="symbol", suffixes=("_o", "_n"))
+        rng = ((m_.high_n - m_.low_n) / (m_.high_o - m_.low_o) - 1).abs()
+        refetch[repo] = (int((od.date == BASE).sum()), int((nw.date == BASE).sum()),
+                         int(((m_.close_n / m_.close_o - 1).abs() > 1e-4).sum()), int((rng > 0.005).sum()), len(m_))
+    except Exception:
+        pass
 data = (f"本版資料：再次觸發三個 repo 的 GitHub Actions（fetch_yahoo_eod ×3、fetch_eod_snapshot）抓到 10-01 23:18–23:23 UTC（美東 10-01 收盤後約 3.3 小時）。"
         f"Yahoo 這次出齊了 09-25 到 10-01 每一天的完整日線，連 r9 時的 09-22 缺口也已回補："
         + "、".join(f"{d_[5:]} {cov[d_]:,}" for d_ in days)
@@ -89,6 +101,12 @@ data = (f"本版資料：再次觸發三個 repo 的 GitHub Actions（fetch_yaho
         "下一次抓取時約一半名字的振幅會被修正、收盤幾乎不動）。載入器把這些 K 棒的高低價放寬到至少包住開與收"
         + (f"，watchlist 中受影響的 {len(gc['wl_fix'])} 檔在「資料警示」欄註明" if gc["wl_fix"] else "")
         + "；②（波動指數斜率）與 ⑥ 用到最後一根的真實波幅，修訂後可能變動。"
+        + (("10-02 00:07–00:12 UTC 再抓一次想取得定案的高低價，結果 Yahoo 在整理期間把 10-01 撤回："
+            + "、".join(f"{'VCP' if k.startswith('vcp') else '10MA'} 鏡像 {v[0]:,} → {v[1]:,} 檔" for k, v in refetch.items())
+            + f"；仍有 10-01 的名字收盤變動 {sum(v[2] for v in refetch.values())} 檔、振幅變動 >0.5% 的 {sum(v[3] for v in refetch.values())} 檔"
+            f"（共比對 {sum(v[4] for v in refetch.values())} 檔）。所以本版沿用第一次的完整抓取"
+            "（vcp-watchlist commit 4705389、10ma-watchlist commit 663f926），兩個 repo 目前同名檔案已被重抓覆蓋、只剩少數名字的 10-01。")
+           if refetch else "")
         + (f"10MA repo 的 Nasdaq 快照有標錯日期的情形：{mis_txt}；載入器逐份與 Yahoo 官方收盤比對後已改標或略過，所以 10-01 沒有可用的 Nasdaq 快照，"
            "10-01 的收盤只有 Yahoo 一個來源。" if mislab else "")
         + (f"Yahoo 個別缺漏、以當日 Nasdaq 收盤補成只有收盤的一根：{gf_txt}。" if gapfill else "Watchlist 名字沒有任何一天需要用 Nasdaq 收盤補。"))
