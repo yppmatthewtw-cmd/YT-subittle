@@ -1,5 +1,5 @@
 #!/bin/bash
-# r9 報表重建：HTML + CSV + XLSX（基準 09-24 完整 OHLC；09-22 缺口以 Nasdaq 收盤補；附與 r8 對照）
+# r10 報表重建：HTML + CSV + XLSX（基準 10-01 收盤，10-01 高低價為 Yahoo 暫定值、已放寬校正；附與 r9 對照）
 set -e
 S=/tmp/claude-0/-home-user-YT-subittle/0bd65ef0-0bef-5829-9a6f-f0a46d2d96cd/scratchpad
 W=/home/user/YT-subittle/trading-signal-analysis/watchlist
@@ -15,7 +15,7 @@ export UNIVERSE_CSV=$S/universe_r10.csv CHATHITS_CSV=$S/chat_hits_r10.csv SRC_RO
 unset UPDATE_CSV
 export PREV_CSV=$S/r9keep/base_r9.csv PREV_VER=r9 PREV_DAY=09-24
 # REMAP_NOTE 由 notes_r10.py 依資料算出
-export SRC_NOTE="來源：三個 session 的最新成品 —— chat 1 R23 熱錢回落 20MA（09-30 收盤）、chat 2 Combined R22（09-16）、chat 3 SubSector R12 / AI R13 / 加息 R2（09-17）；價格資料已於 2026-10-01 23:18–23:23 UTC 由各 repo 的 GitHub Actions 重新抓取，完整 OHLC 至 10-01；Nasdaq 快照逐份與 Yahoo 收盤核對日期後才使用。"
+export SRC_NOTE="來源：三個 session 的最新成品 —— chat 1 R23 熱錢回落 20MA（09-30 收盤）、chat 2 Combined R22（09-16）、chat 3 SubSector R12 / AI R13 / 加息 R2（09-17）；價格資料已於 2026-10-01 23:18–23:23 UTC 由各 repo 的 GitHub Actions 重新抓取，Yahoo 日線至 10-01（10-01 收盤與量為定值、高低價為暫定值）；Nasdaq 快照逐份與 Yahoo 收盤核對日期後才使用。"
 cd $W
 rm -f "$W"/R7_six_criteria_scan_r10*
 python3 build_r7_scan_html.py >/dev/null

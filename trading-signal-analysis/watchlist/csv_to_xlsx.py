@@ -20,6 +20,7 @@ DATA_NOTE = os.environ.get("DATA_NOTE", "")
 PANEL_NOTE = os.environ.get("PANEL_NOTE", "")
 FIX_NOTE = os.environ.get("FIX_NOTE", "")
 SCOPE_NOTE = os.environ.get("SCOPE_NOTE", "")
+BASIS_NOTE = os.environ.get("BASIS_NOTE", "完整 OHLC")
 COLS = [  # (csv 欄, Excel 標題, 格式)
     ("ticker", "Ticker", "link"), ("lists", "來源榜單", "txt"), ("date", "數據日", "txt"), ("close", "收盤", "num2"), ("score", "命中 /6", "int"),
     ("c1", "① 重心線向上", "tick"), ("grav", "重心線", "num2"), ("grav_slope", "重心斜率", "num3"), ("grav_shift5atr", "重心 5 根位移 (ATR)", "num2"),
@@ -282,7 +283,7 @@ if UNI and os.path.exists(UNI):
 
 ws = wb.create_sheet("說明")
 for i, t in enumerate([t for t in [
-    f"R7 A–H 六項條件掃描 {VER} — 六項條件的基準是 2026-{BD} 官方收盤（完整 OHLC，三個 repo 的 Yahoo 鏡像合併 {PANEL_N} 檔）。"
+    f"R7 A–H 六項條件掃描 {VER} — 六項條件的基準是 2026-{BD} 官方收盤（{BASIS_NOTE}；三個 repo 的 Yahoo 鏡像合併 {PANEL_N} 檔）。"
     + (f"另有三個 {SD} 分頁，用 10MA repo 的 Nasdaq 收盤快照更新 ①④⑤⑥；快照沒有盤中高低，②③（波動指數）不能重算，沿用 {BD} 值。" if (UPD and os.path.exists(UPD)) else ""),
     DATA_NOTE,
     "① 重心線向上：r7e_gravity（滾動 VWAP 30，hlc3）最新一根斜率 > 0",
